@@ -1,270 +1,296 @@
-// App shell: screens, saving, progression, main loop.
-import { CFG } from './config.js';
-import { LEVELS } from './levels.js';
+// App shell: title, story flow, cutscenes, HUD, saving, main loop.
+import * as THREE from 'three';
+import { CHAPTERS } from './chapters.js';
 import { Audio } from './audio.js';
 import { Renderer, QUALITY, QUALITY_ORDER } from './renderer.js';
 import { Input } from './input.js';
 import { Game } from './game.js';
 import { loadBlahajModel } from './art.js';
+import { CINES } from './cinematics.js';
 
 const $ = (id) => document.getElementById(id);
-const SAVE_KEY = 'blahaj-adventure-v1';
-
+const SAVE_KEY = 'blahaj-backtobed-v1';
 const ABILITIES = {
   doubleJump: { icon: '🫧', name: 'Double Jump', how: 'Press Space again in the air' },
-  flop: { icon: '💥', name: 'Belly Flop', how: 'Press C in the air: cracks crates, super-bounces sponges' },
+  flop: { icon: '💥', name: 'Belly Flop', how: 'Press C in the air. Super-bounce off cushions and squash nightmares' },
   dash: { icon: '🚀', name: 'Torpedo Dash', how: 'Press Shift to zoom forward' },
   glide: { icon: '🪽', name: 'Fin Glide', how: 'Hold Space while falling' },
 };
 
-// ----------------------------------------------------------------- save --
 function loadSave() {
   let s = null;
   try { s = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch (e) { /* storage unavailable */ }
   s = s || {};
   s.completed = s.completed || [];
-  s.stars = s.stars || [];
-  s.bestTime = s.bestTime || [];
-  s.bestFish = s.bestFish || [];
-  LEVELS.forEach((L, i) => { s.stars[i] = s.stars[i] || [false, false, false]; });
+  s.teddies = s.teddies || [];
+  s.best = s.best || [];
+  CHAPTERS.forEach((c, i) => { s.teddies[i] = s.teddies[i] || [false, false, false]; });
   s.quality = s.quality || 'high';
   return s;
 }
 const save = loadSave();
-function persist() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) { /* ignore */ } }
-const totalStars = () => save.stars.reduce((a, s) => a + s.filter(Boolean).length, 0);
-const abilities = () => { const a = {}; for (const [k, lvl] of Object.entries(CFG.unlocks)) a[k] = !!save.completed[lvl]; return a; };
-const unlocked = (i) => (LEVELS[i].bonus ? totalStars() >= CFG.bonusStars : i === 0 || !!save.completed[i - 1]);
+const persist = () => { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) { /* ignore */ } };
+const unlocked = (i) => i === 0 || !!save.completed[i - 1];
+const fmt = (t) => (Number.isFinite(t) ? `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}` : '–');
 
-// -------------------------------------------------------------- engine --
 const renderer = new Renderer($('game'));
 renderer.setQuality(save.quality);
 const input = new Input($('game'));
-let game = null;
-let mode = 'title';
-let current = 0;
+let game = null, mode = 'title', current = 0, story = false;
 
 function show(id) {
-  ['title', 'how', 'levels', 'pause', 'complete', 'ending'].forEach((s) => $(s).classList.toggle('hidden', s !== id));
-  $('hud').classList.toggle('hidden', id !== null);
-  $('touch').classList.toggle('off', id !== null);
+  ['title', 'how', 'chapters', 'pause', 'complete', 'ending'].forEach((s) => $(s).classList.toggle('hidden', s !== id));
+  $('hud').classList.toggle('hidden', !(id === null && mode === 'play'));
+  $('touch').classList.toggle('off', !(id === null && mode === 'play'));
 }
 
+// ------------------------------------------------------------------ hooks --
+let toastTimer = null, popTimer = null;
 const hooks = {
   hud: updateHud,
-  toast,
-  pop,
-  hint: (t) => { const h = $('hint'); if (t) { h.textContent = t; h.style.opacity = 1; } else h.style.opacity = 0; },
-  fade: (on) => $('fade').classList.toggle('on', on),
-  star: (i) => { if (!save.stars[current][i]) { save.stars[current][i] = true; persist(); } },
+  toast(title, sub = '', ms = 2400) {
+    const t = $('toast'); t.innerHTML = `${title}${sub ? `<small>${sub}</small>` : ''}`; t.classList.add('show');
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), ms);
+  },
+  pop(text) { const c = $('combo'); c.textContent = text; c.classList.add('show'); clearTimeout(popTimer); popTimer = setTimeout(() => c.classList.remove('show'), 900); },
+  hint(t) { const h = $('hint'); if (t) { h.textContent = t; h.style.opacity = 1; } else h.style.opacity = 0; },
+  fade(on) { $('fade').classList.toggle('on', on); },
+  teddy(i) { if (!save.teddies[current][i]) { save.teddies[current][i] = true; persist(); } },
+  subtitle(text) { const s = $('subtitle'); if (text) { s.textContent = text; s.classList.add('show'); } else s.classList.remove('show'); },
+  letterbox(on) { document.body.classList.toggle('cinema', on); },
   complete: onComplete,
 };
 
-function loading(on, text = 'Fluffing pillows…') {
-  $('loading').classList.toggle('hidden', !on);
-  $('loadingText').textContent = text;
+function loading(on, text = 'Tucking in…') { $('loading').classList.toggle('hidden', !on); $('loadingText').textContent = text; }
+
+function newGame(i, opts = {}) {
+  if (game) game.dispose();
+  hooks.subtitle(null); hooks.letterbox(false); $('skip').classList.add('hidden'); cineDone = null;
+  current = i;
+  perf.reset();
+  game = new Game(renderer, input, CHAPTERS[i], i, hooks, { savedTeddies: save.teddies[i] });
+  return game;
 }
 
-function startLevel(i, attract = false) {
-  loading(true, attract ? 'Fluffing pillows…' : `Loading ${LEVELS[i].name}…`);
-  // let the loading card paint before the heavy texture/geometry work
+// Title: a slow orbit around Leo asleep, hugging Blåhaj.
+function startTitle() {
+  loading(true);
   setTimeout(() => {
-    if (game) game.dispose();
-    current = i;
-    game = new Game(renderer, input, LEVELS[i], i, abilities(), save.stars[i], hooks);
-    game.attract = attract;
-    perf.reset();
+    mode = 'title';
+    newGame(0);
+    const g = game;
+    g.leo.update(0, { cover: 1, roll: 0, arm: 'hug', prevArm: 'hug', armT: 1 });
+    let a = 0;
+    g.cine = {
+      ownsCamera: true, ownsPlayer: true, dream: 1, done: false,
+      update(dt) {
+        a += dt * 0.05;
+        const hp = g.leo.hugPoint;
+        g.p.pos.copy(hp).setY(hp.y - 0.4); g.p.yaw = Math.PI; g.rig.body.rotation.z = 0.5;
+        g.rig.update(dt, { speed: 0, grounded: true, vx: 0, vy: 0, vz: 0 });
+        g.leo.update(dt, {});
+        g.comfort = 100;
+        g.camera.position.set(-5.0 + Math.cos(a + 0.9) * 7.5, 7.2 + Math.sin(a * 2) * 0.3, -5.0 + Math.sin(a + 0.9) * 7.5);
+        g.camera.lookAt(-4.9, 5.6, -6.0);
+      },
+    };
     loading(false);
-    if (attract) return;
+    show('title');
+  }, 30);
+}
+
+function startChapter(i, withIntro) {
+  loading(true, `Chapter ${i + 1}: ${CHAPTERS[i].title}`);
+  Audio.init(); Audio.resume();
+  setTimeout(() => {
+    const ch = CHAPTERS[i];
+    newGame(i);
+    loading(false);
     mode = 'play';
     show(null);
-    $('levelName').textContent = `${i + 1}. ${LEVELS[i].name}`;
-    $('fishTotal').textContent = LEVELS[i].fish.length;
+    $('chapterName').textContent = `${i + 1}. ${ch.title}`;
+    $('objective').textContent = ch.goalText;
+    $('teddyTotal').textContent = ch.teddies.length;
     updateHud();
-    Audio.init(); Audio.resume(); Audio.startMusic(LEVELS[i].music);
-    const newAb = Object.entries(CFG.unlocks).find(([, lvl]) => lvl === i - 1);
-    if (newAb && abilities()[newAb[0]]) toast(`${ABILITIES[newAb[0]].icon} ${ABILITIES[newAb[0]].name}`, ABILITIES[newAb[0]].how, 4000);
+    Audio.startMusic(ch.music);
+    if (withIntro && ch.intro && CINES[ch.intro]) runCine(CINES[ch.intro](game, hooks), () => chapterTitle(i));
+    else chapterTitle(i);
     $('game').focus();
   }, 40);
 }
 
+function chapterTitle(i) {
+  const ch = CHAPTERS[i];
+  hooks.fade(false);
+  const card = $('chapterCard');
+  card.innerHTML = `<small>Chapter ${i + 1}</small>${ch.title}<em>${ch.goalText}</em>`;
+  card.classList.add('show');
+  setTimeout(() => card.classList.remove('show'), 3000);
+  if (ch.newAbility && ABILITIES[ch.newAbility]) { const a = ABILITIES[ch.newAbility]; setTimeout(() => hooks.toast(`New move: ${a.icon} ${a.name}`, a.how, 5000), 2600); }
+}
+
+let cineDone = null;
+function runCine(c, after) {
+  game.cine = c;
+  cineDone = after;
+  mode = 'cine';
+  show(null);
+  $('skip').classList.remove('hidden');
+}
+function endCine() {
+  if (!game || !game.cine) return;
+  const c = game.cine;
+  game.cine = null;
+  $('skip').classList.add('hidden');
+  hooks.subtitle(null); hooks.letterbox(false);
+  mode = 'play';
+  show(null);
+  const after = cineDone; cineDone = null;
+  if (after) after(c);
+}
+function skipCine() {
+  if (!game || !game.cine || mode !== 'cine') return;
+  const c = game.cine;
+  if (c.finish) c.finish();
+  else { c.t = c.length - 0.01; c.update(0.01, game); }
+  c.done = true;
+}
+
 function updateHud() {
   if (!game) return;
-  $('fish').textContent = game.stats.fish;
-  const st = game.stars.map((s) => s.taken || save.stars[current][s.i]);
-  $('stars').innerHTML = st.map((on) => `<span class="${on ? '' : 'off'}">⭐</span>`).join('');
-  $('hearts').innerHTML = Array.from({ length: CFG.maxHearts }, (_, k) => `<span class="${k < game.p.hearts ? '' : 'lost'}">💙</span>`).join('');
+  const c = Math.round(game.comfort);
+  const bar = $('dreamFill');
+  bar.style.width = `${c}%`;
+  $('dream').classList.toggle('low', c < 30);
+  $('dreamLabel').textContent = c > 66 ? 'Sweet dreams' : c > 33 ? 'Restless…' : 'Nightmare!';
+  $('teddies').textContent = game.teddies.filter((t) => t.taken || save.teddies[current][t.i]).length;
 }
-
-let toastTimer = null;
-function toast(title, sub = '', ms = 2200) {
-  const t = $('toast');
-  t.innerHTML = `${title}${sub ? `<small>${sub}</small>` : ''}`;
-  t.classList.add('show');
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.classList.remove('show'), ms);
-}
-let popTimer = null;
-function pop(text) {
-  const c = $('combo');
-  c.textContent = text;
-  c.classList.add('show');
-  clearTimeout(popTimer);
-  popTimer = setTimeout(() => c.classList.remove('show'), 700);
-}
-
-const fmt = (t) => (Number.isFinite(t) ? `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}` : '–');
 
 function onComplete(r) {
-  const i = current;
-  const wasBonusOpen = totalStars() >= CFG.bonusStars;
-  const before = abilities();
+  const i = current, ch = CHAPTERS[i];
   save.completed[i] = true;
-  r.stars.forEach((s, k) => { if (s) save.stars[i][k] = true; });
-  save.bestTime[i] = save.bestTime[i] ? Math.min(save.bestTime[i], r.time) : r.time;
-  save.bestFish[i] = Math.max(save.bestFish[i] || 0, r.fish);
+  r.teddies.forEach((t, k) => { if (t) save.teddies[i][k] = true; });
+  save.best[i] = save.best[i] ? Math.min(save.best[i], r.time) : r.time;
   persist();
-  Audio.stopMusic();
-  mode = 'menu';
-  $('completeTitle').textContent = `${LEVELS[i].name} complete!`;
-  $('completeStars').innerHTML = save.stars[i].map((s) => `<span class="${s ? '' : 'off'}">⭐</span>`).join('');
-  $('cFish').textContent = `${r.fish} / ${r.fishTotal}${r.fish >= r.fishTotal ? ' 👑' : ''}`;
-  $('cTime').textContent = `${fmt(r.time)}  (best ${fmt(save.bestTime[i])})`;
-  $('cBops').textContent = r.bops;
-  $('cFalls').textContent = r.falls;
-  let unlock = '';
-  const after = abilities();
-  for (const k of Object.keys(after)) if (after[k] && !before[k]) unlock += `<div class="unlock">New ability: ${ABILITIES[k].icon} ${ABILITIES[k].name}<small>${ABILITIES[k].how}</small></div>`;
-  if (!wasBonusOpen && totalStars() >= CFG.bonusStars) unlock += `<div class="unlock">✨ Bonus level unlocked: ${LEVELS[LEVELS.length - 1].name}!</div>`;
-  $('completeUnlock').innerHTML = unlock;
-  if (unlock) Audio.unlock();
-  const next = i + 1 < LEVELS.length && unlocked(i + 1) ? i + 1 : -1;
-  $('btnNext').classList.toggle('hidden', next < 0);
-  $('btnNext').onclick = () => { Audio.click(); startLevel(next); };
-  if (LEVELS[i].id === 'dreamsea' && !save.sawEnding) { save.sawEnding = true; persist(); show('ending'); $('btnEndLevels').onclick = () => { Audio.click(); show('complete'); }; }
-  else show('complete');
+  const after = () => {
+    if (ch.outro === 'ending') { Audio.stopMusic(); mode = 'menu'; showEnding(r); return; }
+    if (i + 1 < CHAPTERS.length) startChapter(i + 1, true);
+  };
+  if (ch.outro && CINES[ch.outro]) setTimeout(() => runCine(CINES[ch.outro](game, hooks), after), 250);
+  else after();
 }
 
-function buildLevelGrid() {
-  const grid = $('levelGrid');
+function showEnding() {
+  const total = save.teddies.reduce((a, t) => a + t.filter(Boolean).length, 0);
+  $('endTeddies').textContent = `${total} / ${CHAPTERS.length * 3}`;
+  hooks.fade(false);
+  show('ending');
+}
+
+function buildChapterList() {
+  const grid = $('chapterGrid');
   grid.innerHTML = '';
-  const swatch = { bedroom: '#ffb3c6', kitchen: '#ffd166', shelf: '#b79fff', rooftops: '#ff9f68', dreamsea: '#5a4b9c', lagoon: '#36c5b8' };
-  LEVELS.forEach((L, i) => {
+  CHAPTERS.forEach((ch, i) => {
     const open = unlocked(i);
-    const d = document.createElement('div');
-    d.className = 'lvl' + (open ? '' : ' locked') + (L.bonus ? ' bonus' : '');
-    const st = save.stars[i].map((s) => `<span class="${s ? '' : 'off'}">⭐</span>`).join('');
-    const lockMsg = L.bonus ? `🔒 Collect ${CFG.bonusStars} ⭐ (${totalStars()}/${CFG.bonusStars})` : '🔒 Finish the previous level';
-    d.innerHTML = `<div class="swatch" style="background:${swatch[L.theme]}"></div><div class="num">${L.bonus ? 'Bonus' : 'Level ' + (i + 1)}</div><div class="name">${L.name}</div>
-      <div class="blurb">${open ? L.blurb : lockMsg}</div><div class="stars">${st}</div>
-      <div class="meta">${save.completed[i] ? `🐟 best ${save.bestFish[i] || 0}/${L.fish.length}${(save.bestFish[i] || 0) >= L.fish.length ? ' 👑' : ''} · ⏱ ${fmt(save.bestTime[i])}` : open ? 'Not finished yet' : ''}</div>`;
-    if (open) d.onclick = () => { Audio.init(); Audio.click(); startLevel(i); };
+    const d = document.createElement('button');
+    d.className = 'chap' + (open ? '' : ' locked');
+    const td = save.teddies[i].map((t) => `<span class="${t ? '' : 'off'}">🧸</span>`).join('');
+    d.innerHTML = `<span class="num">Chapter ${i + 1}</span><span class="name">${ch.title}</span><span class="goal">${open ? ch.goalText : '🔒 Finish the chapter before'}</span><span class="td">${td}</span><span class="meta">${save.completed[i] ? '⏱ best ' + fmt(save.best[i]) : ''}</span>`;
+    if (open) d.onclick = () => { Audio.init(); Audio.click(); story = false; startChapter(i, true); };
     grid.appendChild(d);
   });
-  const ab = abilities();
-  $('abilityList').innerHTML = Object.entries(ABILITIES).map(([k, a]) => `<span class="ab ${ab[k] ? '' : 'off'}" title="${a.how}">${a.icon} ${a.name}</span>`).join('') + `<span class="ab">⭐ ${totalStars()} / ${LEVELS.length * 3}</span>`;
-}
-
-function openLevels() {
-  Audio.init(); Audio.click();
-  if (mode === 'play' || mode === 'paused' || mode === 'menu') { mode = 'title'; Audio.stopMusic(); startLevel(0, true); }
-  buildLevelGrid();
-  show('levels');
 }
 
 function pause(on) {
-  if (on && mode === 'play') { mode = 'paused'; show('pause'); Audio.stopMusic(); }
-  else if (!on && mode === 'paused') { mode = 'play'; show(null); Audio.startMusic(LEVELS[current].music); $('game').focus(); }
+  if (on && mode === 'play') { mode = 'paused'; show('pause'); }
+  else if (!on && mode === 'paused') { mode = 'play'; show(null); $('game').focus(); }
 }
-
-function qualityLabel() { return `Graphics: ${QUALITY[renderer.quality].label}`; }
+const qualityLabel = () => `Graphics: ${QUALITY[renderer.quality].label}`;
 function cycleQuality() {
-  const i = QUALITY_ORDER.indexOf(renderer.quality);
-  const q = QUALITY_ORDER[(i + 1) % QUALITY_ORDER.length];
-  save.quality = q; persist();
+  const q = QUALITY_ORDER[(QUALITY_ORDER.indexOf(renderer.quality) + 1) % QUALITY_ORDER.length];
+  save.quality = q; save.qualityLocked = true; persist();
   renderer.setQuality(q);
   document.querySelectorAll('.qbtn').forEach((b) => (b.textContent = qualityLabel()));
-  perf.reset();
-  if (game && mode !== 'title') toast(qualityLabel(), 'Grass and some effects update on the next level');
 }
 
-// ----------------------------------------------------------- wiring ----
-$('btnStart').onclick = openLevels;
+// ----------------------------------------------------------------- wiring --
+$('btnStart').onclick = () => { Audio.init(); Audio.click(); story = true; startChapter(save.completed[0] ? CHAPTERS.findIndex((c, i) => !save.completed[i]) : 0, true); };
+$('btnChapters').onclick = () => { Audio.init(); Audio.click(); buildChapterList(); show('chapters'); };
 $('btnHow').onclick = () => { Audio.init(); Audio.click(); show('how'); };
 $('btnHowBack').onclick = () => { Audio.click(); show('title'); };
-$('btnBackTitle').onclick = () => { Audio.click(); show('title'); };
-$('btnReset').onclick = () => {
-  if (!confirm('Reset all progress? Your starfish will swim away!')) return;
-  try { localStorage.removeItem(SAVE_KEY); } catch (e) { /* ignore */ }
-  location.reload();
-};
+$('btnChaptersBack').onclick = () => { Audio.click(); show('title'); };
 $('btnResume').onclick = () => pause(false);
-$('btnRestart').onclick = () => { Audio.click(); startLevel(current); };
-$('btnQuit').onclick = openLevels;
-$('btnAgain').onclick = () => { Audio.click(); startLevel(current); };
-$('btnToLevels').onclick = openLevels;
-$('btnEndLevels').onclick = openLevels;
-document.querySelectorAll('.qbtn').forEach((b) => { b.textContent = qualityLabel(); b.onclick = () => { Audio.click(); cycleQuality(); }; });
+$('btnRestart').onclick = () => { Audio.click(); startChapter(current, false); };
+$('btnQuit').onclick = () => { Audio.click(); Audio.stopMusic(); startTitle(); };
+$('btnEndTitle').onclick = () => { Audio.click(); startTitle(); };
+$('skip').onclick = skipCine;
 $('tPause').onclick = () => pause(true);
+document.querySelectorAll('.qbtn').forEach((b) => { b.textContent = qualityLabel(); b.onclick = () => { Audio.click(); cycleQuality(); }; });
+if ($('btnStart').textContent && save.completed[0]) $('btnStart').textContent = '▶ Continue';
 
 addEventListener('keydown', (e) => {
-  if (e.code === 'KeyM') { Audio.init(); const m = Audio.toggleMute(); toast(m ? '🔇 Sound off' : '🔊 Sound on'); }
+  if (e.code === 'KeyM') { Audio.init(); const m = Audio.toggleMute(); hooks.toast(m ? '🔇 Sound off' : '🔊 Sound on'); }
+  if (mode === 'cine' && (e.code === 'Enter' || e.code === 'Escape')) { skipCine(); return; }
   if (e.code === 'Escape' || e.code === 'KeyP') { if (mode === 'play') pause(true); else if (mode === 'paused') pause(false); }
-  if (e.code === 'KeyR' && mode === 'play') startLevel(current);
-  if ((e.code === 'Enter' || e.code === 'Space') && mode === 'title' && !$('title').classList.contains('hidden')) { e.preventDefault(); openLevels(); }
+  if (e.code === 'KeyR' && mode === 'play') startChapter(current, false);
+  if (e.code === 'Enter' && mode === 'title' && !$('title').classList.contains('hidden')) $('btnStart').click();
 });
 addEventListener('resize', () => renderer.resize());
 
-// --------------------------------------------- adaptive quality guard ---
+// ------------------------------------------- adaptive quality guard ---
 const perf = {
   frames: 0, time: 0, warm: 0,
   reset() { this.frames = 0; this.time = 0; this.warm = 0; },
   sample(dt) {
-    if (mode !== 'play') return;
+    if (mode !== 'play' && mode !== 'cine') { this.reset(); return; }
     this.warm += dt;
     if (this.warm < 3) return; // ignore shader-compile hitches
     this.frames++; this.time += dt;
     if (this.time > 4) {
       const fps = this.frames / this.time;
       const i = QUALITY_ORDER.indexOf(renderer.quality);
-      if (fps < 32 && i > 0 && !save.qualityLocked) {
+      if (fps < 30 && i > 0 && !save.qualityLocked) {
         const q = QUALITY_ORDER[i - 1];
-        renderer.setQuality(q);
-        save.quality = q; persist();
+        renderer.setQuality(q); save.quality = q; persist();
         document.querySelectorAll('.qbtn').forEach((b) => (b.textContent = qualityLabel()));
-        toast(`Graphics set to ${QUALITY[q].label}`, 'for smoother swimming (change it in the pause menu)');
+        hooks.toast(`Graphics set to ${QUALITY[q].label}`, 'for smoother play (change it in the pause menu)');
       }
       this.frames = 0; this.time = 0;
     }
   },
 };
 
-// --------------------------------------------------------------- loop ---
-let last = performance.now();
+// ------------------------------------------------------------------- loop --
+const debug = { noRender: false, freeze: false };
+let last = performance.now(), beatT = 0;
 function frame(now) {
   requestAnimationFrame(frame);
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
+  if (debug.noRender) return;
+  if (debug.freeze && game) { game.render(); input.endFrame(); return; }
   input.pollPad();
   if (input.pressed.has('pad-pause')) { if (mode === 'play') pause(true); else if (mode === 'paused') pause(false); }
-  if (debug.noRender) return; // tests drive the simulation themselves
-  if (debug.freeze && game) { game.render(); input.endFrame(); return; } // inspect a frozen frame
   if (!game) { input.endFrame(); return; }
-  if (mode === 'play' || mode === 'title' || (mode === 'menu' && game.state === 'win')) game.update(dt);
-  else input.endFrame();
-  if (mode === 'play') $('timer').textContent = fmt(game.stats.time);
+  if (mode !== 'paused') game.update(dt); else input.endFrame();
+  if (mode === 'cine' && game.cine && game.cine.done) endCine();
+  if (mode === 'play') {
+    $('timer').textContent = fmt(game.stats.time);
+    updateHud();
+    Audio.setDream(game.comfort / 100);
+    beatT -= dt;
+    if (game.comfort < 25 && beatT <= 0) { Audio.heartbeat(); beatT = 0.9 + game.comfort / 40; }
+  }
   game.render();
   perf.sample(dt);
 }
 
-// boot: title screen over a live orbiting shot of the first level
-show('title');
-loading(true, 'Fluffing pillows…');
-loadBlahajModel().then(() => { startLevel(0, true); requestAnimationFrame(frame); });
-// debug / test hooks
-const debug = { noRender: false, freeze: false };
+loading(true);
+loadBlahajModel().then(() => { startTitle(); requestAnimationFrame(frame); });
+
 window.__blahaj = {
-  get game() { return game; }, startLevel, save, get mode() { return mode; }, debug,
-  // advance the simulation deterministically (used by automated tests)
-  sim(seconds, step = 1 / 60) { for (let t = 0; t < seconds; t += step) { input.pollPad(); if (game && (mode === 'play' || game.state === 'win')) game.update(step); } },
+  get game() { return game; }, get mode() { return mode; }, save, debug, CHAPTERS,
+  startChapter, skipCine, startTitle,
+  sim(seconds, step = 1 / 60) { for (let t = 0; t < seconds; t += step) { input.pollPad(); if (game) { game.update(step); if (mode === 'cine' && game.cine && game.cine.done) endCine(); } } },
 };
+void THREE;

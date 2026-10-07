@@ -1,105 +1,90 @@
-# 🦈 Blåhaj's Big Adventure
+# 🦈 Blåhaj: Back to Bed
 
-A soft, squishy 3D platformer starring everyone's favourite plush shark. Hop across a
-bedroom where the floor is lava, bounce off kitchen sponges, climb a bookshelf, dash
-over rooftops and glide across a starry dream sea, learning a new trick in every level.
-
-Blåhaj herself is a real 3D model of the toy (credited below). Everything else is
-generated in code: the props, creatures, every texture (knitted rugs, wood grain, marble,
-cookie crumbs, roof tiles) and all the music and sound. The game ships as one HTML page
-plus one JavaScript bundle.
+A cinematic 3D story platformer. In the middle of the night, Leo rolls over to pull
+up his blanket and lets go of his Blåhaj. The plush shark tumbles off the bed, and
+Leo's sweet dream of sharks and teddy bears starts turning into a nightmare. Get
+Blåhaj back into his arms before the nightmares reach him.
 
 ## Play
 
 Open `index.html` in a modern browser. No server or build step is needed.
 
-To serve it locally instead (handy on a phone on the same network):
-
 ```sh
-npm run serve        # then visit http://localhost:8080
+npm run serve        # or serve it locally, then visit http://localhost:8080
 ```
+
+## The story
+
+| | Chapter | What happens |
+| --- | --- | --- |
+| 🎬 | Prologue | Leo hugs Blåhaj while dreaming of teddy bears. He gets cold, reaches for the covers, rolls over, and Blåhaj tumbles off the bed. |
+| 1 | Off the Edge | Cross the messy bedroom floor, climb the pulled-out dresser drawers, and make your way to the windowsill. Then Biscuit the dog shows up. |
+| 2 | Downstairs | Biscuit drops you in his dog bed and falls asleep. Cross the dark living room, past the fireplace, couch and robo-vacuum, and find the stairs. |
+| 3 | The Big Stairs | Climb while the darkness rises behind you. Watch out for rolling balls and a grumpy cat, and get over the baby gate. |
+| 4 | Back to Bed | The nightmare has found Leo. Climb, glide to the bed, and belly-flop the nightmare knots away. |
+| 🎬 | Ending | Leo pulls Blåhaj close and the dream turns sweet again. |
+
+**Leo's dream** is the meter at the top of the screen. It fades slowly while he's alone,
+and fast when you stand on the **dark floor** where the nightmares live. Light, rugs and
+anything you can climb onto are safe. Glowing dream stars, lamps you switch on and hidden
+teddy bears keep the dream sweet. Each chapter hides three teddy bears.
 
 ### Controls
 
 | Action | Keyboard | Gamepad | Touch |
 | --- | --- | --- | --- |
-| Swim | WASD / arrows | Left stick | Left joystick |
-| Jump (hold for higher) | Space | A | ⤴ |
-| Double jump | Space in the air | A in the air | ⤴ in the air |
-| Belly flop | C | B / LB / LT | 💥 |
-| Torpedo dash | Shift | X / RB / RT | 🚀 |
-| Fin glide | Hold Space while falling | Hold A | Hold ⤴ |
+| Move | WASD / arrows | Left stick | Left joystick |
+| Jump, double jump | Space | A | ⤴ |
+| Belly flop (chapter 2+) | C | B / LB | 💥 |
+| Torpedo dash (chapter 3+) | Shift | X / RB | 🚀 |
+| Fin glide (chapter 4) | Hold Space while falling | Hold A | Hold ⤴ |
 | Camera | Drag mouse, Q / E | Right stick | Drag right side |
-| Pause / restart / mute | Esc · R · M | Start | ⏸ |
+| Pause, skip scene, mute | Esc · Enter · M | Start | ⏸ |
 
-## Levels and progression
+## How it's made
 
-Each level teaches the move you need for the next one.
+Everything except Blåhaj herself is built in code: the rooms and furniture, Leo, Biscuit the
+dog, the cat, the teddy bears and nightmares, every texture, and the music and sound.
 
-| # | Level | New mechanics | Finishing it unlocks |
-| --- | --- | --- | --- |
-| 1 | Cozy Bedroom | Jumping, moving toy car, dust bunnies, toy bricks | 🫧 Double jump |
-| 2 | Kitchen Counter | Sponge bounce pads, sliding chopping boards | 💥 Belly flop |
-| 3 | Bookshelf Climb | Crumbling cookies, cardboard crates, robo-vacuums, super bounce | 🚀 Torpedo dash |
-| 4 | Rooftop Breeze | Long dash gaps, hot-air balloon baskets | 🪽 Fin glide |
-| 5 | Dream Sea | Gliding, bubble-column updrafts, floating islands | The ending |
-| ★ | Starlight Lagoon | Bonus gauntlet using everything | Opens at 12 starfish |
-
-Every level hides three ⭐ starfish (some inside crates) and is full of 🐟 fish. Collect
-every fish for a 👑. Falling off is gentle: Blåhaj pops back at the last lamp you lit.
-Progress saves automatically in the browser.
-
-## Graphics
-
-- Physically based materials: plush fabric with sheen, clearcoat ceramics, transmissive
-  iridescent crystals and bubbles, and brushed metal.
-- Procedural tileable textures with generated normal and roughness maps.
-- Image-based lighting baked from each level's sky, plus soft sun shadows that follow the
-  player.
-- Post-processing: ground-truth ambient occlusion, Unreal bloom, ACES filmic tone
-  mapping, MSAA, and a colour grade with vignette.
-- Instanced wind-swept grass, animated lava goo and sea, background bokeh, fireflies and
-  particle effects.
-- Four quality presets (Low to Ultra). The game drops a preset automatically if the frame
-  rate falls below about 32 fps.
+- **Night lighting:** moonlight casts shadows through the windows, with visible moonbeams and
+  dust. Warm lamps flicker, the fireplace glows, and light spills in from the hallway.
+- **Materials:** physically based plush, fabric, wood, ceramic and brass, with procedural
+  textures, normal maps and roughness maps.
+- **The nightmare:** a smoky shader pools in the dark on the floor, and creatures smoulder with
+  glowing eyes. As the dream sours, the colour grade drains, a heartbeat pulses, colours
+  fringe, and the lullaby detunes into a drone.
+- **Post-processing:** ambient occlusion, bloom, ACES tone mapping and MSAA, with four quality
+  presets that step down automatically on slow devices.
+- **Cutscenes:** in-engine, with letterboxing, subtitles and a skip button.
 
 ## Development
 
 ```sh
 npm install
 npm run build      # bundles src/ into dist/game.js (commit the result)
-npm run watch      # rebuild on change, with source maps
-npm run check      # proves every level is beatable with the abilities available
-npm run playtest   # headless end-to-end gameplay tests (needs Chromium)
+npm run check      # proves each chapter's goal and teddies are reachable, flags overlapping furniture
+npm run playtest   # a bot plays the whole story through the real controls (needs Chromium)
 ```
-
-`npm run check` simulates the game's real jump physics to confirm that each level's goal and
-all of its starfish are reachable. It also confirms that each level requires the ability
-unlocked just before it.
-
-`npm run playtest` drives the real game through its input system in headless Chromium.
-It checks movement, every ability, enemies, hazards, moving and crumbling platforms,
-respawning and level completion. Set `CHROMIUM_PATH` if Chromium isn't found
-automatically.
 
 | Path | What lives there |
 | --- | --- |
-| `src/config.js` | Physics and progression tuning, shared with the level checker |
-| `src/levels.js` | Level layouts as plain data |
-| `src/game.js` | Physics, abilities, enemies, collectibles, camera |
-| `src/world.js` | Sky, lighting, floors, platform visuals, grass, particles |
-| `src/art.js` | Blåhaj (model loading and animation) and every prop and creature |
-| `src/textures.js`, `src/materials.js` | Procedural textures and PBR materials |
-| `src/renderer.js` | Render pipeline and quality presets |
-| `src/audio.js` | Synthesised music and sound effects |
-| `src/main.js`, `index.html` | Menus, saving, the main loop |
+| `src/chapters.js` | The four chapters as data: furniture, lights, pickups, creatures |
+| `src/prefabs.js` | Furniture and rooms as collision boxes, shared with the checker |
+| `src/rooms.js` | Room and furniture visuals, lighting, moonbeams, the dark floor |
+| `src/characters.js` | Leo, the dream bubble, Biscuit, the cat, teddy bears, nightmares |
+| `src/cinematics.js` | The cutscenes |
+| `src/game.js` | Physics, abilities, the dream meter, creatures, the indoor camera |
+| `src/art.js` | Blåhaj (model loading, plush material, pool-noodle flex) and small props |
+| `src/main.js`, `index.html` | Title, story flow, HUD, saving |
+| `tools/` | Level checker, jump-reach model, playtest bot and its routes |
 
 ## Credits
 
 - Blåhaj 3D model: ["Blahaj"](https://sketchfab.com/3d-models/blahaj-ce981de49111488c81ea646067abe1ec)
   by [Kaine_G](https://sketchfab.com/Kaine_G), licensed
-  [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Changes for this game: new
-  plush material, recreated teeth texture, and vertex-shader animation for the tail and
-  fins. The file lives in `assets/blahaj.glb`.
-- Built with [three.js](https://threejs.org) (MIT). Blåhaj is a trademark of IKEA. This is an
-unofficial fan project made with love for the shark.
+  [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Changes for this game: new plush
+  material, textures shipped separately so strict browsers load them, a recreated teeth
+  texture, and vertex-shader animation for the tail, fins and floppy body. Files are in
+  `assets/`.
+- Built with [three.js](https://threejs.org) (MIT).
+- Blåhaj is a trademark of IKEA. This is an unofficial fan project made with love for the shark.

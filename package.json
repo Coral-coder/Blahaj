@@ -1,12 +1,12 @@
 {
-  "name": "blahaj-adventure",
-  "version": "1.0.0",
+  "name": "blahaj-back-to-bed",
+  "version": "2.0.0",
   "private": true,
-  "description": "Bl\u00e5haj's Big Adventure: a cute 3D platformer starring a plush shark.",
+  "description": "Bl\u00e5haj: Back to Bed. A cinematic 3D story platformer about a plush shark climbing back to a sleeping child.",
   "type": "module",
   "scripts": {
-    "build": "esbuild src/main.js --loader:.glb=binary --bundle --minify --format=iife --target=es2020 --outfile=dist/game.js",
-    "watch": "esbuild src/main.js --loader:.glb=binary --bundle --sourcemap --format=iife --target=es2020 --outfile=dist/game.js --watch",
+    "build": "esbuild src/main.js --loader:.glb=binary --loader:.jpg=dataurl --loader:.png=dataurl --bundle --minify --format=iife --target=es2020 --outfile=dist/game.js",
+    "watch": "esbuild src/main.js --loader:.glb=binary --loader:.jpg=dataurl --loader:.png=dataurl --bundle --sourcemap --format=iife --target=es2020 --outfile=dist/game.js --watch",
     "check": "node tools/check-levels.js",
     "serve": "python3 -m http.server 8080",
     "playtest": "node tools/playtest.cjs"

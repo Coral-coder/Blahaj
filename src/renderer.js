@@ -18,18 +18,30 @@ export const QUALITY_ORDER = ['low', 'medium', 'high', 'ultra'];
 
 // vignette + gentle filmic grade + a whisper of grain (runs after tone mapping)
 const GradeShader = {
-  uniforms: { tDiffuse: { value: null }, time: { value: 0 }, vignette: { value: 0.32 }, warmth: { value: 0.03 }, saturation: { value: 1.08 } },
+  uniforms: { tDiffuse: { value: null }, time: { value: 0 }, vignette: { value: 0.32 }, warmth: { value: 0.03 }, saturation: { value: 1.08 }, nightmare: { value: 0 } },
   vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
-  fragmentShader: `uniform sampler2D tDiffuse; uniform float time; uniform float vignette; uniform float warmth; uniform float saturation; varying vec2 vUv;
+  fragmentShader: `uniform sampler2D tDiffuse; uniform float time; uniform float vignette; uniform float warmth; uniform float saturation; uniform float nightmare; varying vec2 vUv;
   float rnd(vec2 p){ return fract(sin(dot(p, vec2(12.9898,78.233)) + time) * 43758.5453); }
   void main(){
-    vec4 c = texture2D(tDiffuse, vUv);
-    float l = dot(c.rgb, vec3(0.299,0.587,0.114));
-    c.rgb = mix(vec3(l), c.rgb, saturation);
-    c.rgb += vec3(warmth, warmth*0.4, -warmth*0.6) * (1.0 - l);
+    float nm = clamp(nightmare, 0.0, 1.0);
+    float deep = smoothstep(0.55, 1.0, nm);
     vec2 d = vUv - 0.5;
-    c.rgb *= 1.0 - vignette * smoothstep(0.25, 0.85, dot(d,d) * 2.2);
-    c.rgb += (rnd(vUv * 731.0) - 0.5) * 0.018;
+    // as the dream sours: colour fringing, a slow throb, a cold violet cast
+    float ca = 0.004 * deep * (1.0 + 0.5 * sin(time * 2.6));
+    vec4 c;
+    c.r = texture2D(tDiffuse, vUv + d * ca).r;
+    c.g = texture2D(tDiffuse, vUv).g;
+    c.b = texture2D(tDiffuse, vUv - d * ca).b;
+    c.a = 1.0;
+    float l = dot(c.rgb, vec3(0.299,0.587,0.114));
+    c.rgb = mix(vec3(l), c.rgb, mix(saturation, 0.55, nm));
+    c.rgb += vec3(warmth, warmth*0.4, -warmth*0.6) * (1.0 - l) * (1.0 - nm);
+    c.rgb = mix(c.rgb, c.rgb * vec3(0.82, 0.78, 1.12), nm * 0.8);
+    float beat = pow(max(0.0, sin(time * 5.2)), 12.0) * deep;
+    float v = vignette + nm * 0.35 + beat * 0.25;
+    c.rgb *= 1.0 - v * smoothstep(0.2, 0.85, dot(d,d) * 2.2);
+    c.rgb += vec3(0.25, 0.0, 0.08) * deep * smoothstep(0.35, 0.9, dot(d,d) * 2.2) * (0.6 + beat);
+    c.rgb += (rnd(vUv * 731.0) - 0.5) * (0.016 + nm * 0.02);
     gl_FragColor = c;
   }`,
 };

@@ -3,235 +3,172 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Blåhaj's Big Adventure</title>
-<meta name="description" content="A soft, squishy 3D platformer starring a very good plush shark.">
+<title>Blåhaj: Back to Bed</title>
+<meta name="description" content="A story platformer: a plush shark tumbles off a sleeping child's bed and must climb back before the nightmares reach him.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦈</text></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,800&family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
 <style>
-  :root {
-    --blue: #4f86c6; --deep: #23477d; --ink: #1f2b44; --pink: #ff9fbf; --gold: #ffcf4a;
-    --glass: rgba(255, 255, 255, 0.62); --glass-edge: rgba(255, 255, 255, 0.75);
-  }
+  :root { --ink: #eef1ff; --muted: #aab3d6; --night: #0b0f24; --panel: rgba(14, 18, 40, 0.62); --edge: rgba(190, 205, 255, 0.22); --gold: #ffd27a; --violet: #9a6bff; }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  html, body { margin: 0; height: 100%; overflow: hidden; background: #a9d8ff; font-family: Nunito, "Segoe UI", system-ui, sans-serif; color: var(--ink); user-select: none; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #05060c; font-family: Nunito, "Segoe UI", system-ui, sans-serif; color: var(--ink); user-select: none; }
   canvas#game { display: block; width: 100vw; height: 100vh; outline: none; touch-action: none; }
   #ui { position: fixed; inset: 0; pointer-events: none; }
-  #ui .screen, #ui .screen * { pointer-events: auto; }
+  #ui .screen, #ui .screen *, #skip, #touch > * { pointer-events: auto; }
   .hidden { display: none !important; }
-
-  .screen { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 20px; text-align: center; }
-  .card {
-    background: var(--glass); backdrop-filter: blur(18px) saturate(1.4); -webkit-backdrop-filter: blur(18px) saturate(1.4);
-    border: 1.5px solid var(--glass-edge); border-radius: 28px; padding: 30px 38px; width: 100%; max-width: 860px;
-    box-shadow: 0 30px 80px rgba(20, 40, 90, 0.28), inset 0 1px 0 rgba(255,255,255,0.9);
-    animation: rise .45s cubic-bezier(.2,1.2,.4,1);
-  }
-  @keyframes rise { from { opacity: 0; transform: translateY(20px) scale(.97); } to { opacity: 1; transform: none; } }
-  h1 { font-size: clamp(40px, 7vw, 78px); line-height: 1; margin: 0 0 10px; font-weight: 900; letter-spacing: -1.5px;
-       background: linear-gradient(180deg, #ffffff 0%, #dceaff 100%); -webkit-background-clip: text; background-clip: text; color: transparent;
-       filter: drop-shadow(0 3px 0 #2f5fa0) drop-shadow(0 10px 18px rgba(20,40,90,.35)); }
-  h2 { margin: 0 0 14px; font-size: clamp(26px, 4vw, 40px); font-weight: 900; color: var(--deep); }
-  .sub { font-size: 18px; font-weight: 700; color: #fff; text-shadow: 0 2px 8px rgba(20,40,90,.5); margin-bottom: 22px; }
-  .btn { font: inherit; font-weight: 900; font-size: 18px; padding: 13px 30px; margin: 6px; border-radius: 999px; border: 0; cursor: pointer; color: #fff;
-         background: linear-gradient(180deg, #6aa3e6, #3f75b8); box-shadow: 0 6px 0 #284f86, 0 12px 24px rgba(20,40,90,.3); transition: transform .08s, box-shadow .08s, filter .15s; }
-  .btn:hover { transform: translateY(-2px); filter: brightness(1.06); box-shadow: 0 8px 0 #284f86, 0 16px 28px rgba(20,40,90,.3); }
-  .btn:active { transform: translateY(4px); box-shadow: 0 2px 0 #284f86; }
-  .btn.alt { background: linear-gradient(180deg, #ffc2d6, #ff8fb4); color: #6d1f3d; box-shadow: 0 6px 0 #d0648a, 0 12px 24px rgba(120,20,60,.2); }
-  .btn.ghost { background: rgba(255,255,255,.75); color: var(--deep); box-shadow: 0 6px 0 rgba(35,71,125,.35); }
+  .screen { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 20px; }
+  .card { background: var(--panel); backdrop-filter: blur(16px) saturate(1.2); -webkit-backdrop-filter: blur(16px) saturate(1.2); border: 1px solid var(--edge); border-radius: 22px; padding: 28px 34px; width: 100%; max-width: 760px; box-shadow: 0 30px 80px rgba(0,0,0,.5); animation: rise .45s cubic-bezier(.2,1.1,.4,1); }
+  @keyframes rise { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+  h1, h2, .serif { font-family: Fraunces, Georgia, serif; }
+  h1 { font-size: clamp(42px, 7vw, 86px); line-height: .95; margin: 0 0 12px; font-weight: 800; letter-spacing: -1px; color: #fff4dc; text-shadow: 0 0 40px rgba(255,200,120,.35), 0 4px 24px rgba(0,0,0,.6); }
+  h1 small { display: block; font-size: .42em; letter-spacing: 6px; text-transform: uppercase; color: var(--gold); font-family: Nunito, sans-serif; font-weight: 800; margin-bottom: 8px; }
+  h2 { margin: 0 0 14px; font-size: clamp(26px, 4vw, 38px); font-weight: 800; color: #fff4dc; }
+  p { color: var(--muted); font-weight: 700; line-height: 1.5; }
+  .btn { font: inherit; font-weight: 900; font-size: 17px; padding: 13px 28px; margin: 6px 6px 0 0; border-radius: 999px; border: 0; cursor: pointer; color: #2a1a05; background: linear-gradient(180deg, #ffe2a2, #f4b860); box-shadow: 0 8px 26px rgba(244,184,96,.35); transition: transform .1s, filter .15s; }
+  .btn:hover { transform: translateY(-2px); filter: brightness(1.05); }
+  .btn.ghost { background: rgba(255,255,255,.08); color: var(--ink); box-shadow: none; border: 1px solid var(--edge); }
   .btn.small { font-size: 14px; padding: 9px 18px; }
-  kbd { background: #fff; border: 1.5px solid #c9d7ee; border-bottom-width: 4px; border-radius: 8px; padding: 1px 8px; font-weight: 900; font-family: inherit; color: var(--deep); font-size: .9em; }
+  kbd { background: rgba(255,255,255,.1); border: 1px solid var(--edge); border-bottom-width: 3px; border-radius: 7px; padding: 1px 7px; font-weight: 900; font-family: inherit; }
 
-  /* title */
-  #title { align-items: flex-end; justify-content: flex-start; padding: 0 0 7vh 6vw; text-align: left; }
-  #title .titlebox { max-width: 640px; animation: rise .6s cubic-bezier(.2,1.2,.4,1); }
-  #title .credit { font-size: 12px; opacity: .85; margin-top: 4px; }
-  #title .credit a { color: #fff; }
-  #title .tiny { color: #fff; text-shadow: 0 1px 6px rgba(0,0,0,.4); font-weight: 700; margin-top: 12px; font-size: 14px; }
+  #title { justify-content: flex-start; align-items: flex-end; padding: 0 0 8vh 6vw; }
+  #title .box { max-width: 620px; animation: rise .8s ease; }
+  #title p { color: #d9def5; max-width: 520px; text-shadow: 0 2px 10px rgba(0,0,0,.7); }
+  #title .credit { font-size: 12px; opacity: .75; margin-top: 14px; }
+  #title .credit a { color: #d9def5; }
 
-  /* levels */
-  #levels .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin: 8px 0 14px; max-height: 58vh; overflow: auto; padding: 4px; }
-  .lvl { position: relative; overflow: hidden; text-align: left; border-radius: 20px; padding: 16px; cursor: pointer; background: rgba(255,255,255,.82);
-         border: 2px solid rgba(255,255,255,.9); transition: transform .12s, box-shadow .12s; box-shadow: 0 6px 18px rgba(20,40,90,.12); }
-  .lvl:hover { transform: translateY(-4px); box-shadow: 0 14px 28px rgba(20,40,90,.2); }
-  .lvl.locked { cursor: not-allowed; opacity: .6; filter: grayscale(.5); }
-  .lvl.locked:hover { transform: none; }
-  .lvl.bonus { background: linear-gradient(135deg, rgba(255,255,255,.9), rgba(220,255,248,.9)); }
-  .lvl .swatch { position: absolute; right: -24px; top: -24px; width: 90px; height: 90px; border-radius: 50%; opacity: .45; filter: blur(2px); }
-  .lvl .num { font-size: 12px; font-weight: 900; letter-spacing: 2px; text-transform: uppercase; color: var(--blue); }
-  .lvl .name { font-weight: 900; font-size: 20px; margin: 2px 0 4px; }
-  .lvl .blurb { font-size: 13px; opacity: .75; min-height: 34px; }
-  .lvl .stars { font-size: 20px; letter-spacing: 3px; margin-top: 6px; }
-  .lvl .meta { font-size: 12px; opacity: .7; margin-top: 2px; }
-  .off { opacity: .22; filter: grayscale(1); }
-  .abilities { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
-  .ab { background: rgba(255,255,255,.85); border-radius: 999px; padding: 6px 13px; font-size: 13px; font-weight: 800; }
-  .ab.off { opacity: .45; filter: none; }
+  .chapters { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin: 10px 0 16px; }
+  .chap { font: inherit; text-align: left; color: var(--ink); background: rgba(255,255,255,.06); border: 1px solid var(--edge); border-radius: 16px; padding: 14px; cursor: pointer; display: flex; flex-direction: column; gap: 4px; transition: transform .12s, background .12s; }
+  .chap:hover { transform: translateY(-3px); background: rgba(255,255,255,.1); }
+  .chap.locked { opacity: .45; cursor: not-allowed; }
+  .chap .num { font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: var(--gold); font-weight: 900; }
+  .chap .name { font-family: Fraunces, serif; font-size: 21px; font-weight: 800; }
+  .chap .goal, .chap .meta { font-size: 13px; color: var(--muted); }
+  .off { opacity: .25; filter: grayscale(1); }
 
-  /* hud */
   #hud { position: absolute; inset: 0; pointer-events: none; }
-  .hudrow { position: absolute; top: max(14px, env(safe-area-inset-top)); left: 16px; right: 16px; display: flex; justify-content: space-between; align-items: flex-start; }
-  .stack { display: flex; flex-direction: column; gap: 8px; }
-  .stack.right { align-items: flex-end; }
-  .pill { background: rgba(255,255,255,.62); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,.8);
-          border-radius: 999px; padding: 7px 16px; font-weight: 900; font-size: 20px; box-shadow: 0 6px 18px rgba(20,40,90,.16); display: inline-flex; align-items: center; gap: 8px; width: fit-content; }
-  .pill.small { font-size: 14px; padding: 6px 13px; }
-  #hearts span { display: inline-block; transition: transform .25s, opacity .25s; }
-  #hearts span.lost { transform: scale(.7); opacity: .2; filter: grayscale(1); }
-  #hint { position: absolute; bottom: max(26px, env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); background: rgba(20,32,60,.6); backdrop-filter: blur(10px);
-          color: #fff; padding: 10px 22px; border-radius: 16px; font-weight: 800; font-size: 17px; transition: opacity .4s; opacity: 0; white-space: nowrap; }
-  #toast { position: absolute; top: 84px; left: 50%; transform: translateX(-50%) scale(.6); opacity: 0; transition: all .4s cubic-bezier(.2,1.6,.4,1);
-           background: linear-gradient(135deg, #ffe08a, #ffab7a); color: #5a2a00; padding: 14px 30px; border-radius: 20px; font-weight: 900; font-size: 23px; text-align: center; box-shadow: 0 14px 34px rgba(120,60,0,.25); }
+  .hudrow { position: absolute; top: max(14px, env(safe-area-inset-top)); left: 16px; right: 16px; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+  .pill { background: rgba(10,14,32,.55); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 1px solid var(--edge); border-radius: 14px; padding: 8px 14px; font-weight: 900; }
+  #chapterName { font-family: Fraunces, serif; font-size: 18px; }
+  #objective { font-size: 13px; color: var(--muted); font-weight: 700; margin-top: 2px; }
+  #dream { position: absolute; left: 50%; top: max(14px, env(safe-area-inset-top)); transform: translateX(-50%); width: min(360px, 44vw); text-align: center; }
+  #dreamLabel { font-size: 12px; letter-spacing: 2px; text-transform: uppercase; font-weight: 900; color: var(--gold); margin-bottom: 5px; text-shadow: 0 2px 8px rgba(0,0,0,.6); }
+  .bar { height: 14px; border-radius: 999px; background: rgba(10,10,30,.65); border: 1px solid var(--edge); overflow: hidden; box-shadow: 0 4px 18px rgba(0,0,0,.4); }
+  #dreamFill { height: 100%; width: 100%; border-radius: 999px; background: linear-gradient(90deg, #7a4bff, #c58cff 30%, #ffd27a 75%, #fff1c8); transition: width .25s; box-shadow: 0 0 16px rgba(255,210,122,.6); }
+  #dream.low #dreamLabel { color: #ff7a9a; }
+  #dream.low #dreamFill { animation: throb .9s ease-in-out infinite; background: linear-gradient(90deg, #5a1a8a, #b02a6a); box-shadow: 0 0 16px rgba(200,40,120,.7); }
+  @keyframes throb { 50% { filter: brightness(1.6); } }
+  .right { text-align: right; display: flex; flex-direction: column; gap: 8px; align-items: flex-end; }
+  #hint { position: absolute; bottom: max(26px, env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); background: rgba(10,14,32,.65); padding: 10px 20px; border-radius: 14px; font-weight: 800; transition: opacity .4s; opacity: 0; }
+  #toast { position: absolute; top: 96px; left: 50%; transform: translateX(-50%) scale(.7); opacity: 0; transition: all .4s cubic-bezier(.2,1.5,.4,1); background: linear-gradient(135deg, #ffe2a2, #f4a860); color: #3a1f00; padding: 13px 26px; border-radius: 16px; font-weight: 900; font-size: 20px; text-align: center; box-shadow: 0 14px 34px rgba(0,0,0,.35); max-width: 90vw; }
   #toast.show { opacity: 1; transform: translateX(-50%) scale(1); }
-  #toast small, .unlock small { display: block; font-size: 14px; font-weight: 700; opacity: .8; }
-  #combo { position: absolute; left: 50%; top: 40%; transform: translateX(-50%); font-weight: 900; font-size: 30px; color: #fff; text-shadow: 0 3px 0 var(--deep), 0 8px 20px rgba(0,0,0,.3); opacity: 0; transition: opacity .2s, transform .2s; }
-  #combo.show { opacity: 1; transform: translateX(-50%) translateY(-24px); }
-  #fade { position: absolute; inset: 0; background: radial-gradient(circle, #3a6fb8, #1b3566); opacity: 0; transition: opacity .45s; pointer-events: none; }
+  #toast small { display: block; font-size: 13px; font-weight: 800; opacity: .8; }
+  #combo { position: absolute; left: 50%; top: 40%; transform: translateX(-50%); font-weight: 900; font-size: 26px; color: #fff; text-shadow: 0 3px 14px rgba(0,0,0,.7); opacity: 0; transition: opacity .2s, transform .2s; }
+  #combo.show { opacity: 1; transform: translateX(-50%) translateY(-20px); }
+
+  /* cinema */
+  .bars::before, .bars::after { content: ''; position: absolute; left: 0; right: 0; height: 0; background: #000; transition: height .6s ease; z-index: 1; }
+  .bars::before { top: 0; } .bars::after { bottom: 0; }
+  body.cinema .bars::before, body.cinema .bars::after { height: 11vh; }
+  #subtitle { position: absolute; left: 50%; bottom: 13vh; transform: translateX(-50%); width: min(820px, 90vw); text-align: center; font-family: Fraunces, Georgia, serif; font-size: clamp(18px, 2.6vw, 28px); font-weight: 600; color: #fff6e6; text-shadow: 0 2px 16px rgba(0,0,0,.9); opacity: 0; transition: opacity .6s; z-index: 2; }
+  #subtitle.show { opacity: 1; }
+  #skip { position: absolute; right: 18px; bottom: calc(11vh + 14px); z-index: 3; }
+  #chapterCard { position: absolute; left: 50%; top: 40%; transform: translate(-50%, -50%); text-align: center; font-family: Fraunces, serif; font-size: clamp(34px, 6vw, 64px); font-weight: 800; color: #fff4dc; text-shadow: 0 0 30px rgba(255,200,120,.4), 0 4px 20px rgba(0,0,0,.8); opacity: 0; transition: opacity 1s; }
+  #chapterCard.show { opacity: 1; }
+  #chapterCard small { display: block; font-family: Nunito, sans-serif; font-size: 14px; letter-spacing: 6px; text-transform: uppercase; color: var(--gold); }
+  #chapterCard em { display: block; font-family: Nunito, sans-serif; font-style: normal; font-size: 17px; color: #d9def5; margin-top: 8px; }
+  #fade { position: absolute; inset: 0; background: #000; opacity: 0; transition: opacity .6s; pointer-events: none; z-index: 5; }
   #fade.on { opacity: 1; }
-
-  /* results */
-  .stat { display: flex; justify-content: space-between; padding: 9px 2px; border-bottom: 1.5px dashed rgba(35,71,125,.18); font-weight: 800; font-size: 18px; }
-  .stat b { color: var(--deep); }
-  .bigstars { font-size: 46px; letter-spacing: 8px; margin: 4px 0 10px; }
-  .unlock { background: linear-gradient(135deg, #ffe08a, #ffab7a); color: #5a2a00; border-radius: 16px; padding: 12px; margin: 10px 0; font-weight: 900; font-size: 18px; animation: rise .5s cubic-bezier(.2,1.6,.4,1); }
-  .controls { text-align: left; display: grid; grid-template-columns: 1fr 1fr; gap: 8px 26px; font-size: 15px; font-weight: 700; margin: 10px 0 14px; }
-  #how p { font-weight: 700; }
-
-  /* loading */
-  #loading { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: radial-gradient(circle at 50% 40%, #bfe0ff, #7fb2ec); }
-  #loading .shark { font-size: 80px; animation: swim 1.4s ease-in-out infinite; }
-  #loading div { font-weight: 900; color: #fff; font-size: 20px; text-shadow: 0 2px 10px rgba(20,40,90,.4); }
-  @keyframes swim { 0%,100% { transform: translateX(-20px) rotate(-6deg); } 50% { transform: translateX(20px) rotate(6deg); } }
+  #loading { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: radial-gradient(circle at 50% 40%, #1a2350, #05060c); z-index: 6; }
+  #loading div { font-family: Fraunces, serif; font-size: 22px; color: #fff4dc; text-align: center; }
+  #loading .moon { font-size: 64px; animation: float 2s ease-in-out infinite; }
+  @keyframes float { 50% { transform: translateY(-10px); } }
+  .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 22px; font-weight: 700; color: #d9def5; margin: 6px 0 12px; }
 
   /* touch */
   #touch { position: absolute; inset: 0; pointer-events: none; }
   #touch.off { display: none; }
-  #touch > * { pointer-events: auto; position: absolute; }
-  #stick { left: 28px; bottom: 34px; width: 132px; height: 132px; border-radius: 50%; background: rgba(255,255,255,.25); border: 2px solid rgba(255,255,255,.6); backdrop-filter: blur(6px); }
-  #knob { position: absolute; left: 36px; top: 36px; width: 56px; height: 56px; border-radius: 50%; background: rgba(255,255,255,.85); box-shadow: 0 4px 12px rgba(0,0,0,.2); }
-  .tbtn { width: 74px; height: 74px; border-radius: 50%; background: rgba(255,255,255,.6); border: 2px solid rgba(255,255,255,.85); backdrop-filter: blur(6px); font-size: 30px; display: flex; align-items: center; justify-content: center; }
-  .tbtn.down { background: rgba(255,255,255,.95); transform: scale(.94); }
-  #tJump { right: 30px; bottom: 40px; width: 90px; height: 90px; }
-  #tDash { right: 132px; bottom: 30px; }
-  #tFlop { right: 40px; bottom: 144px; }
-  #tPause { right: 16px; top: 120px; width: 46px; height: 46px; font-size: 20px; }
-  @media (max-width: 640px) { .controls { grid-template-columns: 1fr; } .card { padding: 22px; } #title { padding: 0 16px 6vh; } }
+  #touch > * { position: absolute; }
+  #stick { left: 28px; bottom: 34px; width: 132px; height: 132px; border-radius: 50%; background: rgba(255,255,255,.12); border: 1px solid var(--edge); }
+  #knob { position: absolute; left: 36px; top: 36px; width: 56px; height: 56px; border-radius: 50%; background: rgba(255,255,255,.6); }
+  .tbtn { width: 74px; height: 74px; border-radius: 50%; background: rgba(255,255,255,.14); border: 1px solid var(--edge); font-size: 28px; display: flex; align-items: center; justify-content: center; }
+  .tbtn.down { background: rgba(255,255,255,.35); }
+  #tJump { right: 30px; bottom: 40px; width: 90px; height: 90px; } #tDash { right: 132px; bottom: 30px; } #tFlop { right: 40px; bottom: 144px; } #tPause { right: 16px; top: 140px; width: 46px; height: 46px; font-size: 20px; }
+  @media (max-width: 640px) { .controls { grid-template-columns: 1fr; } .card { padding: 20px; } #title { padding: 0 16px 6vh; } #dream { top: 70px; width: 70vw; } }
 </style>
 </head>
 <body>
 <canvas id="game" tabindex="0"></canvas>
-
 <div id="ui">
+  <div class="bars" style="position:absolute;inset:0;pointer-events:none"></div>
   <div id="hud" class="hidden">
     <div class="hudrow">
-      <div class="stack">
-        <div class="pill">🐟 <span id="fish">0</span><span style="opacity:.45;font-size:14px">/ <span id="fishTotal">0</span></span></div>
-        <div class="pill" id="stars"></div>
-        <div class="pill" id="hearts"></div>
-      </div>
-      <div class="stack right">
-        <div class="pill small" id="levelName">Level</div>
-        <div class="pill small" id="timer">0:00</div>
-      </div>
+      <div class="pill"><div id="chapterName">Chapter</div><div id="objective"></div></div>
+      <div class="right"><div class="pill">🧸 <span id="teddies">0</span> / <span id="teddyTotal">3</span></div><div class="pill" id="timer" style="font-size:13px">0:00</div></div>
     </div>
+    <div id="dream"><div id="dreamLabel">Sweet dreams</div><div class="bar"><div id="dreamFill"></div></div></div>
     <div id="combo"></div>
     <div id="toast"></div>
     <div id="hint"></div>
   </div>
+  <div id="chapterCard"></div>
+  <div id="subtitle"></div>
+  <button class="btn ghost small hidden" id="skip">Skip ▸▸</button>
 
   <div id="touch" class="hidden">
     <div id="stick"><div id="knob"></div></div>
-    <div class="tbtn" id="tJump">⤴</div>
-    <div class="tbtn" id="tDash">🚀</div>
-    <div class="tbtn" id="tFlop">💥</div>
-    <div class="tbtn" id="tPause">⏸</div>
+    <div class="tbtn" id="tJump">⤴</div><div class="tbtn" id="tDash">🚀</div><div class="tbtn" id="tFlop">💥</div><div class="tbtn" id="tPause">⏸</div>
   </div>
 
-  <div id="title" class="screen">
-    <div class="titlebox">
-      <h1>Blåhaj's<br>Big Adventure</h1>
-      <div class="sub">A soft and squishy 3D platformer about a very good shark.</div>
-      <button class="btn" id="btnStart">▶ Play</button>
-      <button class="btn alt" id="btnHow">How to play</button>
+  <div id="title" class="screen hidden">
+    <div class="box">
+      <h1><small>Blåhaj</small>Back to Bed</h1>
+      <p>Leo’s favourite shark has tumbled off the bed in the middle of the night. Climb back up through a dark house before his dream turns into a nightmare.</p>
+      <button class="btn" id="btnStart">▶ Begin</button>
+      <button class="btn ghost" id="btnChapters">Chapters</button>
+      <button class="btn ghost" id="btnHow">How to play</button>
       <button class="btn ghost small qbtn">Graphics</button>
-      <div class="tiny">Press <kbd>M</kbd> to toggle sound · works with keyboard, gamepad and touch</div>
-      <div class="tiny credit">Blåhaj 3D model: <a href="https://sketchfab.com/3d-models/blahaj-ce981de49111488c81ea646067abe1ec" target="_blank" rel="noopener">“Blahaj”</a> by <a href="https://sketchfab.com/Kaine_G" target="_blank" rel="noopener">Kaine_G</a>, <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a> (animated and re-textured for this game)</div>
+      <div class="credit">Blåhaj 3D model: <a href="https://sketchfab.com/3d-models/blahaj-ce981de49111488c81ea646067abe1ec" target="_blank" rel="noopener">“Blahaj”</a> by <a href="https://sketchfab.com/Kaine_G" target="_blank" rel="noopener">Kaine_G</a>, <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a> (animated and re-materialled) · <kbd>M</kbd> sound</div>
     </div>
   </div>
 
   <div id="how" class="screen hidden">
-    <div class="card" style="max-width:760px">
+    <div class="card">
       <h2>How to play</h2>
       <div class="controls">
-        <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / arrows: swim</div>
-        <div><kbd>Space</kbd>: jump (hold for higher)</div>
-        <div><kbd>Space</kbd> in the air: 🫧 double jump</div>
-        <div><kbd>C</kbd> in the air: 💥 belly flop</div>
-        <div><kbd>Shift</kbd>: 🚀 torpedo dash</div>
-        <div>Hold <kbd>Space</kbd> falling: 🪽 fin glide</div>
-        <div>Drag mouse or <kbd>Q</kbd>/<kbd>E</kbd>: turn camera</div>
-        <div><kbd>Esc</kbd> pause · <kbd>R</kbd> restart</div>
+        <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / arrows: move</div>
+        <div><kbd>Space</kbd>: jump, again for a double jump</div>
+        <div><kbd>C</kbd> in the air: belly flop</div>
+        <div><kbd>Shift</kbd>: torpedo dash</div>
+        <div>Hold <kbd>Space</kbd> falling: fin glide</div>
+        <div>Drag mouse or <kbd>Q</kbd>/<kbd>E</kbd>: camera</div>
+        <div><kbd>Esc</kbd> pause · <kbd>Enter</kbd> skip scene</div>
+        <div>Gamepad and touch work too</div>
       </div>
-      <p>Collect 🐟 fish and find the three ⭐ starfish hidden in every level. Bop 🐰 dust bunnies by landing on them, belly flop the robo-vacuums, and snuggle the big pillow to finish. Each level you finish teaches Blåhaj a new trick, and enough starfish open a secret bonus level.</p>
-      <button class="btn" id="btnHowBack">Got it!</button>
+      <p>The meter at the top is <b>Leo’s dream</b>. It slowly fades while he’s alone, and it drains fast when you walk on the <b>dark floor</b>, where the nightmares live. Pools of light, rugs and furniture are safe. Gather glowing dream stars, switch on lamps, and find the hidden teddy bears to keep the dream sweet. Jump on nightmares to make them go poof.</p>
+      <button class="btn" id="btnHowBack">Got it</button>
     </div>
   </div>
 
-  <div id="levels" class="screen hidden">
-    <div class="card">
-      <h2>Choose a level</h2>
-      <div class="grid" id="levelGrid"></div>
-      <div class="abilities" id="abilityList"></div>
-      <div style="margin-top:14px">
-        <button class="btn alt" id="btnBackTitle">Back</button>
-        <button class="btn ghost small qbtn">Graphics</button>
-        <button class="btn ghost small" id="btnReset">Reset progress</button>
-      </div>
-    </div>
+  <div id="chapters" class="screen hidden">
+    <div class="card"><h2>Chapters</h2><div class="chapters" id="chapterGrid"></div><button class="btn ghost" id="btnChaptersBack">Back</button> <button class="btn ghost small qbtn">Graphics</button></div>
   </div>
 
   <div id="pause" class="screen hidden">
-    <div class="card" style="max-width:440px">
-      <h2>Paused</h2>
-      <p style="font-weight:700">Blåhaj is taking a little nap. 💤</p>
-      <button class="btn" id="btnResume">Resume</button><br>
-      <button class="btn alt" id="btnRestart">Restart level</button>
-      <button class="btn alt" id="btnQuit">Level select</button><br>
-      <button class="btn ghost small qbtn">Graphics</button>
-    </div>
+    <div class="card" style="max-width:420px"><h2>Paused</h2><p>Leo is still asleep. Take a breath.</p>
+      <button class="btn" id="btnResume">Resume</button><button class="btn ghost" id="btnRestart">Restart chapter</button><button class="btn ghost" id="btnQuit">Title</button><br><button class="btn ghost small qbtn">Graphics</button></div>
   </div>
-
-  <div id="complete" class="screen hidden">
-    <div class="card" style="max-width:540px">
-      <h2 id="completeTitle">Level complete!</h2>
-      <div class="bigstars" id="completeStars"></div>
-      <div id="completeUnlock"></div>
-      <div class="stat"><span>🐟 Fish</span><b id="cFish"></b></div>
-      <div class="stat"><span>⏱ Time</span><b id="cTime"></b></div>
-      <div class="stat"><span>🐰 Baddies bopped</span><b id="cBops"></b></div>
-      <div class="stat"><span>😵 Tumbles</span><b id="cFalls"></b></div>
-      <div style="margin-top:18px">
-        <button class="btn" id="btnNext">Next level ➜</button>
-        <button class="btn alt" id="btnAgain">Play again</button>
-        <button class="btn alt" id="btnToLevels">Level select</button>
-      </div>
-    </div>
-  </div>
-
+  <div id="complete" class="screen hidden"></div>
   <div id="ending" class="screen hidden">
-    <div class="card" style="max-width:580px">
-      <div style="font-size:70px;animation:swim 2.4s ease-in-out infinite;display:inline-block">🦈💤</div>
-      <h2>You did it!</h2>
-      <p style="font-size:17px;font-weight:700">Blåhaj hopped through the bedroom, bounced across the kitchen, climbed the bookshelf, dashed over the rooftops and glided across the dream sea… and now it's time for a nap on the softest pillow in the world.</p>
-      <p style="font-weight:700;opacity:.8">Can you find every starfish? There's a secret waiting for star collectors…</p>
-      <button class="btn" id="btnEndLevels">Continue</button>
+    <div class="card" style="max-width:560px;text-align:center">
+      <h2>Sweet dreams, Leo.</h2>
+      <p>Blåhaj made it all the way back: off the edge, downstairs with Biscuit, up the big stairs, and into Leo’s arms just in time.</p>
+      <p>Teddy bears found: <b id="endTeddies"></b></p>
+      <button class="btn" id="btnEndTitle">Back to the title</button>
     </div>
   </div>
-
-  <div id="loading" class="hidden"><div style="text-align:center"><div class="shark">🦈</div><div id="loadingText">Fluffing pillows…</div></div></div>
+  <div id="loading"><div><div class="moon">🌙</div><div id="loadingText">Tucking in…</div></div></div>
   <div id="fade"></div>
 </div>
-
 <script src="dist/game.js"></script>
 </body>
 </html>

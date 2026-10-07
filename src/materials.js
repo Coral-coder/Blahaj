@@ -4,7 +4,7 @@ import { Tex } from './textures.js';
 
 const cache = new Map();
 const memo = (key, make) => {
-  if (!cache.has(key)) cache.set(key, make());
+  if (!cache.has(key)) { const m = make(); m.userData.shared = true; cache.set(key, m); }
   return cache.get(key);
 };
 
@@ -15,6 +15,7 @@ function rep(set, r) {
     if (!set[k]) continue;
     const t = set[k].clone();
     t.repeat.set(r, r);
+    t.userData.shared = true;
     t.needsUpdate = true;
     out[k] = t;
   }
@@ -105,3 +106,20 @@ export const Mat = {
     return memo('matte' + color + rough, () => new THREE.MeshStandardMaterial({ color, roughness: rough }));
   },
 };
+
+Object.assign(Mat, {
+  paint(color, rough = 0.85) { return memo('paint' + color + rough, () => new THREE.MeshStandardMaterial(Object.assign({ color, roughness: rough, normalScale: new THREE.Vector2(0.35, 0.35) }, rep(Tex.plaster(), 0.5)))); },
+  wallpaper(color) { return memo('wallpaper' + color, () => new THREE.MeshStandardMaterial(Object.assign({ color, normalScale: new THREE.Vector2(0.3, 0.3) }, rep(Tex.wallpaper(), 0.22)))); },
+  fabric(color, rep_ = 1) { return memo('fabric' + color + rep_, () => new THREE.MeshPhysicalMaterial(Object.assign({ color, sheen: 0.6, sheenRoughness: 0.7, sheenColor: new THREE.Color(0xffffff).lerp(new THREE.Color(color), 0.5), normalScale: new THREE.Vector2(0.7, 0.7) }, rep(Tex.weave(), rep_)))); },
+  carpet(color) { return memo('carpet' + color, () => new THREE.MeshStandardMaterial(Object.assign({ color, normalScale: new THREE.Vector2(1.2, 1.2) }, rep(Tex.carpet(), 1)))); },
+  whiteWood() { return memo('whiteWood', () => new THREE.MeshPhysicalMaterial(Object.assign({ color: 0xf2efe8, clearcoat: 0.25, clearcoatRoughness: 0.5 }, rep(Tex.painted(), 1)))); },
+  oak() { return memo('oak', () => new THREE.MeshStandardMaterial(Object.assign({}, rep(Tex.wood('oak', 0xc9a06a, 0x8f673c, false, 0.8), 1)))); },
+  oakFloor() { return memo('oakFloor', () => new THREE.MeshStandardMaterial(Object.assign({ roughness: 0.6 }, rep(Tex.wood('oakFloor', 0xb98d5c, 0x7d5733, true, 0.7), 1)))); },
+  walnut() { return memo('walnut', () => new THREE.MeshStandardMaterial(Object.assign({}, rep(Tex.wood('walnut', 0x6f4a2e, 0x3d2616, false, 0.8), 1)))); },
+  walnutFloor() { return memo('walnutFloor', () => new THREE.MeshStandardMaterial(Object.assign({ roughness: 0.55 }, rep(Tex.wood('walnutFloor', 0x7a5638, 0x47301d, true, 0.7), 1)))); },
+  brass() { return memo('brass', () => new THREE.MeshStandardMaterial({ color: 0xd2ad66, metalness: 1, roughness: 0.3 })); },
+  steel() { return memo('steel', () => new THREE.MeshStandardMaterial({ color: 0xc9ccd4, metalness: 1, roughness: 0.35 })); },
+  plastic(color) { return memo('plastic' + color, () => new THREE.MeshPhysicalMaterial(Object.assign({ color, roughness: 0.35, clearcoat: 0.6, clearcoatRoughness: 0.2 }, rep(Tex.grainy(), 2)))); },
+  book(color) { return memo('book' + color, () => new THREE.MeshStandardMaterial(Object.assign({ color, roughness: 0.75 }, rep(Tex.linen(), 1)))); },
+  glass() { return memo('glass', () => new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0.04, transmission: 0.95, thickness: 0.1, ior: 1.5, transparent: true, opacity: 0.25 })); },
+});

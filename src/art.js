@@ -5,6 +5,8 @@ import { Tex, textTexture, softDotTexture, vnoise } from './textures.js';
 import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import blahajGlb from '../assets/blahaj.glb';
+import blahajColorUrl from '../assets/blahaj_color.jpg';
+import blahajRoughUrl from '../assets/blahaj_rough.jpg';
 
 const shadow = (m, cast = true, recv = true) => { m.castShadow = cast; m.receiveShadow = recv; return m; };
 const smoothstep = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
@@ -337,8 +339,22 @@ export function createProceduralBlahaj() {
 // Modified: re-materialled with a plush sheen and animated in the vertex
 // shader (tail wag, fin flaps). The mesh has no skeleton, so we bend it.
 let blahajModel = null;
-export function loadBlahajModel() {
+let blahajMaps = null;
+// Textures are embedded as data: images (not blob: URLs) so strict viewers,
+// like the Claude artifact frame, can still load them.
+function loadTex(url, srgb) {
   return new Promise((resolve) => {
+    new THREE.TextureLoader().load(url, (t) => {
+      t.flipY = false; // glTF UV convention
+      if (srgb) t.colorSpace = THREE.SRGBColorSpace;
+      t.anisotropy = 8;
+      resolve(t);
+    }, undefined, () => resolve(null));
+  });
+}
+export function loadBlahajModel() {
+  const maps = Promise.all([loadTex(blahajColorUrl, true), loadTex(blahajRoughUrl, false)]).then(([map, rough]) => { blahajMaps = { map, rough }; });
+  const geo = new Promise((resolve) => {
     try {
       const buf = blahajGlb.buffer.slice(blahajGlb.byteOffset, blahajGlb.byteOffset + blahajGlb.byteLength);
       new GLTFLoader().parse(buf, '', (gltf) => {
@@ -349,6 +365,7 @@ export function loadBlahajModel() {
       }, (err) => { console.warn('Blåhaj model failed to load, using the procedural one', err); resolve(false); });
     } catch (err) { console.warn('Blåhaj model failed to load, using the procedural one', err); resolve(false); }
   });
+  return Promise.all([geo, maps]).then(([ok]) => ok && !!(blahajMaps && blahajMaps.map));
 }
 
 // mesh space: snout toward -x, dorsal fin +y, pectoral fins toward ±z
@@ -390,9 +407,9 @@ function plushModelMaterial(src, uni, deform) {
     map: blahajTeethTexture(), alphaTest: 0.5, transparent: false, side: THREE.DoubleSide,
     roughness: 0.85, sheen: 0.6, sheenColor: new THREE.Color(0xffffff),
   } : {
-    map: src.map || null, roughnessMap: src.roughnessMap || null, normalMap: fuzzN, normalScale: new THREE.Vector2(0.45, 0.45),
+    map: blahajMaps && blahajMaps.map, roughnessMap: blahajMaps && blahajMaps.rough, normalMap: fuzzN, normalScale: new THREE.Vector2(0.45, 0.45),
     roughness: 1, metalness: 0, side: THREE.DoubleSide,
-    sheen: 1, sheenRoughness: 0.5, sheenColor: new THREE.Color(0xc8dcff),
+    sheen: 0.45, sheenRoughness: 0.55, sheenColor: new THREE.Color(0x8fb0e0),
   });
   if (deform) addBlahajDeform(m, uni, src.name === 'teef');
   return m;
@@ -425,7 +442,7 @@ function addBlahajDeform(m, uni, teeth) {
 }
 
 export function createBlahaj() {
-  if (!blahajModel) return createProceduralBlahaj();
+  if (!blahajModel || !blahajMaps || !blahajMaps.map) return createProceduralBlahaj();
   const root = new THREE.Group();
   const body = new THREE.Group();
   root.add(body);

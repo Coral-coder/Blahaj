@@ -57,6 +57,7 @@ function dataTex(data, size, srgb) {
   t.magFilter = THREE.LinearFilter;
   t.anisotropy = maxAniso;
   if (srgb) t.colorSpace = THREE.SRGBColorSpace;
+  t.userData.shared = true;
   t.needsUpdate = true;
   return t;
 }
@@ -298,6 +299,103 @@ export const Tex = {
   },
 };
 
+
+// ------------------------------------------------------------ interiors --
+Object.assign(Tex, {
+  // matte painted plaster, greyscale (tinted by material colour)
+  plaster() {
+    return makeSet('plaster', 512, 1.2, (u, v) => {
+      const n = fbm(u * 6, v * 6, 6, 5, 201), f = vnoise(u * 90, v * 90, 90, 202);
+      const s = 0.94 + n * 0.05 + f * 0.01;
+      return [s, s, s, n * 0.7 + f * 0.3, 0.9];
+    });
+  },
+  // kids' wallpaper: tiny stars and moons on a soft ground (greyscale motif in R, tinted later)
+  wallpaper() {
+    return makeSet('wallpaper', 1024, 0.8, (u, v) => {
+      const n = fbm(u * 8, v * 8, 8, 4, 211);
+      const cx = u * 8, cy = v * 8 + (Math.floor(u * 8) & 1) * 0.5;
+      const fx = cx - Math.floor(cx) - 0.5, fy = cy - Math.floor(cy) - 0.5;
+      // five-point star
+      const a = Math.atan2(fy, fx), r = Math.hypot(fx, fy);
+      const star = r < 0.11 * (0.62 + 0.38 * Math.cos(5 * a)) ? 1 : 0;
+      const dot = Math.hypot(fx - 0.33, fy - 0.3) < 0.035 ? 1 : 0;
+      const base = 0.93 + n * 0.04;
+      const k = Math.max(star, dot);
+      const c = [base - k * 0.12, base - k * 0.05, base + k * 0.04];
+      return [c[0], c[1], c[2], n * 0.5 + k * 0.3, 0.88 - k * 0.2];
+    });
+  },
+  // woven upholstery
+  weave() {
+    return makeSet('weave', 512, 4, (u, v) => {
+      const a = Math.sin(u * Math.PI * 2 * 96) * 0.5 + 0.5, b = Math.sin(v * Math.PI * 2 * 96) * 0.5 + 0.5;
+      const over = ((Math.floor(u * 96) + Math.floor(v * 96)) & 1) ? a : b;
+      const n = fbm(u * 24, v * 24, 24, 3, 221), sl = vnoise(u * 400, v * 40, 400, 222);
+      const s = 0.8 + over * 0.12 + n * 0.06 + sl * 0.04;
+      return [s, s, s, over * 0.7 + n * 0.3, 0.95];
+    });
+  },
+  carpet() {
+    return makeSet('carpet', 512, 6, (u, v) => {
+      const n = vnoise(u * 220, v * 220, 220, 231) * 0.6 + fbm(u * 16, v * 16, 16, 3, 232) * 0.4;
+      const s = 0.82 + n * 0.18;
+      return [s, s, s, n, 1];
+    });
+  },
+  // brushed/leathery grain for book covers, toy plastic, etc.
+  grainy() {
+    return makeSet('grainy', 256, 1.5, (u, v) => {
+      const n = vnoise(u * 160, v * 160, 160, 241) * 0.5 + fbm(u * 8, v * 8, 8, 3, 242) * 0.5;
+      const s = 0.9 + n * 0.1;
+      return [s, s, s, n, 0.7];
+    });
+  },
+});
+
+// a moonlit night seen through a window: sky gradient, stars, moon, rooftops
+let nightSkyTex = null;
+export function nightSkyTexture() {
+  if (nightSkyTex) return nightSkyTex;
+  const W = 1024, H = 768;
+  const c = document.createElement('canvas');
+  c.width = W; c.height = H;
+  const g = c.getContext('2d');
+  const grd = g.createLinearGradient(0, 0, 0, H);
+  grd.addColorStop(0, '#0b1230'); grd.addColorStop(0.6, '#1f2f63'); grd.addColorStop(1, '#3a4a86');
+  g.fillStyle = grd; g.fillRect(0, 0, W, H);
+  let seed = 7;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  for (let i = 0; i < 260; i++) {
+    const x = rnd() * W, y = rnd() * H * 0.75, r = rnd() * 1.4 + 0.3;
+    g.fillStyle = `rgba(255,255,240,${0.4 + rnd() * 0.6})`;
+    g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill();
+  }
+  // moon with a soft halo
+  const mx = W * 0.68, my = H * 0.24;
+  const halo = g.createRadialGradient(mx, my, 10, mx, my, 160);
+  halo.addColorStop(0, 'rgba(220,230,255,0.55)'); halo.addColorStop(1, 'rgba(220,230,255,0)');
+  g.fillStyle = halo; g.fillRect(0, 0, W, H);
+  g.fillStyle = '#f3f1e6'; g.beginPath(); g.arc(mx, my, 46, 0, Math.PI * 2); g.fill();
+  g.fillStyle = 'rgba(180,180,170,0.35)';
+  [[-12, -8, 9], [14, 10, 7], [6, -18, 5], [-6, 16, 6]].forEach(([dx, dy, r]) => { g.beginPath(); g.arc(mx + dx, my + dy, r, 0, Math.PI * 2); g.fill(); });
+  // rooftops and a tree line, a few warm windows
+  g.fillStyle = '#0a0f22';
+  g.beginPath(); g.moveTo(0, H);
+  let x = 0;
+  while (x < W) {
+    const w = 80 + rnd() * 120, h = 120 + rnd() * 140;
+    g.lineTo(x, H - h); g.lineTo(x + w * 0.5, H - h - 60 - rnd() * 40); g.lineTo(x + w, H - h);
+    x += w;
+  }
+  g.lineTo(W, H); g.closePath(); g.fill();
+  for (let i = 0; i < 9; i++) { g.fillStyle = rnd() > 0.5 ? '#ffcf7a' : '#ffb35c'; g.fillRect(rnd() * W, H - 60 - rnd() * 140, 10, 14); }
+  nightSkyTex = new THREE.CanvasTexture(c);
+  nightSkyTex.userData.shared = true;
+  nightSkyTex.colorSpace = THREE.SRGBColorSpace;
+  return nightSkyTex;
+}
+
 // soft round sprite used by all particles and background bokeh
 let softDot = null;
 export function softDotTexture() {
@@ -312,6 +410,7 @@ export function softDotTexture() {
   g.fillStyle = grd;
   g.fillRect(0, 0, 128, 128);
   softDot = new THREE.CanvasTexture(c);
+  softDot.userData.shared = true;
   softDot.colorSpace = THREE.SRGBColorSpace;
   return softDot;
 }
@@ -331,6 +430,7 @@ export function bokehTexture() {
   g.fillStyle = grd;
   g.beginPath(); g.arc(64, 64, 62, 0, Math.PI * 2); g.fill();
   bokeh = new THREE.CanvasTexture(c);
+  bokeh.userData.shared = true;
   bokeh.colorSpace = THREE.SRGBColorSpace;
   return bokeh;
 }
