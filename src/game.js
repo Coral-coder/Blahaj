@@ -735,7 +735,7 @@ export class Game {
     P.pos && this.rig.root.position.copy(P.pos);
     this.rig.root.rotation.y = P.yaw;
     const sp = Math.min(1, Math.hypot(P.vel.x, P.vel.z) / CFG.run);
-    this.rig.update(dt, { speed: sp, grounded: P.grounded, vy: P.vel.y, pound: !!P.pound, glide: P.glide, happy: this.state === 'win' });
+    this.rig.update(dt, { speed: sp, grounded: P.grounded, vx: P.vel.x, vy: P.vel.y, vz: P.vel.z, pound: !!P.pound, glide: P.glide, happy: this.state === 'win' });
     this.rig.root.visible = !(P.invuln > 0 && this.state === 'play' && Math.floor(t * 20) % 2 === 0);
     // blob shadow sits on whatever is below
     let groundY = this.L.floor.y;

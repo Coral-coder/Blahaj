@@ -248,6 +248,7 @@ function frame(now) {
   input.pollPad();
   if (input.pressed.has('pad-pause')) { if (mode === 'play') pause(true); else if (mode === 'paused') pause(false); }
   if (debug.noRender) return; // tests drive the simulation themselves
+  if (debug.freeze && game) { game.render(); input.endFrame(); return; } // inspect a frozen frame
   if (!game) { input.endFrame(); return; }
   if (mode === 'play' || mode === 'title' || (mode === 'menu' && game.state === 'win')) game.update(dt);
   else input.endFrame();
@@ -261,7 +262,7 @@ show('title');
 loading(true, 'Fluffing pillows…');
 loadBlahajModel().then(() => { startLevel(0, true); requestAnimationFrame(frame); });
 // debug / test hooks
-const debug = { noRender: false };
+const debug = { noRender: false, freeze: false };
 window.__blahaj = {
   get game() { return game; }, startLevel, save, get mode() { return mode; }, debug,
   // advance the simulation deterministically (used by automated tests)
