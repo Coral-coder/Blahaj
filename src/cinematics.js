@@ -196,39 +196,78 @@ export function dogSnatch(game, hooks) {
   game.scene.add(dog.group);
   const P = game.p, rig = game.rig;
   const r = game.ch.room;
-  const sill = P.pos.clone();
+  const sill = P.pos.clone(); // wherever Blåhaj was when Biscuit burst in
   const door = V(4.6, 0, 12);
-  const spot = V(THREE.MathUtils.clamp(sill.x + 2.8, r.x0 + 1.5, r.x1 - 1.5), 0, -4.4);
   const faceTo = (from, to) => Math.atan2(to.x - from.x, to.z - from.z);
-  const path = [door, V(4.25, 0, 6.5), V(4.25, 0, 1.2), spot];
+  // does a dog standing at p facing yaw fit, clear of all furniture?
+  const furniture = game.solids.filter((s) => s.active && !s.mover && s.kind !== 'floor' && !/^(wall|ceiling|glass|doorStop)/.test(s.tag || ''));
+  const fits = (p, yaw) => {
+    const fx = Math.sin(yaw), fz = Math.cos(yaw);
+    for (let k = -1.4; k <= 1.6; k += 0.5) {
+      const x = p.x + fx * k, z = p.z + fz * k;
+      if (x < r.x0 + 0.5 || x > r.x1 - 0.5 || z < r.z0 + 0.5 || z > r.z1 - 0.5) return false;
+      if (furniture.some((s) => s.max.y > 0.25 && s.min.y < 2.6 && x > s.min.x - 0.45 && x < s.max.x + 0.45 && z > s.min.z - 0.45 && z < s.max.z + 0.45)) return false;
+    }
+    return true;
+  };
+  // he stops out in the room, a few steps from Blåhaj
+  const toRoom = V(-sill.x, 0, -sill.z).normalize();
+  let spot = null;
+  for (const d of [4.8, 4.0, 5.6, 3.4]) for (const turn of [0, 0.4, -0.4, 0.8, -0.8]) {
+    if (spot) break;
+    const dir = toRoom.clone().applyAxisAngle(V(0, 1, 0), turn), p = sill.clone().setY(0).addScaledVector(dir, d);
+    if ([0, 1, 2, 3].filter((a) => fits(p, a * Math.PI / 2)).length >= 3 && fits(p, faceTo(p, sill))) spot = p;
+  }
+  spot = spot || V(0.6, 0, -4.6);
+  // in through the door and round the toys to the spot (and back out again)
+  // (the bedroom: past the laundry, round the west side of the block towers and the books)
+  const path = [door, V(4.4, 0, 7.6), V(3.6, 0, 6.2), V(1.4, 0, 5.8), V(1.3, 0, 1.6), ...(spot.x < 0.5 ? [V(-0.6, 0, 0.6)] : []), spot];
   dog.group.position.copy(door); dog.group.rotation.y = Math.PI;
   const turnTo = (want, k) => { const d = dog.group.rotation; d.y += Math.atan2(Math.sin(want - d.y), Math.cos(want - d.y)) * Math.min(1, k); };
-  // bake Blåhaj's startled hop off the sill
+  // bake Blåhaj's startled tumble (away from the bark, toward the room)
   const RELEASE = 3.3;
   const q0 = yawQ(P.yaw);
-  const body = createTumble(game.solids, { rollDrag: 3, surface: game.softHeight });
+  const body = createTumble(game.solids, { rollDrag: 3, floorDrag: 8, surface: game.softHeight });
   body.x.copy(sill).add(BLAHAJ_COM.clone().applyQuaternion(q0)); body.q.copy(q0);
-  body.v.set(0.3, 6.5, 4.6); body.w.set(-6, 0.8, 0.6);
+  const hop = spot.clone().sub(sill).setY(0).normalize();
+  body.v.copy(hop).multiplyScalar(4.2).setY(6.2); body.w.copy(new THREE.Vector3().crossVectors(hop, V(0, 1, 0)).multiplyScalar(6)).setY(0.8);
   const fall = body.bake(7);
   const at = (t) => fall.frames[Math.max(0, Math.min(fall.frames.length - 1, Math.floor((t - RELEASE) / fall.h)))];
   const rest = fall.frames[fall.frames.length - 1];
   const restPos = rest.x.clone();
-  // where Biscuit stands to pick him up (mouth over Blåhaj's back)
+  // he grabs Blåhaj by an end, like any dog with a toy: try both ends and a
+  // few angles, keep the shortest walk where he isn't standing in furniture
   const MOUTH = new THREE.Vector3(0, 0.77, 1.19);
-  // he grabs Blåhaj by an end, like any dog with a toy, standing in line with
-  // him so his paws stay clear (whichever end is the shorter walk)
   const axis = V(0, 0, 1).applyQuaternion(rest.q).setY(0).normalize();
-  const ends = [1, -1].map((sg) => {
+  const options = [];
+  for (const sg of [1, -1]) for (const turn of [0, 0.5, -0.5, 1.0, -1.0, 1.5, -1.5]) {
     const g = restPos.clone().addScaledVector(axis, sg * 0.85);
-    return { grab: g, pick: g.clone().setY(0).addScaledVector(axis, sg * MOUTH.z) };
-  }).sort((a, b) => a.pick.distanceTo(spot) - b.pick.distanceTo(spot));
-  const { grab, pick } = ends[0];
+    const out = axis.clone().multiplyScalar(sg).applyAxisAngle(V(0, 1, 0), turn);
+    const pk = g.clone().setY(0).addScaledVector(out, MOUTH.z);
+    if (fits(pk, faceTo(pk, g))) options.push({ grab: g, pick: pk, cost: pk.distanceTo(spot) + Math.abs(turn) });
+  }
+  options.sort((a, b) => a.cost - b.cost);
+  const { grab, pick } = options[0] || { grab: restPos.clone(), pick: restPos.clone().setY(0).addScaledVector(hop, MOUTH.z) };
   const approach = faceTo(pick, grab);
   const fwd = V(Math.sin(approach), 0, Math.cos(approach));
-  const exitPath = [pick, V(4.25, 0, 1.2), V(4.25, 0, 6.5), door.clone().add(V(0, 0, 2))];
+  const exitPath = [pick, spot, ...path.slice(1, -1).reverse(), door.clone().add(V(0, 0, 2))];
+  // (for testing: does he fit everywhere along both walks?)
+  const walkOK = (pts) => pts.slice(0, -1).every((a, i) => { const b = pts[i + 1], yaw = faceTo(a, b); for (let k = 0.2; k <= 0.8; k += 0.1) { const p = a.clone().lerp(b, k); if (p.z < r.z1 - 1 && !fits(p, yaw)) return false; } return true; });
+  // a camera off to the side of the tumble, inside the room and clear of furniture
+  const clear = (p) => p.x > r.x0 + 0.5 && p.x < r.x1 - 0.5 && p.z > r.z0 + 0.5 && p.z < r.z1 - 0.5 && !furniture.some((s) => p.x > s.min.x - 0.3 && p.x < s.max.x + 0.3 && p.y > s.min.y - 0.3 && p.y < s.max.y + 0.3 && p.z > s.min.z - 0.3 && p.z < s.max.z + 0.3);
+  const side = V(-hop.z, 0, hop.x);
+  const sees = (eye, at) => { for (let k = 0.1; k < 0.95; k += 0.1) if (!clear(eye.clone().lerp(at, k))) return false; return clear(eye); };
+  const gside = V(-fwd.z, 0, fwd.x), gAt = grab.clone().setY(0.7);
+  const pickCam = [[3.7, 1.5], [3.7, -1.5], [3.0, 0], [0.5, 3.6], [0.5, -3.6], [2.4, 2.8], [2.4, -2.8]]
+    .map(([f, sd]) => grab.clone().addScaledVector(fwd, f).addScaledVector(gside, sd).setY(1.6)).find((e) => sees(e, gAt)) || grab.clone().addScaledVector(fwd, 3.7).setY(2.2);
+  // ...and not behind Biscuit's head: keep him out of the line of sight
+  const dogFree = (eye) => { const a = eye.clone().setY(0), b = sill.clone().setY(0), ab = b.clone().sub(a), t = THREE.MathUtils.clamp(spot.clone().sub(a).dot(ab) / ab.lengthSq(), 0, 1); return a.addScaledVector(ab, t).distanceTo(spot) > 1.6 && eye.distanceTo(spot) > 2.6; };
+  const startleCam = [[4.2, 2.2], [-4.2, 2.2], [4.6, 0.8], [-4.6, 0.8], [3.2, 3.6], [-3.2, 3.6]]
+    .map(([sd, f]) => sill.clone().addScaledVector(side, sd).addScaledVector(hop, f).setY(Math.max(2.6, sill.y - 1.2)))
+    .find((e) => clear(e) && dogFree(e)) || sill.clone().addScaledVector(hop, 5).setY(3.4);
   const lines = [[0.4, 'Then came a jingle of collar tags…'], [2.7, 'Biscuit!'], [5.0, 'Biscuit wanted to play.']];
   const c = base(hooks, lines, 10.6);
-  c.snatchInfo = { sill, rest: restPos, pick };
+  c.snatchInfo = { sill, rest: restPos, pick, spot, inOK: walkOK(path.slice(1)), outOK: walkOK(exitPath) };
   hooks.letterbox(true);
   for (const e of game.enemies) e.s.group.visible = false; // the nightmares hide from Biscuit
   Audio.dogBark && Audio.dogBark();
@@ -243,7 +282,7 @@ export function dogSnatch(game, hooks) {
     if (t < 2.6) { // in through the door, around the blocks and the open drawer
       const k = Math.min(1, t / 2.6) * (path.length - 1), i = Math.min(path.length - 2, Math.floor(k));
       dog.group.position.copy(lerpV(path[i], path[i + 1], k - i));
-      turnTo(faceTo(path[i], path[i + 1]), dt * 10);
+      turnTo(faceTo(path[i], path[i + 1]), dt * 5);
     }
     else if (t < 3.7) { pose = t < 2.8 ? 'stand' : 'rear'; speed = 0; dog.group.position.copy(spot); turnTo(faceTo(spot, sill), dt * 8); if (!barked && t > 2.85) { barked = true; Audio.dogBark && Audio.dogBark(); } }
     else if (t < 4.7) { pose = 'stand'; speed = 0; turnTo(faceTo(spot, at(t).x), dt * 4); }
@@ -253,7 +292,7 @@ export function dogSnatch(game, hooks) {
       pose = 'carry';
       const k = Math.min(1, (t - 6.7) / 3.5) * (exitPath.length - 1), i = Math.min(exitPath.length - 2, Math.floor(k));
       dog.group.position.copy(lerpV(exitPath[i], exitPath[i + 1], k - i));
-      turnTo(faceTo(exitPath[i], exitPath[i + 1]), dt * 6);
+      turnTo(faceTo(exitPath[i], exitPath[i + 1]), dt * 5);
     }
     dog.update(dt, pose, speed);
     dog.group.updateMatrixWorld(true);
@@ -283,16 +322,14 @@ export function dogSnatch(game, hooks) {
     // --- camera
     if (t < 2.6) camShot(game, V(-2.4, 8.2, -1.2), V(-2.0, 7.6, -1.6), V(4.6, 1.6, 8.0), V(3.6, 2.4, -4.6), seg(t, 0, 2.6), 54);
     else if (t < 4.8) {
-      camShot(game, V(sill.x - 4.2, 3.4, -2.4), V(sill.x - 3.8, 2.8, -2.8), V(sill.x + 0.6, 3.6, -7.4), V(sill.x + 0.6, 1.6, -6.4), seg(t, 2.6, 4.8), 52);
-      if (t > RELEASE) game.camera.lookAt(lerpV(V(sill.x + 0.6, 3.6, -7.4), V(sill.x + 0.6, 1.6, -6.4), seg(t, 2.6, 4.8)).lerp(com, 0.45));
+      camShot(game, startleCam, startleCam.clone().add(V(0, -0.5, 0)).addScaledVector(hop, -0.4), sill.clone().add(V(0, 0.4, 0)), sill.clone().addScaledVector(hop, 2.0).setY(1.4), seg(t, 2.6, 4.8), 52);
+      if (t > RELEASE) game.camera.lookAt(lerpV(sill.clone().add(V(0, 0.4, 0)), sill.clone().addScaledVector(hop, 2.0).setY(1.4), seg(t, 2.6, 4.8)).lerp(com, 0.45));
     } else if (t < 6.9) {
       // low and in front of Biscuit, so we see him come nose-down onto Blåhaj
-      const side = V(-fwd.z, 0, fwd.x);
-      const eye = grab.clone().addScaledVector(fwd, 3.7).addScaledVector(side, 1.5).setY(1.6);
-      eye.x = THREE.MathUtils.clamp(eye.x, r.x0 + 0.6, r.x1 - 0.6); eye.z = THREE.MathUtils.clamp(eye.z, r.z0 + 0.6, r.z1 - 0.6);
+      const eye = pickCam;
       camShot(game, eye, eye.clone().add(V(0, 0.25, 0)), grab.clone().setY(0.5).addScaledVector(fwd, -0.4), grab.clone().setY(1.0).addScaledVector(fwd, -0.9), seg(t, 4.8, 6.9), 48);
-    } else { // from the middle of the room, watch him trot off with Blåhaj
-      game.camera.position.set(1.6, 5.4, -1.0);
+    } else { // from the foot of the bed, watch him trot off with Blåhaj
+      game.camera.position.set(-5.2, 6.2, 1.6);
       const hp = dog.head.getWorldPosition(V());
       game.camera.lookAt(hp.x, hp.y - 0.7, hp.z);
       if (game.camera.fov !== 46) { game.camera.fov = 46; game.camera.updateProjectionMatrix(); }
@@ -309,63 +346,76 @@ export function downstairs(game, hooks) {
   const P = game.p, rig = game.rig;
   const bed = V(game.ch.spawn[0], game.ch.spawn[1], game.ch.spawn[2]);
   const from = V(2, 0, 4), sleep = dog.group.position.clone(), sleepRot = dog.group.rotation.y;
-  const dropAt = bed.clone().setY(0).add(V(0.5, 0, 2.6));
+  const play = bed.clone().setY(0).add(V(3.0, 0, 2.6));          // where he stops to play, facing his bed
+  const faceBed = Math.atan2(bed.x - play.x, bed.z - play.z);
   const uprightQ = yawQ(game.ch.spawnYaw || 0), uprightCom = bed.clone().add(BLAHAJ_COM.clone().applyQuaternion(uprightQ));
-  const lines = [[0.5, 'Downstairs, Biscuit dropped Blåhaj in his dog bed…'], [4.4, '…and fell fast asleep.'], [7.2, 'Leo is still upstairs. Find the stairs!']];
-  const c = base(hooks, lines, 10);
+  const lines = [[0.5, 'Downstairs, Biscuit wanted to play.'], [3.4, 'Woof! A play bow, a shake…'], [5.0, '…and a big toss, right into his dog bed!'], [7.4, 'Then Biscuit yawned, and curled up by the fire.'], [10.2, 'Leo is still upstairs. Find the stairs!']];
+  const c = base(hooks, lines, 13);
+  c.ownsDog = true;
   hooks.letterbox(true); hooks.fade(false);
-  let held = null, drop = null, lastImpact = -1;
+  for (const e of game.enemies) e.s.group.visible = false; // nightmares keep away from a wide-awake dog
+  const TOSS = 4.7;
+  let held = null, toss = null, lastImpact = -1;
+  const turnTo = (want, k) => { const d = dog.group.rotation; d.y += Math.atan2(Math.sin(want - d.y), Math.cos(want - d.y)) * Math.min(1, k); };
   c.update = (dt) => {
     const t = (c.t += dt);
     c.subtitles(t);
-    // Biscuit: carry him in, drop him, wander off to sleep
-    if (t < 3.2) {
-      dog.group.position.copy(lerpV(from, dropAt, seg(t, 0, 3.2))); dog.group.rotation.y = Math.atan2(bed.x - from.x, bed.z - from.z);
-      dog.update(dt, 'carry', 1);
-    } else if (t < 4.0) dog.update(dt, 'stand', 0);
+    // Biscuit: trot in, play bow, shake, toss, yawn, pad over to the fire, flop down
+    if (t < 3.0) { dog.group.position.copy(lerpV(from, play, seg(t, 0, 3.0))); turnTo(t < 2.4 ? Math.atan2(play.x - from.x, play.z - from.z) : faceBed, dt * 6); dog.update(dt, 'carry', 1); }
+    else if (t < 3.9) { turnTo(faceBed, dt * 6); dog.update(dt, 'bow', 0); if (t > 3.3 && !c.barked) { c.barked = true; Audio.dogBark && Audio.dogBark(); } }
+    else if (t < 4.5) dog.update(dt, 'shake', 0);
+    else if (t < 5.4) dog.update(dt, 'toss', 0);
+    else if (t < 6.6) dog.update(dt, 'stand', 0);
+    else if (t < 7.6) dog.update(dt, 'yawn', 0);
     else {
-      const k = seg(t, 4.0, 5.6);
-      dog.group.position.copy(lerpV(dropAt, sleep, k)); dog.group.rotation.y = sleepRot;
-      dog.update(dt, k < 1 ? 'walk' : 'sleep', k < 1 ? 1 : 0);
+      const k = seg(t, 7.6, 9.6);
+      dog.group.position.copy(lerpV(play, sleep, k)); turnTo(k < 0.85 ? Math.atan2(sleep.x - play.x, sleep.z - play.z) : sleepRot, dt * 4);
+      dog.update(dt, k < 1 ? 'walk' : 'sleep', k < 1 ? 0.6 : 0);
     }
     dog.group.updateMatrixWorld(true);
-    // Blåhaj: in his mouth, then dropped (physics) into the dog bed
+    // Blåhaj: in his mouth until the toss, then real physics into the bed
     let com, q, vel = V(), grounded = false;
-    if (t < 3.2) { held = carried(dog, t); com = held.com; q = held.q; vel.set(0, Math.sin(t * 7) * 3, 0); }
+    if (t < TOSS) { held = carried(dog, t); com = held.com; q = held.q; vel.set(0, Math.sin(t * 7) * 3, 0); }
     else {
-      if (!drop) {
+      if (!toss) {
         if (!held) held = carried(dog, t); // skipped before the first frame
-        const b = createTumble(game.solids, { rollDrag: 3.5, surface: game.softHeight });
-        b.x.copy(held.com); b.q.copy(held.q); b.v.set(0.3, 0.3, -0.8); b.w.set(-3.2, 0.3, 1.4);
-        drop = b.bake(4.5); drop.t0 = t;
-        const last = drop.frames[drop.frames.length - 1];
+        const b = createTumble(game.solids, { rollDrag: 3.5, floorDrag: 8, surface: game.softHeight });
+        // aim the throw so it arcs into the middle of the bed
+        const tgt = bed.clone().add(V(0, 0.6, 0)), fly = 0.8;
+        b.x.copy(held.com); b.q.copy(held.q);
+        b.v.copy(tgt).sub(held.com).divideScalar(fly); b.v.y += 0.5 * 40 * fly; b.w.set(1.2, 5.0, 0.8);
+        toss = b.bake(c.length - TOSS + 0.1); toss.t0 = t;
+        const last = toss.frames[toss.frames.length - 1];
         const restPivot = last.x.clone().sub(BLAHAJ_COM.clone().applyQuaternion(last.q));
-        drop.nudge = V(bed.x - restPivot.x, 0, bed.z - restPivot.z);
-        drop.restQ = last.q.clone(); drop.restCom = last.x.clone().add(drop.nudge);
-        Audio.fall();
+        toss.nudge = V(bed.x - restPivot.x, 0, bed.z - restPivot.z);
+        toss.restQ = last.q.clone(); toss.restCom = last.x.clone().add(toss.nudge);
+        Audio.jump();
       }
-      const ft = t - drop.t0, f = drop.frames[Math.min(drop.frames.length - 1, Math.floor(ft / drop.h))];
-      com = f.x.clone().addScaledVector(drop.nudge, ease(ft / 0.7)); q = f.q; vel = f.v; grounded = f.contact;
-      for (const e of drop.impacts) {
+      const ft = t - toss.t0, f = toss.frames[Math.min(toss.frames.length - 1, Math.floor(ft / toss.h))];
+      com = f.x.clone().addScaledVector(toss.nudge, ease(ft / 1.2)); q = f.q; vel = f.v; grounded = f.contact;
+      for (const e of toss.impacts) {
         if (e.done || e.time > ft) continue;
         e.done = true;
         if (e.time - lastImpact < 0.12) continue;
         lastImpact = e.time; rig.impulse(-Math.min(8, e.speed * 0.4)); Audio.land();
       }
-      if (t > 7.4) { // wriggles back onto his belly
-        const k = seg(t, 7.4, 8.4);
-        q = drop.restQ.clone().slerp(uprightQ, k);
-        com = drop.restCom.clone().lerp(uprightCom, k); com.y += Math.sin(k * Math.PI) * 0.5;
+      if (t > 10.0) { // wriggles back onto his belly
+        const k = seg(t, 10.0, 11.0);
+        q = toss.restQ.clone().slerp(uprightQ, k);
+        com = toss.restCom.clone().lerp(uprightCom, k); com.y += Math.sin(k * Math.PI) * 0.5;
         vel = V(0, Math.cos(k * Math.PI) * 3, 0); grounded = k >= 1;
       }
     }
-    rig.update(dt, { speed: t < 3.2 ? 0.5 : 0, grounded, vx: vel.x, vy: vel.y, vz: vel.z });
+    rig.update(dt, { speed: t < TOSS ? 0.5 : 0, grounded, vx: vel.x, vy: vel.y, vz: vel.z });
     poseRig(game, com, q);
-    if (t < 4.4) camShot(game, V(4, 7.5, 6), V(-2, 6.5, 3), V(0, 1.5, 0), V(-8.8, 1.0, -4.0), seg(t, 0, 4.4), 54);
-    else if (t < 7.2) camShot(game, V(-4.4, 2.5, -8.0), V(-4.9, 2.1, -8.3), V(-8.4, 0.9, -5.0), V(-8.6, 0.9, -5.4), seg(t, 4.4, 7.2), 48);
-    else camShot(game, V(-4.9, 2.1, -8.3), V(-3.0, 6.0, 1.0), V(-8.6, 0.9, -5.4), V(12, 2.0, 7.5), seg(t, 7.4, 10), 54);
+    // cameras: in from the room, then the game of fetch, then Biscuit settling by the fire
+    if (t < 3.0) camShot(game, V(4, 7.5, 6), V(-1, 6.0, 3), V(0, 1.5, 0), play.clone().setY(1.6), seg(t, 0, 3.0), 54);
+    else if (t < 7.2) camShot(game, V(-1.2, 3.4, -5.6), V(-1.8, 3.0, -6.2), lerpV(play, bed, 0.4).setY(1.4), lerpV(play, bed, 0.6).setY(1.0), seg(t, 3.0, 7.2), 50);
+    else if (t < 10.4) camShot(game, V(-4.6, 2.6, -7.8), V(-5.0, 2.4, -7.6), lerpV(play, sleep, 0.5).setY(1.2), sleep.clone().setY(0.9).lerp(bed, 0.4), seg(t, 7.2, 10.4), 50);
+    else camShot(game, V(-5.0, 2.4, -7.6), V(-3.0, 6.0, 1.0), sleep.clone().setY(0.9).lerp(bed, 0.4), V(12, 2.0, 7.5), seg(t, 10.4, 13), 54);
     if (t >= c.length) {
       c.done = true; hooks.subtitle(null); hooks.letterbox(false);
+      for (const e of game.enemies) e.s.group.visible = true;
       rig.body.position.set(0, 0, 0); rig.body.rotation.set(0, 0, 0);
       P.pos.copy(bed); P.yaw = game.ch.spawnYaw || 0; P.vel.set(0, 0, 0);
       game.cam.yaw = game.ch.camYaw; game.updateCamera(1, true);
@@ -396,7 +446,7 @@ export function stairsIntro(game, hooks) {
   return flyover(game, hooks, [
     { d: 4.2, from: V(3.8, 1.6, 9.2), to: V(3.6, 9.5, 2.0), look0: V(-2, 3, 0), look1: V(-2.2, 11, -9), fov: 56 },
     { d: 3.4, from: V(3.6, 9.5, 2.0), to: V(3.4, 3.0, 9.0), look0: V(-2.2, 11, -9), look1: V(1.5, 0.5, 6.5), fov: 56 },
-  ], [[0.4, 'The stairs. Leo’s room is all the way at the top.'], [4.0, 'And the dark is rising behind you…']]);
+  ], [[0.4, 'The stairs. Leo’s room is all the way at the top.'], [3.0, 'A nightmare up on the landing is hurling balls down them…'], [5.4, '…and the dark is rising behind you!']]);
 }
 export function bedIntro(game, hooks) {
   return flyover(game, hooks, [
@@ -411,40 +461,52 @@ export function ending(game, hooks) {
   const start = P.pos.clone(), hug = leo.hugPoint.clone();
   const fromQ = yawQ(P.yaw), heldQ = yawQ(Math.PI).multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0, 0.3)));
   const startCom = start.clone().add(BLAHAJ_COM.clone().applyQuaternion(fromQ));
-  const lines = [[1.8, 'Leo stirred…'], [4.0, '…slid his arm under Blåhaj…'], [5.8, '…and pulled the covers up over them both.'], [8.4, 'The nightmares melted away like morning mist.'], [11.4, 'Sweet dreams, Leo.']];
-  const c = base(hooks, lines, 15);
+  const smoother = (x) => { x = THREE.MathUtils.clamp(x, 0, 1); return x * x * x * (x * (x * 6 - 15) + 10); };
+  const sm = (t, a, b) => smoother((t - a) / (b - a));
+  const lines = [[1.8, 'Leo stirred…'], [3.8, '…rolled over, and pulled Blåhaj close…'], [6.4, '…and snuggled down under the covers, both arms around him.'], [9.4, 'The nightmares melted away like morning mist.'], [12.6, 'Sweet dreams, Leo.']];
+  const c = base(hooks, lines, 16);
   c.dream = game.comfort / 100;
   hooks.letterbox(true);
   for (const l of game.lamps) if (!l.on) l.setOn(true);
+  if (game.bubble) game.bubble.trail.forEach((m) => (m.visible = false)); // keep the dream's bubbles off his face
+  const bedX = hug.x - 1.15; // the middle of the bed
   let pose = { com: startCom, q: fromQ };
   c.update = (dt) => {
     const t = (c.t += dt);
     c.subtitles(t);
-    // Leo rolls back toward him and wraps his arm over him
-    const roll = 1 - seg(t, 2.0, 4.0);
-    const cr = leo.cradle(hug.x, hug.z);
-    const ikW = seg(t, 3.4, 5.2);
-    // then the covers come up over both of them: Blåhaj ends up tucked in
-    const tuck = seg(t, 5.4, 6.8);
+    // where Blåhaj lies: landed beside him, then drawn in against his chest
+    const pull = sm(t, 4.4, 6.4), tuck = sm(t, 6.2, 8.0);
+    const bx = bedX + lerpV(V(1.85, 0, 0), V(1.42, 0, 0), pull).x, bz = hug.z - 0.05;
+    // Leo: rolls toward him and curls up; right arm slides underneath, left arm over the top
+    const roll = 1 - 1.85 * sm(t, 2.0, 4.6), curl = sm(t, 2.6, 5.0);
+    const cr = leo.cradle(bx, bz);
+    const over = leo.worldToLocal(pose.com.clone().add(V(0.5, 0.3, 0.1)));
     const spheres = onTopOf(leo, pose);
-    leo.update(dt, { cover: 0.92, roll, shiver: 0, ik: cr.ik, ikW, pole: cr.pole, armOver: ikW > 0.35 && tuck <= 0, onTop: tuck > 0 ? [] : spheres, under: tuck > 0 ? spheres : [] });
-    const rest = restOnBed(leo, hug.x, hug.z, heldQ).lerp(restOnBed(leo, hug.x, hug.z, heldQ, true), tuck);
-    // Blåhaj hops up into his arms and snuggles down onto the duvet
+    leo.update(dt, {
+      cover: 0.86, roll, curl, shiver: 0,
+      ik: cr.ik, ikW: sm(t, 3.8, 5.6), pole: cr.pole, armOver: tuck < 0.5,
+      ikL: over, ikWL: sm(t, 4.2, 6.0), poleL: V(-0.2, 1, -0.3), armOverL: tuck < 0.5,
+      onTop: tuck < 1 ? spheres.map((o) => Object.assign({}, o, { r: o.r * (1 - tuck) })) : [],
+      under: tuck > 0 ? spheres.map((o) => Object.assign({}, o, { r: o.r * tuck })) : [],
+    });
+    const rest = restOnBed(leo, bx, bz, heldQ).lerp(restOnBed(leo, bx, bz, heldQ, true), tuck);
+    // Blåhaj hops up beside him, lands softly, then is held
     let com, q, vel = V(), grounded = true;
-    if (t < 1.6) {
-      const k = seg(t, 0, 1.6);
-      com = startCom.clone().lerp(rest, k); com.y += Math.sin(k * Math.PI) * 1.2;
-      q = fromQ.clone().slerp(heldQ, k); vel.set(0, (0.5 - k) * 10, 0); grounded = k > 0.95;
-    } else { com = rest; q = heldQ; com.y += Math.sin(t * 1.6) * 0.02; }
-    rig.update(dt, { speed: t < 1.6 ? 0.4 : 0, grounded, vx: vel.x, vy: vel.y, vz: vel.z });
+    if (t < 1.8) {
+      const k = sm(t, 0, 1.8);
+      com = startCom.clone().lerp(rest, k); com.y += Math.sin(k * Math.PI) * 1.4;
+      q = fromQ.clone().slerp(heldQ, k); vel.set(0, Math.cos(k * Math.PI) * 6, 0); grounded = k > 0.97;
+      if (t + dt >= 1.8 && !c.landed) { c.landed = true; rig.impulse(-6); Audio.land(); }
+    } else { com = rest; q = heldQ; com.y += Math.sin(t * 1.6) * 0.015; }
+    rig.update(dt, { speed: t < 1.8 ? 0.4 : 0, grounded, vx: vel.x, vy: vel.y, vz: vel.z });
     poseRig(game, com, q);
     pose = { com: com.clone(), q: q.clone() };
-    c.dream = Math.min(1, game.comfort / 100 + seg(t, 5, 9));
+    c.dream = Math.min(1, game.comfort / 100 + seg(t, 6, 10));
     game.comfort = Math.max(game.comfort, c.dream * 100);
     if (t > 5 && t < 10 && Math.random() < 0.6) game.sparks.emit({ p: hug.clone().add(V((Math.random() - 0.5) * 6, Math.random() * 4, (Math.random() - 0.5) * 6)), v: V(0, 0.8, 0), life: 2, size: 0.3, color: new THREE.Color().setHSL(0.1 + Math.random() * 0.1, 0.8, 0.75), drag: 0.3 });
-    if (t < 7) camShot(game, V(-1.2, 7.0, -3.2), V(-1.8, 6.6, -4.0), V(-4.6, 5.2, -6.0), V(-4.8, 5.0, -6.2), seg(t, 0, 7), 40);
-    else camShot(game, V(-1.8, 6.6, -4.0), V(5.5, 8.6, 6.5), V(-4.8, 5.0, -6.2), V(-4.2, 6.6, -5.6), seg(t, 7, 14.5), 48);
-    if (t > 13.6) hooks.fade(true);
+    if (t < 8.4) camShot(game, V(-1.0, 7.6, -3.9), V(-1.6, 7.8, -5.0), V(-4.0, 5.0, -6.0), V(-4.4, 4.9, -6.9), sm(t, 0, 8.4), 42);
+    else camShot(game, V(-1.6, 7.8, -5.0), V(5.5, 8.6, 6.5), V(-4.4, 4.9, -6.9), V(-4.2, 6.6, -5.6), sm(t, 8.4, 15.6), 48);
+    if (t > 14.8) hooks.fade(true);
     if (t >= c.length) { c.done = true; hooks.subtitle(null); }
   };
   return c;

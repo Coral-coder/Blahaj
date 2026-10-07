@@ -7,6 +7,7 @@ import { createBlahaj } from './art.js';
 const sh = (m, c = true, r = true) => { m.castShadow = c; m.receiveShadow = r; return m; };
 const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 const lerp = (a, b, t) => a + (b - a) * t;
+const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
 
 function furMat(color, sheenColor) {
   const fz = Tex.plush();
@@ -61,12 +62,17 @@ export function createLeo(bed) {
   // shoulders peeking out of the duvet
   const torso = part(new THREE.CapsuleGeometry(0.62, 1.2, 8, 16), pj, root, 0, 0.55, -l / 2 + 3.1); torso.rotation.x = Math.PI / 2; torso.scale.set(1.25, 1, 0.75);
 
-  // the hugging arm: shoulder pivot -> upper arm -> elbow -> forearm -> hand
-  const shoulder = new THREE.Group(); shoulder.position.set(0.75, 0.75, -l / 2 + 2.65); root.add(shoulder);
-  const upper = part(new THREE.CapsuleGeometry(0.2, 0.75, 6, 12), pj, shoulder, 0, 0, 0.5); upper.rotation.x = Math.PI / 2;
-  const elbow = new THREE.Group(); elbow.position.set(0, 0, 1.0); shoulder.add(elbow);
-  const fore = part(new THREE.CapsuleGeometry(0.17, 0.7, 6, 12), pj, elbow, 0, 0, 0.45); fore.rotation.x = Math.PI / 2;
-  const hand = part(new THREE.SphereGeometry(0.2, 16, 12), skin, elbow, 0, 0, 0.98); hand.scale.set(1, 0.7, 1.2);
+  // two arms: shoulder pivot -> upper arm -> elbow -> forearm -> hand (+x is his right)
+  function buildArm(side) {
+    const shoulder = new THREE.Group(); shoulder.position.set(side * 0.75, 0.75, -l / 2 + 2.65); root.add(shoulder);
+    const upper = part(new THREE.CapsuleGeometry(0.2, 0.75, 6, 12), pj, shoulder, 0, 0, 0.5); upper.rotation.x = Math.PI / 2;
+    const elbow = new THREE.Group(); elbow.position.set(0, 0, 1.0); shoulder.add(elbow);
+    const fore = part(new THREE.CapsuleGeometry(0.17, 0.7, 6, 12), pj, elbow, 0, 0, 0.45); fore.rotation.x = Math.PI / 2;
+    const hand = part(new THREE.SphereGeometry(0.2, 16, 12), skin, elbow, 0, 0, 0.98); hand.scale.set(1, 0.7, 1.2);
+    return { shoulder, elbow, side };
+  }
+  const armR = buildArm(1), armL = buildArm(-1);
+  const shoulder = armR.shoulder, elbow = armR.elbow;
 
   // duvet: a quilted sheet draped over the mattress and over Leo. It is
   // collided against his body (torso, tucked arm) so nothing pokes through,
@@ -82,22 +88,23 @@ export function createLeo(bed) {
   const duvet = sh(new THREE.Mesh(dGeo, dMat));
   root.add(duvet);
 
-  const state = { cover: 1, roll: 0, arm: 'hug', armT: 0, shiver: 0, breath: 0, t: 0, ik: null, ikW: 0, armOver: true, onTop: [], under: [] };
+  const state = { cover: 1, roll: 0, curl: 0, shiver: 0, breath: 0, t: 0, ik: null, ikW: 0, armOver: true, ikL: null, ikWL: 0, armOverL: false, onTop: [], under: [] };
   const TH = 0.07; // cloth thickness
   const torsoZ = -l / 2 + 3.1;
   // top of Leo's torso (an elliptical capsule) at bed-local (x, z), or -1
   // soft = true gives the tent the cloth makes over him: wider, no cliffs
   function torsoTop(x, z, soft = false) {
-    const tx = lerp(0, -0.5, state.roll), pad = soft ? 0.45 : 0;
+    const ar = Math.abs(state.roll), tx = -0.5 * state.roll, pad = soft ? 0.45 : 0;
+    const ry = lerp(0.465, 0.6, ar); // on his side he's narrower and taller
     const dz = Math.max(0, Math.abs(z - torsoZ) - 0.6);
     if (dz >= 0.62 + pad) return -1;
-    const k = Math.sqrt(Math.max(0, 1 - (dz / (0.62 + pad)) ** 2)), rx = (0.775 + pad) * k, dx = x - tx;
+    const k = Math.sqrt(Math.max(0, 1 - (dz / (0.62 + pad)) ** 2)), rx = (lerp(0.775, 0.55, ar) + pad) * k, dx = x - tx;
     if (Math.abs(dx) >= rx) return -1;
     if (soft) { // the tent: from his top, sloping away at ~50 degrees
       const rr = Math.hypot(dx, dz);
-      return 0.55 + 0.465 - Math.max(0, rr - 0.25) * 1.2;
+      return 0.55 + ry - Math.max(0, rr - 0.25) * 1.2;
     }
-    return 0.55 + 0.465 * k * Math.sqrt(1 - (dx / rx) ** 2);
+    return 0.55 + ry * k * Math.sqrt(1 - (dx / rx) ** 2);
   }
   // arm capsules in bed-local space, refreshed after posing
   const segs = [];
@@ -105,10 +112,14 @@ export function createLeo(bed) {
   function refreshArm() {
     root.updateMatrixWorld(true);
     const o = root.position;
-    shoulder.getWorldPosition(_a).sub(o); elbow.getWorldPosition(_b).sub(o);
-    _c.set(0, 0, 0.98).applyMatrix4(elbow.matrixWorld).sub(o);
     segs.length = 0;
-    segs.push({ a: _a.clone(), b: _b.clone(), r: 0.21, far: 0.45 }, { a: _b.clone(), b: _c.clone(), r: 0.2, far: 1 });
+    for (const arm of [armR, armL]) {
+      const over = arm === armR ? state.armOver : state.armOverL;
+      arm.shoulder.getWorldPosition(_a).sub(o); arm.elbow.getWorldPosition(_b).sub(o);
+      _c.set(0, 0, 1.12).applyMatrix4(arm.elbow.matrixWorld).sub(o); // through the hand
+      const tag = arm === armR ? 'R' : 'L';
+      segs.push({ a: _a.clone(), b: _b.clone(), r: 0.21, far: 0.45, over, tag }, { a: _b.clone(), b: _c.clone(), r: 0.23, far: 1, over, tag });
+    }
   }
   // vertical extent of a capsule above point (x, z): [bottom, top] or null
   function capsuleSpan(sg, x, z, pad = 0) {
@@ -123,13 +134,16 @@ export function createLeo(bed) {
   }
   // height of the duvet sheet itself at bed-local (x, z) on the mattress
   function sheetY(x, z, zTop, withArm = true) {
-    const bodyX = lerp(0, -0.6, state.roll);
+    const ar = Math.abs(state.roll), cu = state.curl || 0;
+    const bodyX = -0.6 * state.roll;
     const breathe = Math.sin(state.t * 1.6) * 0.04;
     let y = 0.28;
-    const bx = (x - bodyX) / (0.95 + 0.25 * state.roll), bz = (z - (-l / 2 + 4.6)) / 3.2;
+    const bx = (x - bodyX) / (0.95 + 0.25 * ar), bz = (z - (-l / 2 + 4.6 - 0.5 * cu)) / (3.2 - 0.8 * cu);
     y += Math.sqrt(Math.max(0, 1 - bx * bx - bz * bz)) * (0.85 + breathe);
-    const kx = (x - bodyX + 0.2 * state.roll) / 0.8, kz = (z - (-l / 2 + 6.6)) / 0.9;
-    y += Math.max(0, 1 - kx * kx - kz * kz) * 0.35 * (1 - state.roll * 0.4);
+    // knees: drawn up toward the side he faces when he curls
+    const kneeX = bodyX - 0.2 * state.roll + (state.roll < 0 ? 0.65 : -0.65) * cu;
+    const kx = (x - kneeX) / 0.8, kz = (z - (-l / 2 + 6.6 - 1.5 * cu)) / (0.9 + 0.2 * cu);
+    y += Math.max(0, 1 - kx * kx - kz * kz) * (0.35 * (1 - ar * 0.4) + 0.45 * cu);
     y += Math.sin(x * 2.3 + z * 0.7) * 0.03 + Math.sin(z * 3.1 - x * 1.3) * 0.025;
     y += smooth(0.35, 0, z - zTop) * 0.12; // the top edge folds over a little
     // collide with his body: over the torso, and over the arm when it's tucked in
@@ -137,10 +151,10 @@ export function createLeo(bed) {
     if (ts > 0) y = Math.max(y, ts + TH);
     if (tt > 0) y = Math.max(y, tt + TH);
     if (withArm) for (const sg of segs) {
-      const under = !state.armOver || sg.far < 1;
+      const under = !sg.over || sg.far < 1;
       if (under) { // the cloth tents over an arm beneath it, sloping back down to the sheet
         const sp = capsuleSpan(sg, x, z, 1.0);
-        if (sp && (!state.armOver || sp[2] < 0.5)) y = Math.max(y, sp[3] + sg.r + TH - Math.max(0, sp[4] - sg.r) * 1.4);
+        if (sp && (!sg.over || sp[2] < 0.5)) y = Math.max(y, sp[3] + sg.r + TH - Math.max(0, sp[4] - sg.r) * 1.4);
         continue;
       }
       const sp = capsuleSpan(sg, x, z);
@@ -161,15 +175,46 @@ export function createLeo(bed) {
     return y;
   }
   const zTopOf = () => lerp(-l / 2 + 4.4, -l / 2 + 2.3, state.cover);
+  // The duvet as cloth: everything under it (Leo, his tucked arms, a tucked-in
+  // Blåhaj, his legs) is a floor it can't sink through; whatever lies on top
+  // (Blåhaj, an arm) is a ceiling it can't rise through. Between those limits
+  // it relaxes like a stretched membrane, so it spans the gaps between bumps
+  // instead of shrink-wrapping each one.
+  const NV = (NX + 1) * (NZ + 1), lo = new Float32Array(NV), hi = new Float32Array(NV), cy = new Float32Array(NV), ny_ = new Float32Array(NV);
+  function clothBounds(x, z, zTop, i) {
+    const tt = torsoTop(x, z);
+    let floor = 0.22, sheet = sheetY(x, z, zTop, false), ceil = 99;
+    if (tt > 0) floor = Math.max(floor, tt + TH);
+    for (const sg of segs) {
+      const sp = capsuleSpan(sg, x, z);
+      if (!sp) continue;
+      if (!sg.over || (sg.far < 1 && sp[2] < 0.5)) floor = Math.max(floor, sp[1] + TH);   // arm under the covers
+      else if (sp[0] > (tt > 0 ? tt : 0.3)) ceil = Math.min(ceil, sp[0] - 0.02);           // arm lying on top
+    }
+    for (const o of state.under || []) { const d2 = (x - o.x) ** 2 + (z - o.z) ** 2; if (d2 < o.r * o.r) floor = Math.max(floor, o.y + Math.sqrt(o.r * o.r - d2) + TH); }
+    for (const o of state.onTop || []) { const d2 = (x - o.x) ** 2 + (z - o.z) ** 2; if (d2 < o.r * o.r) ceil = Math.min(ceil, o.y - Math.sqrt(o.r * o.r - d2) - 0.015); }
+    lo[i] = Math.min(floor, ceil); hi[i] = Math.max(ceil, lo[i]);
+    return Math.min(Math.max(sheet, lo[i]), hi[i]);
+  }
   function drape() {
     const pos = dGeo.attributes.position;
-    const zTop = zTopOf(), zEnd = l / 2 + 0.4;
-    for (let i = 0; i < pos.count; i++) {
-      const u = base[i * 3] / DW + 0.5, v = base[i * 3 + 2] / DL + 0.5;
-      const x = (u - 0.5) * DW;
-      const z = lerp(zTop, zEnd, v);
-      const edge = w / 2 - 0.2;
-      let y = sheetY(Math.max(-edge, Math.min(edge, x)), z, zTop);
+    const zTop = zTopOf(), zEnd = l / 2 + 0.4, edge = w / 2 - 0.2, RX = NX + 1;
+    const X = (i) => (base[i * 3] / DW) * DW, Z = (i) => lerp(zTop, zEnd, base[i * 3 + 2] / DL + 0.5);
+    for (let i = 0; i < NV; i++) cy[i] = clothBounds(Math.max(-edge, Math.min(edge, X(i))), Z(i), zTop, i);
+    // relax: each point drifts toward its neighbours' average, within its limits
+    for (let it = 0; it < 12; it++) {
+      for (let i = 0; i < NV; i++) {
+        const ix = i % RX, iz = (i / RX) | 0;
+        if (ix === 0 || ix === NX || iz === 0 || iz === NZ) { ny_[i] = cy[i]; continue; }
+        const avg = (cy[i - 1] + cy[i + 1] + cy[i - RX] + cy[i + RX]) * 0.25;
+        ny_[i] = Math.min(hi[i], Math.max(lo[i], cy[i] * 0.4 + avg * 0.6, cy[i] * 0.4 + avg * 0.6));
+        if (ny_[i] < cy[i] && cy[i] <= lo[i] + 1e-4) ny_[i] = cy[i];
+      }
+      cy.set(ny_);
+    }
+    for (let i = 0; i < NV; i++) {
+      const x = X(i), z = Z(i);
+      let y = cy[i];
       // roll over the mattress edge on a soft radius, then hang with lazy folds;
       // on the wall side (-x) it just tucks down into the gap
       const over = Math.abs(x) - edge;
@@ -192,8 +237,7 @@ export function createLeo(bed) {
 
   const UA = 1.0, FA = 0.98;
   const qa = new THREE.Quaternion(), qb = new THREE.Quaternion(), m4 = new THREE.Matrix4();
-  function solveIK(target, pole) {
-    const S = shoulder.position;
+  function solveIK(S, target, pole) {
     const d = target.clone().sub(S);
     const dist = Math.min(UA + FA - 1e-3, Math.max(0.3, d.length()));
     const z1 = d.normalize();
@@ -209,6 +253,7 @@ export function createLeo(bed) {
   }
   const POLE = new THREE.Vector3(0.75, 1, 0.35).normalize(); // elbow out and up, over whatever he hugs
   const TUCK_POLE = new THREE.Vector3(1, 0.2, 0.5).normalize(); // elbow down by his side
+  const POLE_L = new THREE.Vector3(-0.2, 1, -0.3).normalize();  // the other arm reaches over the top
 
   const leo = {
     group: root, state, headPivot, shoulder, elbow, duvet,
@@ -236,18 +281,27 @@ export function createLeo(bed) {
     update(dt, s = {}) {
       Object.assign(state, s);
       state.t += dt;
-      shoulder.position.x = lerp(0.75, 0.05, state.roll);
-      // the arm always reaches for something: by default his hand rests tucked on
-      // his chest under the covers; state.ik (bed-local) pulls it elsewhere
-      const tuck = new THREE.Vector3(lerp(0.35, -0.2, state.roll), 0.62, -l / 2 + 3.35);
-      const w_ = state.ik ? state.ikW : 0;
-      const goal = w_ > 0 ? tuck.clone().lerp(state.ik, w_) : tuck;
-      const pole = TUCK_POLE.clone().lerp(state.pole || POLE, w_).normalize();
-      const [qU, qE] = solveIK(goal, pole);
-      shoulder.quaternion.copy(qU); elbow.quaternion.copy(qE);
-      headPivot.rotation.z = lerp(-0.15, 0.85, state.roll) + Math.sin(state.t * 0.7) * 0.02;
-      headPivot.position.x = lerp(0.1, -0.35, state.roll);
-      torso.position.x = lerp(0, -0.5, state.roll); torso.rotation.z = lerp(0, 0.6, state.roll);
+      // roll > 0: over toward the wall; roll < 0: onto his right side, facing the room
+      const rp = Math.max(0, state.roll), rn = Math.max(0, -state.roll);
+      armR.shoulder.position.set(0.75 - 0.7 * rp + 0.2 * rn, 0.75 - 0.15 * rn, -l / 2 + 2.65);
+      armL.shoulder.position.set(-0.75 - 0.1 * rp + 0.95 * rn, 0.75 - 0.1 * rp + 0.4 * rn, -l / 2 + 2.65);
+      // each arm always reaches for something: by default the hand rests tucked on
+      // his chest under the covers; state.ik / state.ikL (bed-local) pull it elsewhere
+      const arms = [
+        [armR, new THREE.Vector3(0.35 - 0.55 * rp + 0.45 * rn, 0.62, -l / 2 + 3.35), TUCK_POLE, state.ik, state.ikW, state.pole || POLE],
+        // (on his side, the top arm rests along his hip)
+        [armL, new THREE.Vector3(-0.35 - 0.2 * rp, 0.62, -l / 2 + 3.35).lerp(new THREE.Vector3(0.45, 0.95, -l / 2 + 4.3), rn), new THREE.Vector3(-1 + 1.6 * rn, -0.3, 0.5 - 0.8 * rn).normalize(), state.ikL, state.ikWL, state.poleL || POLE_L],
+      ];
+      for (const [arm, tuck, tpole, ik, ikW, ipole] of arms) {
+        const w_ = ik ? ikW : 0;
+        const goal = w_ > 0 ? tuck.clone().lerp(ik, w_) : tuck;
+        const pole = tpole.clone().lerp(ipole, w_).normalize();
+        const [qU, qE] = solveIK(arm.shoulder.position, goal, pole);
+        arm.shoulder.quaternion.copy(qU); arm.elbow.quaternion.copy(qE);
+      }
+      headPivot.rotation.z = -0.15 + state.roll + Math.sin(state.t * 0.7) * 0.02;
+      headPivot.position.x = 0.1 - 0.45 * state.roll;
+      torso.position.x = -0.5 * state.roll; torso.rotation.z = 0.6 * state.roll;
       head.position.y = Math.sin(state.t * 1.6) * 0.01 + state.shiver * Math.sin(state.t * 47) * 0.012;
       refreshArm();
       drape();
@@ -260,10 +314,10 @@ export function createLeo(bed) {
       return root.position.y + Math.max(0.2, tt);
     },
     // top of his arm above (x, z) in world space, or null (things can rest on it)
-    armTopAt(wx, wz) {
+    armTopAt(wx, wz, arm = 'R') {
       const x = wx - root.position.x, z = wz - root.position.z;
       let best = null;
-      for (const sg of segs) { const sp = capsuleSpan(sg, x, z); if (sp && (best === null || sp[1] > best)) best = sp[1]; }
+      for (const sg of segs) { if (sg.tag !== arm) continue; const sp = capsuleSpan(sg, x, z); if (sp && (best === null || sp[1] > best)) best = sp[1]; }
       return best === null ? null : root.position.y + best;
     },
     // a cradle: his arm slides under whatever sits at world (x, z) and the hand
@@ -301,7 +355,7 @@ export function createDreamBubble(at) {
   const teddies = [0, 1, 2].map((i) => { const t = createTeddy(0.35); cloud.add(t.group); return t; });
   const nightmares = [0, 1, 2].map(() => { const s = createShadow(0.38); s.group.visible = false; cloud.add(s.group); return s; });
   const bubble = {
-    group: g, dream: 1,
+    group: g, dream: 1, trail,
     update(dt, t, dream) {
       bubble.dream += (dream - bubble.dream) * Math.min(1, dt * 2);
       const d = bubble.dream;
@@ -487,11 +541,25 @@ export function createDog() {
           L.hip.rotation.x = speed > 0 ? Math.sin(t * 7 + ph) * 0.5 : 0;
           L.knee.rotation.x = speed > 0 ? Math.max(0, -Math.sin(t * 7 + ph)) * 0.6 * (L.front ? -1 : 1) : 0;
         });
+        neck.rotation.y *= 0.85;
         const neckT = pose === 'carry' ? 0.15 : pose === 'pickup' ? 1.75 : Math.sin(t * 1.5) * 0.05;
         neck.rotation.x += (neckT - neck.rotation.x) * Math.min(1, dt * 8);
         if (pose === 'pickup') { body.rotation.x += (0.32 - body.rotation.x) * Math.min(1, dt * 6); body.position.y = 2.4; }
         jaw.rotation.x = pose === 'carry' ? 0.12 : pose === 'pickup' ? 0.4 : 0.25 + Math.sin(t * 6) * 0.08; // panting
         tongue.visible = pose !== 'carry' && pose !== 'pickup';
+      } else if (pose === 'bow' || pose === 'shake' || pose === 'toss' || pose === 'yawn') {
+        // play bow: chest down, bum up, tail going; shake: whip the toy side to side;
+        // toss: fling the head up; yawn: a big sleepy stretch of the jaw
+        const pitch = pose === 'bow' ? 0.32 : pose === 'toss' ? -0.25 : 0;
+        body.rotation.x += (pitch - body.rotation.x) * Math.min(1, dt * 7);
+        body.position.y = 2.7 - (pose === 'bow' ? 0.35 : 0);
+        legs.forEach((L) => { L.hip.rotation.x = pose === 'bow' && L.front ? -0.7 : 0; L.knee.rotation.x = pose === 'bow' && L.front ? 1.2 : 0; });
+        const neckT = pose === 'bow' ? -0.45 : pose === 'toss' ? -0.9 : pose === 'yawn' ? -0.55 : 0.1;
+        neck.rotation.x += (neckT - neck.rotation.x) * Math.min(1, dt * (pose === 'toss' ? 14 : 7));
+        neck.rotation.y = pose === 'shake' ? Math.sin(t * 22) * 0.45 : neck.rotation.y * 0.85;
+        jaw.rotation.x = pose === 'yawn' ? 0.75 : pose === 'toss' ? 0.5 : 0.12;
+        tongue.visible = pose === 'yawn';
+        tail.rotation.y = Math.sin(t * 14) * 0.8;
       } else if (pose === 'rear') {
         body.rotation.x += (-0.95 - body.rotation.x) * Math.min(1, dt * 5);
         body.position.y = 3.3;
@@ -515,26 +583,91 @@ export function createDog() {
 }
 
 // ------------------------------------------------------------------ cat --
+// A grey tabby loafing on the stairs, grumpy about being disturbed.
+// Local frame: +x is where she faces, y up.
+let tabbyTex = null;
+function tabbyTexture() {
+  if (tabbyTex) return tabbyTex;
+  const W = 512, H = 256, c = document.createElement('canvas'); c.width = W; c.height = H;
+  const g = c.getContext('2d');
+  g.fillStyle = '#8f8a86'; g.fillRect(0, 0, W, H);
+  // soft mottling
+  for (let i = 0; i < 900; i++) { g.fillStyle = `rgba(${Math.random() < 0.5 ? '60,55,52' : '190,184,178'},${0.05 + Math.random() * 0.08})`; g.beginPath(); g.arc(Math.random() * W, Math.random() * H, 2 + Math.random() * 6, 0, 7); g.fill(); }
+  // mackerel stripes running round the body (u wraps around a sphere)
+  g.lineCap = 'round';
+  for (let i = 0; i < 18; i++) { // broken, feathery stripes rather than hard bands
+    const x0 = (i + 0.5) * W / 18;
+    for (let y = 24; y < H - 24; y += 6) {
+      if (Math.sin(y * 0.09 + i * 1.7) > 0.55) continue;
+      const x = x0 + Math.sin(y * 0.05 + i) * 6 + Math.sin(y * 0.19) * 2;
+      g.strokeStyle = `rgba(58,52,48,${0.35 + Math.random() * 0.25})`; g.lineWidth = 3 + Math.random() * 4;
+      g.beginPath(); g.moveTo(x, y); g.lineTo(x + (Math.random() - 0.5) * 3, y + 7); g.stroke();
+    }
+  }
+  // fine fur grain
+  for (let i = 0; i < 5000; i++) { g.fillStyle = `rgba(${Math.random() < 0.5 ? '40,36,34' : '220,214,206'},0.12)`; g.fillRect(Math.random() * W, Math.random() * H, 1, 3); }
+  tabbyTex = new THREE.CanvasTexture(c); tabbyTex.colorSpace = THREE.SRGBColorSpace; tabbyTex.wrapS = tabbyTex.wrapT = THREE.RepeatWrapping;
+  return tabbyTex;
+}
 export function createCat() {
   const g = new THREE.Group();
-  const fur = furMat(0x8d8a8a, 0xd8d4d0);
-  const body = part(new THREE.SphereGeometry(0.75, 24, 16), fur, g, 0, 0.62, 0); body.scale.set(1.25, 0.8, 1.05);
-  const head = new THREE.Group(); head.position.set(0.85, 0.65, 0.35); g.add(head);
-  part(new THREE.SphereGeometry(0.42, 22, 16), fur, head, 0, 0, 0);
-  for (const s of [-1, 1]) {
-    const ear = part(new THREE.ConeGeometry(0.15, 0.3, 8), fur, head, 0.05, 0.38, s * 0.22); ear.rotation.x = s * 0.25;
-    const lid = part(new THREE.TorusGeometry(0.06, 0.012, 6, 12, Math.PI), new THREE.MeshStandardMaterial({ color: 0x222222 }), head, 0.38, 0.06, s * 0.15); lid.rotation.set(0, Math.PI / 2, Math.PI);
+  const fz = Tex.plush(), fn = fz.normalMap.clone(); fn.repeat.set(6, 6); fn.needsUpdate = true;
+  const fur = new THREE.MeshPhysicalMaterial({ map: tabbyTexture(), color: 0xffffff, roughness: 0.95, sheen: 1, sheenRoughness: 0.5, sheenColor: new THREE.Color(0xd8d2cc), normalMap: fn, normalScale: new THREE.Vector2(0.5, 0.5) });
+  const white = new THREE.MeshPhysicalMaterial({ color: 0xf3eee8, roughness: 0.95, sheen: 1, sheenColor: new THREE.Color(0xffffff), normalMap: fn, normalScale: new THREE.Vector2(0.4, 0.4) });
+  const pink = new THREE.MeshStandardMaterial({ color: 0xe7a3a3, roughness: 0.6 });
+  const dark = new THREE.MeshStandardMaterial({ color: 0x1b1716, roughness: 0.5 });
+  const iris = new THREE.MeshPhysicalMaterial({ color: 0x9ccf5a, roughness: 0.15, clearcoat: 1, emissive: 0x2d4a10, emissiveIntensity: 0.6 });
+  // body: a loaf, haunches at the back, white bib at the front
+  const body = new THREE.Group(); g.add(body);
+  const loaf = part(new THREE.CapsuleGeometry(0.52, 1.0, 12, 28), fur, body, -0.25, 0.56, 0); loaf.rotation.z = Math.PI / 2; loaf.scale.set(1.05, 1, 1.22);
+  part(new THREE.SphereGeometry(0.4, 20, 16), white, body, 0.6, 0.48, 0).scale.set(0.7, 1.0, 1.25);
+  // tucked front paws, one ready to swat
+  for (const sd of [-1, 1]) part(new THREE.SphereGeometry(0.13, 14, 10), white, body, 0.82, 0.12, sd * 0.22).scale.set(1.5, 0.75, 1);
+  const paw = new THREE.Group(); paw.position.set(0.6, 0.3, -0.42); g.add(paw);
+  const leg = part(new THREE.CapsuleGeometry(0.1, 0.42, 6, 12), fur, paw, 0.2, 0, 0); leg.rotation.z = Math.PI / 2;
+  part(new THREE.SphereGeometry(0.13, 14, 10), white, paw, 0.48, 0, 0).scale.set(1.3, 0.75, 1);
+  // head
+  const head = new THREE.Group(); head.position.set(0.88, 1.0, 0.0); g.add(head);
+  part(new THREE.SphereGeometry(0.4, 32, 24), fur, head, 0, 0, 0).scale.set(0.95, 0.88, 1.05);
+  for (const sd of [-1, 1]) part(new THREE.SphereGeometry(0.2, 16, 12), fur, head, 0.18, -0.12, sd * 0.2).scale.set(0.9, 0.8, 1); // cheeks
+  part(new THREE.SphereGeometry(0.15, 16, 12), white, head, 0.32, -0.14, 0).scale.set(0.8, 0.7, 1.2);                       // muzzle
+  part(new THREE.SphereGeometry(0.16, 16, 12), white, head, 0.22, -0.22, 0).scale.set(1.0, 0.6, 1.1);                        // chin
+  const headFur = new THREE.MeshPhysicalMaterial({ map: tabbyTexture(), color: 0xd9d4ce, roughness: 0.95, sheen: 1, sheenColor: new THREE.Color(0xffffff), normalMap: fn, normalScale: new THREE.Vector2(0.4, 0.4) });
+  head.children[0].material = headFur;
+  const nose = part(new THREE.SphereGeometry(0.045, 10, 8), pink, head, 0.44, -0.07, 0); nose.scale.set(0.8, 0.7, 1.3);
+  const mouth = part(new THREE.TorusGeometry(0.04, 0.008, 6, 12, Math.PI), dark, head, 0.43, -0.17, 0); mouth.rotation.set(0, Math.PI / 2, Math.PI);
+  const eyes = [];
+  for (const sd of [-1, 1]) {
+    const e = part(new THREE.SphereGeometry(0.075, 18, 14), iris, head, 0.31, 0.06, sd * 0.15); e.scale.set(0.6, 0.75, 1.1);
+    const pupil = part(new THREE.CapsuleGeometry(0.012, 0.07, 4, 8), dark, head, 0.355, 0.06, sd * 0.15); pupil.castShadow = false;
+    const lid = part(new THREE.SphereGeometry(0.085, 18, 12, 0, Math.PI * 2, 0, Math.PI * 0.42), fur, head, 0.3, 0.075, sd * 0.15); lid.rotation.z = -0.5; lid.scale.set(0.65, 0.8, 1.15); // grumpy half-lids
+    eyes.push(e);
+    // ears: fur outside, pink inside
+    const ear = new THREE.Group(); ear.position.set(-0.02, 0.3, sd * 0.2); ear.rotation.set(sd * 0.35, 0, sd * 0.1); head.add(ear);
+    part(new THREE.ConeGeometry(0.15, 0.3, 4, 1), fur, ear, 0, 0.12, 0).scale.set(0.55, 1, 1);
+    part(new THREE.ConeGeometry(0.1, 0.22, 4, 1), pink, ear, 0.04, 0.1, 0).scale.set(0.35, 1, 1);
+    // whiskers
+    const pts = [];
+    for (let k = 0; k < 3; k++) { const y = -0.12 + k * 0.035; pts.push(new THREE.Vector3(0.42, y, sd * 0.1), new THREE.Vector3(0.48, y - 0.04 + k * 0.03, sd * (0.48 + k * 0.03))); }
+    head.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: 0xf6f2ec, transparent: true, opacity: 0.8 })));
   }
-  part(new THREE.SphereGeometry(0.05, 10, 8), new THREE.MeshStandardMaterial({ color: 0xd98a8a }), head, 0.42, -0.05, 0);
-  const tail = part(new THREE.TorusGeometry(0.7, 0.13, 10, 24, Math.PI * 1.1), fur, g, 0, 0.18, 0); tail.rotation.x = Math.PI / 2;
-  const paw = new THREE.Group(); paw.position.set(0.6, 0.35, -0.5); g.add(paw);
-  part(new THREE.CapsuleGeometry(0.12, 0.5, 6, 10), fur, paw, 0.25, 0, 0).rotation.z = Math.PI / 2;
+  // tail: wraps round her side; the tip flicks when she's cross
+  const tailCurve = new THREE.CatmullRomCurve3([V3(-1.05, 0.35, 0), V3(-1.05, 0.2, 0.55), V3(-0.5, 0.15, 0.82), V3(0.15, 0.14, 0.8)]);
+  const tail = part(new THREE.TubeGeometry(tailCurve, 24, 0.11, 10), fur, g, 0, 0, 0);
+  const tip = new THREE.Group(); tip.position.set(0.15, 0.14, 0.8); g.add(tip);
+  part(new THREE.CapsuleGeometry(0.1, 0.3, 6, 10), new THREE.MeshPhysicalMaterial({ color: 0x3d3835, roughness: 0.95, sheen: 1, sheenColor: new THREE.Color(0x8d8884) }), tip, 0.2, 0.02, 0).rotation.z = Math.PI / 2;
+  void tail;
   return {
-    group: g, head, paw, swipe: 0, t: 0,
+    group: g, head, paw, swipe: 0, t: Math.random() * 10,
     update(dt) {
       this.t += dt;
-      body.scale.y = 0.8 + Math.sin(this.t * 1.6) * 0.02;
-      if (this.swipe > 0) { this.swipe = Math.max(0, this.swipe - dt * 2.5); paw.rotation.y = Math.sin(this.swipe * Math.PI) * 1.4; head.rotation.z = 0.3 * this.swipe; } else paw.rotation.y *= 0.9;
+      const t = this.t;
+      body.scale.y = 1 + Math.sin(t * 1.6) * 0.02;                       // breathing
+      head.rotation.z = Math.sin(t * 0.5) * 0.05; head.rotation.y = Math.sin(t * 0.31) * 0.15;
+      tip.rotation.y = Math.sin(t * (this.swipe > 0 ? 9 : 2.2)) * (this.swipe > 0 ? 0.8 : 0.35);
+      if (this.swipe > 0) { this.swipe = Math.max(0, this.swipe - dt * 2.5); paw.rotation.y = Math.sin(this.swipe * Math.PI) * 1.4; paw.rotation.z = Math.sin(this.swipe * Math.PI) * 0.5; head.rotation.z = 0.3 * this.swipe; }
+      else { paw.rotation.y *= 0.9; paw.rotation.z *= 0.9; }
+      eyes.forEach((e) => (e.scale.y = 0.75 * (Math.sin(t * 0.7) > 0.985 ? 0.15 : 1))); // the odd slow blink
     },
   };
 }

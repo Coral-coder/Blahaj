@@ -162,6 +162,19 @@ export function roomBoxes(room) {
     };
     for (let i = 0; i < cuts.length; i += 2) seg(cuts[i], cuts[i + 1], 0, room.h);
     for (const hh of holes) { seg(hh.a0, hh.a1, hh.y0 + hh.h, room.h); if (hh.y0 > 0) seg(hh.a0, hh.a1, 0, hh.y0); }
+    // windows have glass in them; doorways lead to a hall you can step into
+    // but not wander off into the void through
+    const slab = (a0, a1, y0, y1, d0, d1, tag, extra) => { // d0..d1: depth beyond the wall's inner face
+      const sg = name[0] === '-' ? -1 : 1, f0 = w.fixed + sg * d0, f1 = w.fixed + sg * d1;
+      const lo = Math.min(f0, f1), hi = Math.max(f0, f1);
+      if (w.axis === 'x') box(a0, y0, lo, a1, y1, hi, tag, extra); else box(lo, y0, a0, hi, y1, a1, tag, extra);
+    };
+    for (const win of (room.windows || []).filter((x) => x.wall === name)) slab(win.at - win.w / 2, win.at + win.w / 2, win.y0, win.y1, 0.15, 0.3, 'glass');
+    for (const d of (room.doors || []).filter((x) => x.wall === name)) {
+      const y0 = d.y0 || 0;
+      if (y0 > 0) slab(d.at - d.w / 2, d.at + d.w / 2, y0 - 0.6, y0, 0, T, 'landing', { surface: 'carpet' });
+      slab(d.at - d.w / 2, d.at + d.w / 2, y0, y0 + d.h, T - 0.3, T, 'doorStop');
+    }
     for (const win of (room.windows || []).filter((x) => x.wall === name && x.sill)) {
       const s = win.sill;
       if (w.axis === 'x') {

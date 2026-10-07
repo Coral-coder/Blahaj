@@ -127,7 +127,7 @@ function chapterTitle(i) {
   card.innerHTML = `<small>Chapter ${i + 1}</small>${ch.title}<em>${ch.goalText}</em>`;
   card.classList.add('show');
   setTimeout(() => card.classList.remove('show'), 3000);
-  if (ch.newAbility && ABILITIES[ch.newAbility]) { const a = ABILITIES[ch.newAbility]; setTimeout(() => hooks.toast(`New move: ${a.icon} ${a.name}`, a.how, 5000), 2600); }
+  [].concat(ch.newAbility || []).filter((k) => ABILITIES[k]).forEach((k, i) => { const a = ABILITIES[k]; setTimeout(() => hooks.toast(`New move: ${a.icon} ${a.name}`, a.how, 4500), 2600 + i * 5000); });
 }
 
 let cineDone = null;

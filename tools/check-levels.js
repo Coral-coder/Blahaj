@@ -7,7 +7,7 @@ import { expand, roomBoxes } from '../src/prefabs.js';
 import { makeReach } from './reach.js';
 const maxReach = makeReach(CFG);
 const COMFORT = 0.78;
-const SKIP = /^(wall|ceiling)|deskLeg|chairLeg|tv$|gate|lampPole|firePillar|fireBack|banister/;
+const SKIP = /^(wall|ceiling|glass|doorStop)|deskLeg|chairLeg|tv$|gate|lampPole|firePillar|fireBack|banister/;
 
 function gap(a, b) {
   const dx = Math.max(0, a.min[0] - b.max[0], b.min[0] - a.max[0]);

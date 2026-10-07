@@ -106,6 +106,10 @@ export class Game {
       this.dog = createDog(); const d = ch.sleepingDog;
       this.dog.group.position.set(d.x, 0, d.z); this.dog.group.rotation.y = d.rot || 0;
       this.dog.update(0, 'sleep'); scene.add(this.dog.group);
+      // he's solid: hop up onto him, don't walk through him (body runs along his facing)
+      const fx = Math.abs(Math.sin(this.dog.group.rotation.y)) > 0.7, cx = d.x + Math.sin(this.dog.group.rotation.y) * 0.2, cz = d.z + Math.cos(this.dog.group.rotation.y) * 0.2;
+      const hx = fx ? 1.4 : 0.7, hz = fx ? 0.7 : 1.4;
+      this.solids.push({ min: V(cx - hx, 0, cz - hz), max: V(cx + hx, 0.95, cz + hz), active: true, kind: 'solid', tag: 'dog', type: 'solid', delta: V() });
       this.zzz = new Particles(40, true); scene.add(this.zzz.points);
     }
     // soft surfaces that aren't boxes: the duvet over Leo (and Leo under it),
@@ -162,7 +166,20 @@ export class Game {
       } else if (e.type === 'knot') {
         const k = createKnot(e.r || 1); scene.add(k.group);
         this.enemies.push({ e, s: k, type: 'knot', pos: V(...e.at), base: V(...e.at), alive: true, deadT: 0, ph: Math.random() * 6 });
-      } else if (e.type === 'ballSpawner') this.ballSpawner = { e, t: 2 };
+      } else if (e.type === 'ballSpawner') {
+        // the balls come from somewhere: a nightmare on the landing, rummaging in a
+        // tipped-over toy basket and lobbing them over the baby gate
+        const src = new THREE.Group(), sx = e.sx ?? -3.0, sz = e.sz ?? -12.0, sy = e.sy ?? 11.41;
+        src.position.set(sx, sy, sz); scene.add(src);
+        const wick = new THREE.MeshStandardMaterial({ color: 0xb98a55, roughness: 0.9 });
+        const bk = new THREE.Mesh(new THREE.CylinderGeometry(0.85, 0.7, 1.4, 20, 1, true), wick); bk.material.side = THREE.DoubleSide;
+        bk.rotation.x = Math.PI / 2 - 0.15; bk.position.set(0, 0.8, -0.2); bk.castShadow = true; src.add(bk);
+        const bottom = new THREE.Mesh(new THREE.CircleGeometry(0.7, 20), wick); bottom.position.set(0, 0.85, -0.9); src.add(bottom);
+        const cols = [0xc8e34b, 0xe5484d, 0x3f6aa3];
+        [[-0.3, 0.5, 0.1], [0.3, 0.55, -0.2], [0.05, 1.0, -0.4], [0.7, 0.5, 0.75]].forEach(([x, y, z], i) => { const b = new THREE.Mesh(new THREE.SphereGeometry(0.42, 18, 12), new THREE.MeshPhysicalMaterial({ color: cols[i % 3], roughness: 0.6, sheen: 0.6 })); b.position.set(x, y, z); b.castShadow = true; src.add(b); });
+        const imp = createShadow(1.05); imp.group.position.set(1.4, 0, -0.3); src.add(imp.group);
+        this.ballSpawner = { e, t: 2, src, imp, throwT: 0, sx, sy, sz };
+      }
     }
     this.knotsLeft = this.enemies.filter((x) => x.type === 'knot').length;
 
@@ -560,11 +577,19 @@ export class Game {
         bs.t = bs.e.every;
         const mesh = new THREE.Mesh(new THREE.SphereGeometry(0.55, 24, 16), new THREE.MeshPhysicalMaterial({ color: [0xc8e34b, 0xe5484d, 0x3f6aa3][Math.floor(Math.random() * 3)], roughness: 0.6, sheen: 0.6 }));
         mesh.castShadow = true; this.scene.add(mesh);
-        this.balls.push({ mesh, pos: V(bs.e.x0 + Math.random() * (bs.e.x1 - bs.e.x0), 12.6, bs.e.z), vz: 3, vy: 0 });
+        // lobbed out of the basket, up over the gate
+        this.balls.push({ mesh, pos: V(bs.sx + (Math.random() - 0.5) * 0.8, bs.sy + 0.6, bs.sz + 0.5), vz: 4.4, vy: 15 });
+        bs.throwT = 0.5;
       }
+      // the nightmare bobs about and lunges when it throws
+      bs.throwT = Math.max(0, bs.throwT - dt);
+      bs.imp.update(dt, this.clock);
+      bs.imp.group.position.y = Math.sin(this.clock * 3) * 0.08 + Math.sin(bs.throwT * Math.PI * 2) * 0.4;
+      bs.imp.group.rotation.x = -Math.sin(bs.throwT * Math.PI * 2) * 0.5;
+      bs.imp.group.lookAt(bs.src.position.x + 0.0, bs.src.position.y, bs.src.position.z + 6);
       for (let i = this.balls.length - 1; i >= 0; i--) {
         const b = this.balls[i];
-        b.vz = Math.min(7, b.vz + dt * 3); b.vy -= CFG.gravity * dt;
+        b.vz = Math.min(7, b.vz + dt * (b.vy > 0 ? 0 : 3)); b.vy -= CFG.gravity * dt;
         b.pos.z += b.vz * dt; b.pos.y += b.vy * dt;
         // ground under the ball = top of the step it's over
         let gy = 0;
@@ -653,7 +678,7 @@ export class Game {
     }
     for (const l of this.lamps) l.update(t);
     for (const cat of this.cats) cat.c.update(dt);
-    if (this.dog) {
+    if (this.dog && !(this.cine && this.cine.ownsDog)) {
       this.dog.update(dt, 'sleep');
       if (Math.random() < 0.02) this.zzz.emit({ p: this.dog.head.getWorldPosition(V()).add(V(0, 0.8, 0)), v: V(0.2, 0.9, 0), life: 2.2, size: 0.35, color: new THREE.Color(0xcfd8ff), drag: 0.1 });
       this.zzz.update(dt);

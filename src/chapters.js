@@ -26,20 +26,20 @@ export const CHAPTERS = [
     id: 'edge', title: 'Off the Edge', room: BEDROOM, music: 0,
     goalText: 'Climb back up to Leo',
     intro: 'prologue', outro: 'dog',
-    abilities: { doubleJump: true },
+    abilities: {}, // just a hop: double jump is learned downstairs
     spawn: [0.0, 0, -5.9], spawnYaw: Math.PI / 2, camYaw: 0.95,
     drain: 0.8,
     props: [
       BED, BEDSIDE, DESK, BOOKCASE, WALLSHELF, WARDROBE,
-      { type: 'chair', x: -0.2, z: 3.4, rot: 1 },
+      { type: 'chair', x: -3.4, z: 5.2, rot: 1 },
       { type: 'dresser', x: 7.3, z: 3.5, rot: 3, drawers: [{ y0: 0.2, h: 0.8, out: 2.4 }, { y0: 1.15, h: 0.85, out: 1.4 }, { y0: 2.2, h: 0.8, out: 0.6 }] },
       { type: 'toyBox', x: -1.5, z: 8.4, rot: 2 },
       { type: 'laundry', x: 2.0, z: 7.8 },
       { type: 'blocks', x: 0, z: 0, towers: [[2.4, 2.4, 1], [3.2, 3.5, 2], [2.6, -2.6, 1]] },
       { type: 'books', x: 0.9, z: -1.6, w: 1.6, h: 1.0, d: 2.0 },
-      { type: 'ball', x: -4.4, z: 3.2 },
+      { type: 'ball', x: 6.9, z: 8.3 },                   // a bouncy way up onto the dresser
       { type: 'lego', x: 4.7, z: -1.4, w: 1.6, d: 1.6 }, { type: 'lego', x: 5.6, z: 0.6, w: 1.2, d: 1.4 },
-      { type: 'lego', x: 2.4, z: 5.4, w: 1.4, d: 1.2 }, { type: 'lego', x: -3.6, z: 6.2, w: 1.2, d: 1.2 },
+      { type: 'lego', x: 2.4, z: 5.4, w: 1.4, d: 1.2 }, { type: 'lego', x: -0.6, z: 6.0, w: 1.2, d: 1.2 },
       { type: 'rug', x: -0.8, z: 1.6, w: 6.4, d: 5.2 },
       { type: 'toyScatter', x: 0, z: 0, seed: 1 },
     ],
@@ -57,7 +57,7 @@ export const CHAPTERS = [
       arc([2.6, 1.6, -2.6], [2.6, 1.6, -1.2], 2, 0.6), line([0, 0.6, 0.4], [-2.6, 0.6, 2.6], 4),
       [[2.4, 1.6, 2.4], [3.2, 2.5, 3.5]], line([4.6, 1.6, 3.5], [5.3, 2.6, 3.5], 2), [[6.0, 3.6, 3.5]],
       line([7.3, 4.4, 4.6], [7.3, 4.4, 2.2], 3), [[7.7, 5.7, 0.6]], line([7.5, 7.1, -1.0], [7.5, 7.1, -3.4], 3),
-      arc([7.4, 7.0, -4.6], [4.4, 5.4, -8.6], 5, 1.4), line([-0.2, 2.5, 3.4], [-0.2, 3.3, 3.4], 2),
+      arc([7.4, 7.0, -4.6], [4.4, 5.4, -8.6], 5, 1.4), line([-3.4, 2.5, 5.2], [-3.4, 3.3, 5.2], 2),
       line([-1.2, 2.6, 8.4], [-2.0, 2.6, 8.4], 2), [[-4.4, 2.4, 3.2]]),
     starfish: [[-1.45, 3.6, -8.45], [2.0, 5.8, 7.8], [7.5, 7.2, -3.6]],
     enemies: [
@@ -66,14 +66,14 @@ export const CHAPTERS = [
       { type: 'shadow', path: [[-0.4, 0, -3.0], [-0.4, 0, -1.6]], speed: 0.8 },
     ],
     bunnies: [[-3.0, 0, 4.9], [2.2, 0, -7.6], [-2.2, 0, 0.6]],
-    goal: { x: 3.5, y: 4.6, z: -9.0, r: 3.0, label: 'windowsill' },
+    goal: { x: -4.3, y: 4.6, z: -6.1, r: 1.8, label: 'Leo' },        // the whole climb ends back in Leo's arms…
     route: ['moon', 'blocks', 'drawer1', 'drawer2', 'drawer3', 'dresser', 'shelf', 'bookcase', 'sill'],
   },
   // ---------------------------------------------------------------------------
   {
     id: 'downstairs', title: 'Downstairs', music: 1,
     goalText: 'Find the stairs back up',
-    intro: 'downstairs', newAbility: 'flop',
+    intro: 'downstairs', newAbility: ['doubleJump', 'flop'],
     room: {
       id: 'living', x0: -13, x1: 13, z0: -12, z1: 12, h: 11.4, floor: 'woodDark', wall: 'livingWall',
       doors: [{ wall: '+x', at: 7.5, w: 4.5, h: 9.5 }],
@@ -145,7 +145,7 @@ export const CHAPTERS = [
     rising: { start: 5, speed: 0.42, from: -1.2 },
     props: [
       { type: 'stairs', x: -2.25, z: 8.0, n: 14, rise: 0.815, run: 1.3, w: 4.5 },
-      { type: 'cat', x: -3.35, y: 5.705, z: -0.3, rot: 1 },
+      { type: 'cat', x: -3.35, y: 5.705, z: -0.3, rot: 3 },  // loafing on a step, glaring at you
       { type: 'basket', x: -1.1, y: 8.965, z: -5.65, d: 1.2 },
       { type: 'books', x: -1.0, y: 11.41, z: -9.4, w: 1.6, h: 1.0, d: 1.0 },
       { type: 'babyGate', x: -2.25, y: 11.41, z: -10.15 },

@@ -47,6 +47,33 @@ function rowOfBooks(g, x0, x1, y, z, depth, maxH, seed) {
   }
 }
 
+// A licking flame: noise scrolls upward through a tapered teardrop and the
+// colour runs white-yellow at the base to orange to a deep red tip.
+function flameMaterial(seed) {
+  return new THREE.ShaderMaterial({
+    uniforms: { time: { value: 0 }, seed: { value: seed } },
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+    vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+    fragmentShader: `uniform float time; uniform float seed; varying vec2 vUv;
+      float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+      float noise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+        return mix(mix(hash(i), hash(i + vec2(1, 0)), f.x), mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), f.x), f.y); }
+      float fbm(vec2 p){ float s = 0.0, a = 0.5; for (int i = 0; i < 4; i++) { s += a * noise(p); p *= 2.03; a *= 0.5; } return s; }
+      void main(){
+        float t = time * 1.7 + seed * 13.0;
+        float n = fbm(vec2(vUv.x * 3.0 + seed * 7.0, vUv.y * 2.6 - t * 1.9));
+        float x = (vUv.x - 0.5) * 2.0 + (n - 0.5) * 0.9 * vUv.y;
+        float h = vUv.y + (n - 0.5) * 0.35;
+        float width = (1.0 - h) * 0.85 + 0.05;
+        float body = (1.0 - smoothstep(width * 0.45, width, abs(x))) * (1.0 - smoothstep(0.5, 0.98, h)) * smoothstep(0.0, 0.1, vUv.y);
+        vec3 col = mix(vec3(1.0, 0.92, 0.65), vec3(1.0, 0.5, 0.1), smoothstep(0.05, 0.42, h));
+        col = mix(col, vec3(0.75, 0.15, 0.04), smoothstep(0.42, 0.85, h));
+        float a = clamp(body * (0.8 + 0.4 * n), 0.0, 1.0);
+        gl_FragColor = vec4(col * a * 1.5, a);
+      }`,
+  });
+}
+
 const V = {
   cabinBed(p) {
     const g = new THREE.Group();
@@ -355,6 +382,28 @@ const V = {
     const glow = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 0.9), new THREE.MeshBasicMaterial({ map: softDotTexture(), color: 0xff7a2a, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false }));
     glow.position.set(0, 0.9, 0.0); g.add(glow);
     g.userData.ember = ember; g.userData.glow = glow;
+    // flames: crossed sheets with a scrolling-noise flame shader, plus rising embers
+    g.userData.flames = [];
+    [[0, 0, 1.5, 2.2, 0.0], [-0.55, 0.55, 1.1, 1.7, 0.37], [0.6, -0.5, 1.1, 1.8, 0.71], [0.1, 1.2, 1.2, 1.9, 0.53], [-0.2, -1.1, 1.0, 1.5, 0.19]].forEach(([x, rot, w, h, seed]) => {
+      const m = flameMaterial(seed);
+      const f = new THREE.Mesh(new THREE.PlaneGeometry(w, h), m);
+      f.position.set(x, 0.92 + h / 2, -0.22); f.rotation.y = rot; f.renderOrder = 5;
+      g.add(f); g.userData.flames.push(m);
+    });
+    const N = 36, eg = new THREE.BufferGeometry(), ep = new Float32Array(N * 3), seeds = [];
+    for (let i = 0; i < N; i++) seeds.push({ x: (Math.random() - 0.5) * 1.6, z: (Math.random() - 0.5) * 0.5 - 0.2, t: Math.random() * 2, sp: 0.8 + Math.random() * 1.2, w: Math.random() * 6 });
+    eg.setAttribute('position', new THREE.BufferAttribute(ep, 3));
+    const embers = new THREE.Points(eg, new THREE.PointsMaterial({ map: softDotTexture(), color: 0xffa040, size: 0.09, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+    embers.frustumCulled = false; g.add(embers);
+    g.userData.updateEmbers = (t) => {
+      seeds.forEach((e, i) => {
+        const life = ((t * e.sp * 0.35 + e.t) % 2) / 2; // 0..1
+        ep[i * 3] = e.x * (1 - life * 0.4) + Math.sin(t * 3 + e.w) * 0.12 * life;
+        ep[i * 3 + 1] = 1.0 + life * 3.4;
+        ep[i * 3 + 2] = e.z + Math.cos(t * 2.3 + e.w) * 0.08 * life;
+      });
+      eg.attributes.position.needsUpdate = true;
+    };
     // things on the mantel
     for (let i = 0; i < 3; i++) { const fr = box(g, 0.9, 1.2 - i * 0.15, 0.12, Mat.oak(), -2.8 + i * 1.3, 5.5, -0.4, 0.03, 1); fr.rotation.y = (i - 1) * 0.1; }
     for (let i = 0; i < 3; i++) cyl(g, 0.15, 0.15, 0.6 + i * 0.25, Mat.paint(0xf6efe0, 0.7), 2.2 + i * 0.4, 5.5, -0.3, 14);
@@ -785,11 +834,15 @@ export function buildRoom(scene, ch, quality) {
     const fire = new THREE.PointLight(0xff7a2a, 30, 22, 2);
     const v = p._visual;
     fire.position.copy(v.localToWorld(new THREE.Vector3(0, 1.4, 1.2)));
+    const base = fire.position.clone();
     scene.add(fire);
     upd.push((t) => {
       const f = 0.8 + Math.sin(t * 9.1) * 0.08 + Math.sin(t * 15.7) * 0.06 + Math.sin(t * 3.3) * 0.06;
       fire.intensity = 30 * f;
       v.userData.ember.emissiveIntensity = 2.2 * f; v.userData.glow.material.opacity = 0.7 * f;
+      for (const m of v.userData.flames) m.uniforms.time.value = t;
+      v.userData.updateEmbers(t);
+      fire.position.x = base.x + Math.sin(t * 7.3) * 0.08; fire.position.y = base.y + Math.sin(t * 5.1) * 0.06;
     });
   }
   // TV standby glow and hallway spill
