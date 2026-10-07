@@ -32,6 +32,20 @@ function restOnBed(leo, x, z, q, underCover = false) {
 }
 const onTopOf = (leo, pose) => blahajSpheres(pose.com, pose.q, true).map((o) => ({ x: o.p.x - leo.group.position.x, y: o.p.y - leo.group.position.y, z: o.p.z - leo.group.position.z, r: o.r }));
 
+// The resting hug (title screen and the start of the story): the blanket has
+// slipped down, and Blåhaj lies on it in the crook of Leo's arm.
+const HELD_Q = yawQ(Math.PI).multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0, 0.3)));
+export function restingHug(game, dt, extra = {}) {
+  const leo = game.leo, hug = leo.hugPoint, t = (game._hugT = (game._hugT || 0) + dt);
+  const cr = leo.cradle(hug.x, hug.z);
+  leo.update(dt, Object.assign({ cover: 0.3, roll: 0, curl: 0, shiver: 0, ik: cr.ik, ikW: 1, pole: cr.pole, armOver: true, ikWL: 0, armOverL: false, onTop: game._hugPose ? onTopOf(leo, game._hugPose) : [] }, extra));
+  const com = restOnBed(leo, hug.x, hug.z, HELD_Q); com.y += Math.sin(t * 1.6) * 0.015;
+  game.rig.update(dt, { speed: 0, grounded: true, vx: 0, vy: 0, vz: 0 });
+  poseRig(game, com, HELD_Q);
+  game._hugPose = { com: com.clone(), q: HELD_Q };
+  return game._hugPose;
+}
+
 // Biscuit carries Blåhaj by the snout; the body dangles along his shoulder
 // and swings as he trots. Returns the rigid pose { com, q } for poseRig().
 const SNOUT = new THREE.Vector3(0, 0.42, 1.05);
@@ -71,7 +85,7 @@ export function prologue(game, hooks) {
   const lines = [
     [0.6, 'It was a cold, quiet night.'],
     [5.2, 'Leo was dreaming of Blåhaj and teddy bears.'],
-    [10.2, 'But the blanket had slipped, and Leo was cold…'],
+    [10.2, 'But his blanket had slipped down, and Leo was getting cold…'],
     [13.8, 'He pulled his arm out from under Blåhaj to reach for it…'],
     [15.4, '…and Blåhaj tumbled right off the bed!'],
     [17.8, 'Leo tugged up the covers and rolled over. He never noticed.'],
@@ -113,14 +127,15 @@ export function prologue(game, hooks) {
     c.subtitles(t);
     // Leo: hugs Blåhaj, gets cold, lets go to grab the duvet's edge and pull
     // it up, then rolls over with his arm tucked under the covers
-    const cover = t < 10 ? 1 : t < 12.5 ? 1 - seg(t, 10, 12.5) * 0.7 : t < 15.8 ? 0.3 : t < 17.6 ? 0.3 + seg(t, 15.8, 17.4) * 0.55 : 0.85 + seg(t, 17.6, 19.6) * 0.2;
+    const cover = t < 15.8 ? 0.3 : t < 17.6 ? 0.3 + seg(t, 15.8, 17.4) * 0.55 : 0.85 + seg(t, 17.6, 19.6) * 0.2; // already slipped down
     const roll = seg(t, 17.6, 19.8);
-    const shiver = t > 10.5 && t < 15.8 ? 1 : 0;
+    const shiver = t > 9.5 && t < 15.8 ? 1 : 0;
     // his arm cradles Blåhaj from underneath; he slides it out to reach the duvet
     const cr = leo.cradle(hug.x, hug.z);
     let ik = cr.ik, ikW = 1, pole = cr.pole;
-    if (t >= 14.0 && t < 15.8) { const k = seg(t, 14.0, 14.9); ik = cr.ik.clone().lerp(toLocal(leo.coverEdge()), k); pole = cr.pole.clone().lerp(V(0.75, 1, 0.35), k); }
-    else if (t >= 15.8) { ik = toLocal(leo.coverEdge()); ikW = 1 - seg(t, 17.3, 18.2); pole = V(0.75, 1, 0.35); }
+    const PULL = V(1, -0.15, 0.4).normalize(); // elbow out to the side and low, the way you tug a blanket
+    if (t >= 14.0 && t < 15.8) { const k = seg(t, 14.0, 14.9); ik = cr.ik.clone().lerp(toLocal(leo.coverEdge()), k); pole = cr.pole.clone().lerp(PULL, k); }
+    else if (t >= 15.8) { ik = toLocal(leo.coverEdge()); ikW = 1 - seg(t, 17.3, 18.2); pole = PULL; }
     const onTop = lastPose ? onTopOf(leo, lastPose) : [];
     leo.update(dt, { cover, roll, shiver, ik, ikW, pole, armOver: t < 17.8, onTop });
     // Blåhaj: snug in his arm, then (real physics) rolling off the bed
@@ -165,7 +180,7 @@ export function prologue(game, hooks) {
     if (t > 21 && Math.random() < 0.35) game.puffs.emit({ p: floor.clone().add(V((Math.random() - 0.5) * 8, 0.1, (Math.random() - 0.5) * 8)), v: V(0, 1.2, 0), life: 1.3, size: 0.7, color: new THREE.Color(0x150924), alpha: 0.7, drag: 0.6 });
     // camera
     if (t < 5) camShot(game, V(4.5, 6.4, 8.2), V(1.8, 6.6, 1.6), V(-4.0, 4.6, -5.6), V(-4.6, 5.0, -6.2), seg(t, 0, 5), 50);
-    else if (t < 10) camShot(game, V(-0.8, 6.9, -3.0), V(-1.6, 6.6, -4.2), V(-4.8, 5.4, -6.6), V(-4.6, 6.4, -6.4), seg(t, 5, 10), 42);
+    else if (t < 10) camShot(game, V(-0.6, 7.4, -2.6), V(-1.4, 8.0, -3.4), V(-4.8, 5.4, -6.6), V(-4.65, 8.3, -7.1), seg(t, 5, 8.5), 44); // up into his dream
     else if (t < 13.8) camShot(game, V(0.4, 7.4, -1.6), V(0.0, 7.0, -2.4), V(-5.0, 4.8, -5.4), V(-4.8, 4.8, -5.8), seg(t, 10, 13.8), 46);
     else if (t < 17.0) { // follow him over the edge
       camShot(game, V(2.6, 3.2, -1.2), V(2.2, 2.4, -2.6), V(-2.6, 3.6, -5.2), F(-0.2, 1.0, 0), seg(t, 13.8, 16.6), 48);

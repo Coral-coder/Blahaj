@@ -185,13 +185,18 @@ export function createLeo(bed) {
     const tt = torsoTop(x, z);
     let floor = 0.22, sheet = sheetY(x, z, zTop, false), ceil = 99;
     if (tt > 0) floor = Math.max(floor, tt + TH);
+    for (const o of state.under || []) { const d2 = (x - o.x) ** 2 + (z - o.z) ** 2; if (d2 < o.r * o.r) floor = Math.max(floor, o.y + Math.sqrt(o.r * o.r - d2) + TH); }
+    // arms never pass through the cloth: one tucked in (over = false) lifts it;
+    // otherwise the cloth goes under the arm wherever the arm is above where the
+    // cloth would lie, and over it wherever it's below (so the arm dives under the
+    // covers rather than cutting through them)
+    const natural = Math.max(sheet, floor);
     for (const sg of segs) {
       const sp = capsuleSpan(sg, x, z);
       if (!sp) continue;
-      if (!sg.over || (sg.far < 1 && sp[2] < 0.5)) floor = Math.max(floor, sp[1] + TH);   // arm under the covers
-      else if (sp[0] > (tt > 0 ? tt : 0.3)) ceil = Math.min(ceil, sp[0] - 0.02);           // arm lying on top
+      if (!sg.over || sp[3] < natural) floor = Math.max(floor, sp[1] + TH);
+      else ceil = Math.min(ceil, sp[0] - 0.02);
     }
-    for (const o of state.under || []) { const d2 = (x - o.x) ** 2 + (z - o.z) ** 2; if (d2 < o.r * o.r) floor = Math.max(floor, o.y + Math.sqrt(o.r * o.r - d2) + TH); }
     for (const o of state.onTop || []) { const d2 = (x - o.x) ** 2 + (z - o.z) ** 2; if (d2 < o.r * o.r) ceil = Math.min(ceil, o.y - Math.sqrt(o.r * o.r - d2) - 0.015); }
     lo[i] = Math.min(floor, ceil); hi[i] = Math.max(ceil, lo[i]);
     return Math.min(Math.max(sheet, lo[i]), hi[i]);
@@ -327,8 +332,8 @@ export function createLeo(bed) {
       return { ik: new THREE.Vector3(x + 0.62, 0.72, z + 0.4), pole: new THREE.Vector3(0.2, -1, -0.1).normalize() };
     },
     // where the edge of the duvet is right now, beside his arm (world space)
-    coverEdge() {
-      const z = zTopOf() + 0.12, x = 1.0;
+    coverEdge() { // (his hand stops at his chest; the covers slide on up past it)
+      const z = Math.max(zTopOf() + 0.12, -l / 2 + 3.35), x = 0.95;
       return new THREE.Vector3(root.position.x + x, root.position.y + sheetY(x, z, zTopOf()) + 0.12, root.position.z + z);
     },
   };
@@ -341,7 +346,8 @@ export function createLeo(bed) {
 export function createDreamBubble(at) {
   const g = new THREE.Group();
   g.position.copy(at);
-  const bubbleMat = new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0.1, transmission: 0.9, thickness: 0.3, transparent: true, opacity: 0.32, emissive: 0xfff0d8, emissiveIntensity: 0.1, iridescence: 0.8 });
+  // a soft, see-through cloud (no refraction, so the dream inside reads clearly)
+  const bubbleMat = new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0.3, transparent: true, opacity: 0.16, emissive: 0xfff0d8, emissiveIntensity: 0.1, iridescence: 0.8, side: THREE.FrontSide });
   bubbleMat.depthWrite = false;
   const cloud = new THREE.Group(); g.add(cloud);
   [[0, 0, 0, 1.8], [1.4, -0.3, 0.2, 1.2], [-1.5, -0.2, -0.1, 1.25], [0.6, 0.9, -0.2, 1.1], [-0.7, 0.8, 0.3, 1.0]].forEach(([x, y, z, r]) => {
@@ -350,10 +356,20 @@ export function createDreamBubble(at) {
   const trail = [];
   [[0.9, -2.4, 0.3, 0.32], [0.5, -3.3, 0.5, 0.22], [0.2, -3.9, 0.6, 0.14]].forEach(([x, y, z, r]) => { const m = new THREE.Mesh(new THREE.SphereGeometry(r, 16, 12), bubbleMat); m.position.set(x, y, z); g.add(m); trail.push(m); });
   const light = new THREE.PointLight(0xffd59a, 5, 7, 2); g.add(light);
-  // inside the dream: a little Blåhaj and teddy bears
-  const mini = createBlahaj(); mini.root.scale.setScalar(0.42); mini.blob.visible = false; cloud.add(mini.root);
-  const teddies = [0, 1, 2].map((i) => { const t = createTeddy(0.35); cloud.add(t.group); return t; });
-  const nightmares = [0, 1, 2].map(() => { const s = createShadow(0.38); s.group.visible = false; cloud.add(s.group); return s; });
+  // inside the dream: Blåhaj swimming loops round a ring of teddy bears dancing on a
+  // little moonlit hill, with twinkling stars and a crescent moon
+  const mini = createBlahaj(); mini.root.scale.setScalar(0.62); mini.blob.visible = false; cloud.add(mini.root);
+  const teddies = [0, 1, 2].map((i) => { const t = createTeddy(0.55, [0xa8784e, 0xd9a066, 0x8a6a8f][i]); cloud.add(t.group); return t; });
+  const nightmares = [0, 1, 2].map(() => { const s = createShadow(0.5); s.group.visible = false; cloud.add(s.group); return s; });
+  const hill = new THREE.Mesh(new THREE.SphereGeometry(1.5, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x8fd18a, emissive: 0x2f6a3a, emissiveIntensity: 0.5, roughness: 0.9 }));
+  hill.scale.set(1.2, 0.3, 0.8); hill.position.y = -0.95; cloud.add(hill);
+  const moon = new THREE.Mesh(new THREE.TorusGeometry(0.28, 0.1, 10, 24, Math.PI * 1.25), new THREE.MeshStandardMaterial({ color: 0xfff1b0, emissive: 0xffd86a, emissiveIntensity: 1.4 }));
+  moon.position.set(-1.1, 0.95, -0.2); moon.rotation.z = 2.2; cloud.add(moon);
+  const twinkles = [];
+  for (let i = 0; i < 9; i++) {
+    const st = new THREE.Sprite(new THREE.SpriteMaterial({ map: softDotTexture(), color: 0xfff3c0, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+    st.position.set((Math.random() - 0.5) * 3.2, 0.2 + Math.random() * 1.0, (Math.random() - 0.5) * 1.2); st.userData.ph = Math.random() * 6; cloud.add(st); twinkles.push(st);
+  }
   const bubble = {
     group: g, dream: 1, trail,
     update(dt, t, dream) {
@@ -365,13 +381,16 @@ export function createDreamBubble(at) {
       bubbleMat.emissiveIntensity = lerp(0.25, 0.1, d);
       light.color.setRGB(lerp(0.6, 1.0, d), lerp(0.2, 0.83, d), lerp(0.9, 0.6, d));
       light.intensity = lerp(3, 5, d);
-      mini.root.position.set(Math.sin(t * 0.8) * 0.4, Math.sin(t * 1.3) * 0.15, 0.2);
-      mini.root.rotation.y = t * 0.8;
+      mini.root.position.set(Math.cos(t * 0.8) * 1.1, 0.45 + Math.sin(t * 1.6) * 0.18, Math.sin(t * 0.8) * 0.55);
+      mini.root.rotation.y = -t * 0.8;
+      twinkles.forEach((st) => { const k = 0.5 + 0.5 * Math.sin(t * 3 + st.userData.ph); st.scale.setScalar(0.12 + 0.14 * k * d); st.material.opacity = (0.4 + 0.6 * k) * d; });
+      moon.material.emissiveIntensity = 1.4 * d + 0.2;
+      hill.material.color.setRGB(lerp(0.25, 0.56, d), lerp(0.2, 0.82, d), lerp(0.35, 0.54, d));
       mini.update(dt, { speed: 0.4, grounded: false, vx: 0, vy: 0, vz: 0, glide: true });
       teddies.forEach((td, i) => {
         const a = t * 0.9 + (i * Math.PI * 2) / 3;
-        td.group.position.set(Math.cos(a) * 1.25, Math.sin(a * 1.3) * 0.3 - 0.1, Math.sin(a) * 0.6);
-        td.group.rotation.y = -a;
+        td.group.position.set(Math.cos(a) * 0.75, -0.72 + Math.abs(Math.sin(t * 3 + i)) * 0.15, Math.sin(a) * 0.4); // dancing on the hill
+        td.group.rotation.y = -a + Math.PI / 2;
         const show = d > (i + 1) * 0.22;
         td.group.visible = show; nightmares[i].group.visible = !show;
         nightmares[i].group.position.copy(td.group.position);

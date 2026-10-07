@@ -6,7 +6,7 @@ import { Renderer, QUALITY, QUALITY_ORDER } from './renderer.js';
 import { Input } from './input.js';
 import { Game } from './game.js';
 import { loadBlahajModel } from './art.js';
-import { CINES } from './cinematics.js';
+import { CINES, restingHug } from './cinematics.js';
 
 const $ = (id) => document.getElementById(id);
 const SAVE_KEY = 'blahaj-backtobed-v1';
@@ -80,16 +80,12 @@ function startTitle() {
     mode = 'title';
     newGame(0);
     const g = game;
-    g.leo.update(0, { cover: 1, roll: 0, arm: 'hug', prevArm: 'hug', armT: 1 });
     let a = 0;
     g.cine = {
       ownsCamera: true, ownsPlayer: true, dream: 1, done: false,
       update(dt) {
         a += dt * 0.05;
-        const hp = g.leo.hugPoint;
-        g.p.pos.copy(hp).setY(hp.y - 0.4); g.p.yaw = Math.PI; g.rig.body.rotation.z = 0.5;
-        g.rig.update(dt, { speed: 0, grounded: true, vx: 0, vy: 0, vz: 0 });
-        g.leo.update(dt, {});
+        restingHug(g, dt); // Blåhaj in Leo's arm, on the slipped-down duvet
         g.comfort = 100;
         g.camera.position.set(-5.0 + Math.cos(a + 0.9) * 7.5, 7.2 + Math.sin(a * 2) * 0.3, -5.0 + Math.sin(a + 0.9) * 7.5);
         g.camera.lookAt(-4.9, 5.6, -6.0);
