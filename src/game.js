@@ -714,7 +714,10 @@ export class Game {
     this.rig.blob.position.y = groundY - P.pos.y + 0.03;
     const hgt = P.pos.y - groundY;
     this.rig.blob.material.opacity = Math.max(0, 0.4 - hgt * 0.05);
-    this.fill.position.copy(P.pos).add(V(0, 2.2, 0)).addScaledVector(V(Math.sin(this.cam.yaw), 0, Math.cos(this.cam.yaw)), 1.6);
+    // the fill light sits just above Blåhaj, on the side the camera sees him from
+    // (in cutscenes the camera isn't the follow camera, so aim it at the real one)
+    const toCam = this.cine && !this.cine.done ? this.camera.position.clone().sub(P.pos).setY(0).normalize() : V(Math.sin(this.cam.yaw), 0, Math.cos(this.cam.yaw));
+    this.fill.position.copy(P.pos).add(V(0, 2.2, 0)).addScaledVector(toCam, 1.6);
     if (P.inDark && Math.random() < 0.5) this.puffs.emit({ p: P.pos.clone().add(V((Math.random() - 0.5) * 1.6, 0.05, (Math.random() - 0.5) * 1.6)), v: V(0, 1.2, 0), life: 0.8, size: 0.4, color: new THREE.Color(0x150924), alpha: 0.7, drag: 1 });
     if (P.glide && Math.random() < 0.5) this.sparks.emit({ p: P.pos.clone().add(V((Math.random() - 0.5) * 1.4, 0.3, (Math.random() - 0.5) * 1.4)), v: V(0, -0.5, 0), life: 0.6, size: 0.15, color: new THREE.Color(0xdff1ff), alpha: 0.6 });
 

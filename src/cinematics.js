@@ -437,7 +437,10 @@ export function downstairs(game, hooks) {
     poseRig(game, com, q);
     // cameras: in from the room, then the game of fetch, then Biscuit settling by the fire
     if (t < 3.0) camShot(game, V(4, 7.5, 6), V(-1, 6.0, 3), V(0, 1.5, 0), play.clone().setY(1.6), seg(t, 0, 3.0), 54);
-    else if (t < 7.2) camShot(game, V(-1.2, 3.4, -5.6), V(-1.8, 3.0, -6.2), lerpV(play, bed, 0.4).setY(1.4), lerpV(play, bed, 0.6).setY(1.0), seg(t, 3.0, 7.2), 50);
+    else if (t < 7.2) { // already wide before the throw: Biscuit, his bed and the whole arc in frame
+      const mid = lerpV(play, bed, 0.5);
+      camShot(game, V(-1.0, 7.2, -10.0), V(-1.4, 6.8, -9.6), mid.clone().setY(2.7), mid.clone().setY(1.9), seg(t, 3.0, 7.2), 56);
+    }
     else if (t < 10.4) camShot(game, V(-4.6, 2.6, -7.8), V(-5.0, 2.4, -7.6), lerpV(play, sleep, 0.5).setY(1.2), sleep.clone().setY(0.9).lerp(bed, 0.4), seg(t, 7.2, 10.4), 50);
     else camShot(game, V(-5.0, 2.4, -7.6), V(-3.0, 6.0, 1.0), sleep.clone().setY(0.9).lerp(bed, 0.4), V(12, 2.0, 7.5), seg(t, 10.4, 13), 54);
     if (t >= c.length) {
