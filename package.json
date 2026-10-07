@@ -5,8 +5,8 @@
   "description": "Bl\u00e5haj's Big Adventure: a cute 3D platformer starring a plush shark.",
   "type": "module",
   "scripts": {
-    "build": "esbuild src/main.js --bundle --minify --format=iife --target=es2020 --outfile=dist/game.js",
-    "watch": "esbuild src/main.js --bundle --sourcemap --format=iife --target=es2020 --outfile=dist/game.js --watch",
+    "build": "esbuild src/main.js --loader:.glb=binary --bundle --minify --format=iife --target=es2020 --outfile=dist/game.js",
+    "watch": "esbuild src/main.js --loader:.glb=binary --bundle --sourcemap --format=iife --target=es2020 --outfile=dist/game.js --watch",
     "check": "node tools/check-levels.js",
     "serve": "python3 -m http.server 8080",
     "playtest": "node tools/playtest.cjs"

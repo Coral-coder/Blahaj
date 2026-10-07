@@ -4,9 +4,10 @@ A soft, squishy 3D platformer starring everyone's favourite plush shark. Hop acr
 bedroom where the floor is lava, bounce off kitchen sponges, climb a bookshelf, dash
 over rooftops and glide across a starry dream sea, learning a new trick in every level.
 
-Everything is generated in code: the shark, the props, and every texture (knitted rugs,
-wood grain, marble, cookie crumbs, roof tiles, plush fabric). The game ships as one
-HTML page plus one JavaScript bundle, with no image, model or audio files.
+Blåhaj herself is a real 3D model of the toy (credited below). Everything else is
+generated in code: the props, creatures, every texture (knitted rugs, wood grain, marble,
+cookie crumbs, roof tiles) and all the music and sound. The game ships as one HTML page
+plus one JavaScript bundle.
 
 ## Play
 
@@ -87,11 +88,18 @@ automatically.
 | `src/levels.js` | Level layouts as plain data |
 | `src/game.js` | Physics, abilities, enemies, collectibles, camera |
 | `src/world.js` | Sky, lighting, floors, platform visuals, grass, particles |
-| `src/art.js` | Blåhaj and every prop and creature |
+| `src/art.js` | Blåhaj (model loading and animation) and every prop and creature |
 | `src/textures.js`, `src/materials.js` | Procedural textures and PBR materials |
 | `src/renderer.js` | Render pipeline and quality presets |
 | `src/audio.js` | Synthesised music and sound effects |
 | `src/main.js`, `index.html` | Menus, saving, the main loop |
 
-Built with [three.js](https://threejs.org) (MIT). Blåhaj is a trademark of IKEA. This is an
+## Credits
+
+- Blåhaj 3D model: ["Blahaj"](https://sketchfab.com/3d-models/blahaj-ce981de49111488c81ea646067abe1ec)
+  by [Kaine_G](https://sketchfab.com/Kaine_G), licensed
+  [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Changes for this game: new
+  plush material, recreated teeth texture, and vertex-shader animation for the tail and
+  fins. The file lives in `assets/blahaj.glb`.
+- Built with [three.js](https://threejs.org) (MIT). Blåhaj is a trademark of IKEA. This is an
 unofficial fan project made with love for the shark.

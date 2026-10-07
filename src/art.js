@@ -3,6 +3,8 @@ import * as THREE from 'three';
 import { Mat } from './materials.js';
 import { Tex, textTexture, softDotTexture, vnoise } from './textures.js';
 import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import blahajGlb from '../assets/blahaj.glb';
 
 const shadow = (m, cast = true, recv = true) => { m.castShadow = cast; m.receiveShadow = recv; return m; };
 const smoothstep = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
@@ -205,7 +207,7 @@ function plushFin(points, depth, bevel, top, bottom, mat) {
   return shadow(new THREE.Mesh(geo, mat));
 }
 
-export function createBlahaj() {
+export function createProceduralBlahaj() {
   const root = new THREE.Group();
   const body = new THREE.Group();
   root.add(body);
@@ -324,6 +326,130 @@ export function createBlahaj() {
     rig.squash += rig.squashVel * dt;
     const s = rig.squash;
     body.scale.set(1.25 / Math.sqrt(s), 1.25 * s, 1.25 / Math.sqrt(s));
+  };
+  rig.impulse = (v) => { rig.squashVel += v; };
+  return rig;
+}
+
+// ------------------------------------------------- imported Blåhaj model --
+// "Blahaj" by Kaine_G (https://sketchfab.com/Kaine_G), CC BY 4.0
+// https://sketchfab.com/3d-models/blahaj-ce981de49111488c81ea646067abe1ec
+// Modified: re-materialled with a plush sheen and animated in the vertex
+// shader (tail wag, fin flaps). The mesh has no skeleton, so we bend it.
+let blahajModel = null;
+export function loadBlahajModel() {
+  return new Promise((resolve) => {
+    try {
+      const buf = blahajGlb.buffer.slice(blahajGlb.byteOffset, blahajGlb.byteOffset + blahajGlb.byteLength);
+      new GLTFLoader().parse(buf, '', (gltf) => {
+        const meshes = [];
+        gltf.scene.traverse((o) => { if (o.isMesh) meshes.push(o); });
+        blahajModel = meshes.map((m) => ({ name: m.name, geometry: m.geometry, material: m.material }));
+        resolve(true);
+      }, (err) => { console.warn('Blåhaj model failed to load, using the procedural one', err); resolve(false); });
+    } catch (err) { console.warn('Blåhaj model failed to load, using the procedural one', err); resolve(false); }
+  });
+}
+
+// mesh space: snout toward -x, dorsal fin +y, pectoral fins toward ±z
+const MODEL = { length: 7.37, bottom: -1.18, worldLength: 2.5 };
+
+// The teeth are 16 little quads that cut their shape out of a texture.
+// (That texture was lost in transfer, so we redraw it: soft white triangles.)
+let teethTex = null;
+function blahajTeethTexture() {
+  if (teethTex) return teethTex;
+  const N = 2048;
+  const c = document.createElement('canvas');
+  c.width = c.height = N;
+  const g = c.getContext('2d');
+  g.fillStyle = '#fbf7f4';
+  // glTF UVs: origin top-left (flipY = false). u = height up the tooth, v = across it.
+  const tooth = (uBase, uTip, v0, v1) => {
+    const vm = (v0 + v1) / 2;
+    g.beginPath();
+    g.moveTo(uBase * N, v0 * N);
+    g.quadraticCurveTo(((uBase + uTip) / 2) * N, (v0 + 0.002) * N, uTip * N, vm * N);
+    g.quadraticCurveTo(((uBase + uTip) / 2) * N, (v1 - 0.002) * N, uBase * N, v1 * N);
+    g.closePath();
+    g.fill();
+  };
+  tooth(0.0605, 0.0855, 0.0285, 0.0588); // lower jaw: base at low u, pointing up
+  tooth(0.0505, 0.0200, 0.0285, 0.0588); // upper jaw: base at high u, pointing down
+  teethTex = new THREE.CanvasTexture(c);
+  teethTex.flipY = false;
+  teethTex.colorSpace = THREE.SRGBColorSpace;
+  return teethTex;
+}
+
+function plushModelMaterial(src, uni, deform) {
+  const isTeeth = src.name === 'teef';
+  const fuzz = Tex.plush();
+  const fuzzN = fuzz.normalMap.clone(); fuzzN.repeat.set(14, 14); fuzzN.needsUpdate = true;
+  const m = new THREE.MeshPhysicalMaterial(isTeeth ? {
+    map: blahajTeethTexture(), alphaTest: 0.5, transparent: false, side: THREE.DoubleSide,
+    roughness: 0.85, sheen: 0.6, sheenColor: new THREE.Color(0xffffff),
+  } : {
+    map: src.map || null, roughnessMap: src.roughnessMap || null, normalMap: fuzzN, normalScale: new THREE.Vector2(0.45, 0.45),
+    roughness: 1, metalness: 0, side: THREE.DoubleSide,
+    sheen: 1, sheenRoughness: 0.5, sheenColor: new THREE.Color(0xc8dcff),
+  });
+  if (!deform) return m;
+  m.onBeforeCompile = (sh) => {
+    sh.uniforms.wag = uni.wag; sh.uniforms.flap = uni.flap;
+    sh.vertexShader = 'uniform float wag;\nuniform float flap;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
+      // tail: bend sideways, more toward the tip
+      float tk = smoothstep(0.2, 3.9, position.x);
+      transformed.z += wag * tk * tk * 2.2;
+      // pectoral fins: lift the tips
+      float fz = abs(position.z);
+      float fk = smoothstep(0.8, 1.3, fz) * (1.0 - smoothstep(0.2, 0.7, position.y)) * step(-1.5, position.x) * step(position.x, 0.8);
+      transformed.y += flap * fk * (fz - 0.8) * 1.6;`);
+  };
+  m.customProgramCacheKey = () => 'blahajDeform';
+  return m;
+}
+
+export function createBlahaj() {
+  if (!blahajModel) return createProceduralBlahaj();
+  const root = new THREE.Group();
+  const body = new THREE.Group();
+  root.add(body);
+  const uni = { wag: { value: 0 }, flap: { value: 0 } };
+  const S = MODEL.worldLength / MODEL.length;
+  const holder = new THREE.Group();
+  holder.rotation.y = Math.PI / 2;      // snout (-x) -> forward (+z)
+  holder.scale.setScalar(S);
+  holder.position.y = -MODEL.bottom * S;
+  body.add(holder);
+  for (const part of blahajModel) {
+    const isShark = part.material.name !== 'teef';
+    const mesh = new THREE.Mesh(part.geometry, plushModelMaterial(part.material, uni, isShark));
+    mesh.castShadow = isShark; mesh.receiveShadow = true;
+    holder.add(mesh);
+  }
+  const blob = new THREE.Mesh(new THREE.CircleGeometry(0.6, 32), new THREE.MeshBasicMaterial({ map: softDotTexture(), color: 0x0a1020, transparent: true, opacity: 0.35, depthWrite: false }));
+  blob.rotation.x = -Math.PI / 2;
+  blob.scale.set(0.9, 1.7, 1);
+  blob.renderOrder = 2;
+  root.add(blob);
+
+  const rig = { root, body, eyes: [], blob, t: Math.random() * 10, squash: 1, squashVel: 0, spin: 0 };
+  rig.update = (dt, st) => {
+    rig.t += dt;
+    const wag = 4 + st.speed * 10;
+    uni.wag.value = Math.sin(rig.t * wag) * (0.08 + st.speed * 0.16);
+    body.rotation.y = -Math.sin(rig.t * wag - 0.6) * st.speed * 0.06;
+    uni.flap.value = Math.sin(rig.t * (st.glide ? 14 : 4)) * (st.glide ? 0.2 : 0.06) + (st.grounded ? 0 : st.glide ? 0.45 : 0.25);
+    body.position.y = st.grounded ? Math.sin(rig.t * 2.2) * 0.012 : 0.04;
+    const targetPitch = st.grounded ? 0 : st.pound ? 0.9 : THREE.MathUtils.clamp(-st.vy * 0.05, -0.45, 0.45);
+    body.rotation.x += (targetPitch - body.rotation.x) * Math.min(1, dt * 10);
+    if (rig.spin > 0) { rig.spin = Math.max(0, rig.spin - dt * 18); body.rotation.z = rig.spin; } else body.rotation.z *= 0.8;
+    const acc = -170 * (rig.squash - 1) - 12 * rig.squashVel;
+    rig.squashVel += acc * dt;
+    rig.squash += rig.squashVel * dt;
+    const s = rig.squash;
+    body.scale.set(1 / Math.sqrt(s), s, 1 / Math.sqrt(s));
   };
   rig.impulse = (v) => { rig.squashVel += v; };
   return rig;

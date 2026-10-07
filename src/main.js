@@ -5,6 +5,7 @@ import { Audio } from './audio.js';
 import { Renderer, QUALITY, QUALITY_ORDER } from './renderer.js';
 import { Input } from './input.js';
 import { Game } from './game.js';
+import { loadBlahajModel } from './art.js';
 
 const $ = (id) => document.getElementById(id);
 const SAVE_KEY = 'blahaj-adventure-v1';
@@ -257,8 +258,8 @@ function frame(now) {
 
 // boot: title screen over a live orbiting shot of the first level
 show('title');
-startLevel(0, true);
-requestAnimationFrame(frame);
+loading(true, 'Fluffing pillows…');
+loadBlahajModel().then(() => { startLevel(0, true); requestAnimationFrame(frame); });
 // debug / test hooks
 const debug = { noRender: false };
 window.__blahaj = {
