@@ -41,12 +41,12 @@ const HELD_Q = yawQ(Math.PI).multiply(new THREE.Quaternion().setFromEuler(new TH
 export const SNUG_BEND = -1.0;
 export function snuggle(leo, bx, bz, pose) {
   const L = leo.worldToLocal(V(bx, 0, bz));
-  const ik = new THREE.Vector3(L.x + 0.6, 0.55, L.z + 0.05);
-  const ikL = pose ? leo.worldToLocal(pose.com.clone().add(V(0.5, 0.3, 0.1))) : new THREE.Vector3(L.x + 0.5, 1.4, L.z + 0.2);
+  const ik = new THREE.Vector3(L.x + 0.5, 0.55, L.z + 0.05);
+  const ikL = pose ? leo.worldToLocal(pose.com.clone().add(V(0.42, 0.25, 0.1))) : new THREE.Vector3(L.x + 0.42, 1.3, L.z + 0.2);
   return { roll: -0.85, curl: 0.7, ik, ikW: 1, pole: V(0.2, -1, -0.1).normalize(), armOver: true, ikL, ikWL: 1, poleL: V(-0.2, 1, -0.3), armOverL: true };
 }
-const snugX = (leo) => leo.hugPoint.x + 0.42;
-const snugZ = (leo) => leo.hugPoint.z + 0.45; // against his chest, not in his face
+const snugX = (leo) => leo.hugPoint.x + 0.12; // right up against his chest
+const snugZ = (leo) => leo.hugPoint.z + 0.15;
 export function restingHug(game, dt, extra = {}) {
   const leo = game.leo, t = (game._hugT = (game._hugT || 0) + dt), bx = snugX(leo), bz = snugZ(leo);
   leo.update(dt, Object.assign({ cover: 0.3, shiver: 0, onTop: game._hugPose ? onTopOf(leo, game._hugPose) : [] }, snuggle(leo, bx, bz, game._hugPose), extra));
@@ -239,7 +239,7 @@ export function dogSnatch(game, hooks) {
   // he stops out in the room, a few steps from Blåhaj
   const toRoom = V(-sill.x, 0, -sill.z).normalize();
   let spot = null;
-  for (const d of [4.8, 4.0, 5.6, 3.4]) for (const turn of [0, 0.4, -0.4, 0.8, -0.8]) {
+  for (const d of [4.8, 4.0, 5.6, 3.4]) for (const turn of [0.8, -0.8, 0.5, -0.5, 0]) { // off to one side, not where Blåhaj will land
     if (spot) break;
     const dir = toRoom.clone().applyAxisAngle(V(0, 1, 0), turn), p = sill.clone().setY(0).addScaledVector(dir, d);
     if ([0, 1, 2, 3].filter((a) => fits(p, a * Math.PI / 2)).length >= 3 && fits(p, faceTo(p, sill))) spot = p;
@@ -255,7 +255,8 @@ export function dogSnatch(game, hooks) {
   const q0 = yawQ(P.yaw);
   const body = createTumble(game.solids, { rollDrag: 3, floorDrag: 8, surface: game.softHeight });
   body.x.copy(sill).add(BLAHAJ_COM.clone().applyQuaternion(q0)); body.q.copy(q0);
-  const hop = spot.clone().sub(sill).setY(0).normalize();
+  // startled, Blåhaj leaps out into the room and away from the barking dog
+  const hop = toRoom.clone().addScaledVector(spot.clone().sub(sill).setY(0).normalize(), -0.7).normalize();
   body.v.copy(hop).multiplyScalar(4.2).setY(6.2); body.w.copy(new THREE.Vector3().crossVectors(hop, V(0, 1, 0)).multiplyScalar(6)).setY(0.8);
   const fall = body.bake(7);
   const at = (t) => fall.frames[Math.max(0, Math.min(fall.frames.length - 1, Math.floor((t - RELEASE) / fall.h)))];
@@ -502,7 +503,7 @@ export function ending(game, hooks) {
     c.subtitles(t);
     // where Blåhaj lies: landed beside him, then drawn in against his chest
     const pull = sm(t, 4.4, 6.4), tuck = sm(t, 6.2, 8.0);
-    const bx = bedX + lerpV(V(1.85, 0, 0), V(1.57, 0, 0), pull).x, bz = snugZ(leo);
+    const bx = lerpV(V(bedX + 1.85, 0, 0), V(snugX(leo), 0, 0), pull).x, bz = snugZ(leo);
     // Leo: rolls toward him and curls up; right arm slides underneath, left arm over the top
     const roll = 1 - 1.85 * sm(t, 2.0, 4.6), curl = 0.7 * sm(t, 2.6, 5.0);
     const sn = snuggle(leo, bx, bz, pose);

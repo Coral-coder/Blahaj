@@ -66,7 +66,7 @@ export const CHAPTERS = [
       { type: 'shadow', path: [[-0.4, 0, -3.0], [-0.4, 0, -1.6]], speed: 0.8 },
     ],
     bunnies: [[-3.0, 0, 4.9], [2.2, 0, -7.6], [-2.2, 0, 0.6]],
-    goal: { x: -4.3, y: 4.6, z: -6.1, r: 1.8, label: 'Leo' },        // the whole climb ends back in Leo's arms…
+    goal: { x: 3.5, y: 4.6, z: -9.0, r: 3.0, label: 'windowsill' }, // so close to Leo… and then Biscuit bursts in
     route: ['moon', 'blocks', 'drawer1', 'drawer2', 'drawer3', 'dresser', 'shelf', 'bookcase', 'sill'],
   },
   // ---------------------------------------------------------------------------
