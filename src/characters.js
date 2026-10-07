@@ -68,81 +68,218 @@ export function createLeo(bed) {
   const fore = part(new THREE.CapsuleGeometry(0.17, 0.7, 6, 12), pj, elbow, 0, 0, 0.45); fore.rotation.x = Math.PI / 2;
   const hand = part(new THREE.SphereGeometry(0.2, 16, 12), skin, elbow, 0, 0, 0.98); hand.scale.set(1, 0.7, 1.2);
 
-  // duvet: a deforming quilted sheet draped over him and the mattress
-  const DW = w + 1.4, DL = l * 0.8, NX = 46, NZ = 52;
+  // duvet: a quilted sheet draped over the mattress and over Leo. It is
+  // collided against his body (torso, tucked arm) so nothing pokes through,
+  // and it slides under the arm whenever that arm is out on top.
+  const DW = w + 2.4, DL = l * 0.8, NX = 96, NZ = 84;
   const dGeo = new THREE.PlaneGeometry(DW, DL, NX, NZ);
   dGeo.rotateX(-Math.PI / 2);
   const base = dGeo.attributes.position.array.slice();
   const dMat = Mat.quilt(0x4a6fb0).clone();
-  dMat.map = dMat.map.clone(); dMat.map.repeat.set(1.6, 2.2); dMat.map.needsUpdate = true;
-  dMat.normalMap = dMat.normalMap.clone(); dMat.normalMap.repeat.set(1.6, 2.2); dMat.normalMap.needsUpdate = true;
+  for (const k of ['map', 'normalMap', 'roughnessMap']) { dMat[k] = dMat[k].clone(); dMat[k].repeat.set(1.85, 2.2); dMat[k].needsUpdate = true; }
   dMat.normalScale = new THREE.Vector2(0.55, 0.55);
   dMat.side = THREE.DoubleSide;
   const duvet = sh(new THREE.Mesh(dGeo, dMat));
   root.add(duvet);
 
-  const state = { cover: 1, roll: 0, arm: 'hug', armT: 0, shiver: 0, breath: 0, t: 0 };
-  function drape() {
-    const pos = dGeo.attributes.position;
-    const zTop = lerp(-l / 2 + 4.4, -l / 2 + 2.3, state.cover); // where the top edge of the duvet sits
-    const zEnd = l / 2 + 0.4;
+  const state = { cover: 1, roll: 0, arm: 'hug', armT: 0, shiver: 0, breath: 0, t: 0, ik: null, ikW: 0, armOver: true, onTop: [], under: [] };
+  const TH = 0.07; // cloth thickness
+  const torsoZ = -l / 2 + 3.1;
+  // top of Leo's torso (an elliptical capsule) at bed-local (x, z), or -1
+  // soft = true gives the tent the cloth makes over him: wider, no cliffs
+  function torsoTop(x, z, soft = false) {
+    const tx = lerp(0, -0.5, state.roll), pad = soft ? 0.45 : 0;
+    const dz = Math.max(0, Math.abs(z - torsoZ) - 0.6);
+    if (dz >= 0.62 + pad) return -1;
+    const k = Math.sqrt(Math.max(0, 1 - (dz / (0.62 + pad)) ** 2)), rx = (0.775 + pad) * k, dx = x - tx;
+    if (Math.abs(dx) >= rx) return -1;
+    if (soft) { // the tent: from his top, sloping away at ~50 degrees
+      const rr = Math.hypot(dx, dz);
+      return 0.55 + 0.465 - Math.max(0, rr - 0.25) * 1.2;
+    }
+    return 0.55 + 0.465 * k * Math.sqrt(1 - (dx / rx) ** 2);
+  }
+  // arm capsules in bed-local space, refreshed after posing
+  const segs = [];
+  const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3();
+  function refreshArm() {
+    root.updateMatrixWorld(true);
+    const o = root.position;
+    shoulder.getWorldPosition(_a).sub(o); elbow.getWorldPosition(_b).sub(o);
+    _c.set(0, 0, 0.98).applyMatrix4(elbow.matrixWorld).sub(o);
+    segs.length = 0;
+    segs.push({ a: _a.clone(), b: _b.clone(), r: 0.21, far: 0.45 }, { a: _b.clone(), b: _c.clone(), r: 0.2, far: 1 });
+  }
+  // vertical extent of a capsule above point (x, z): [bottom, top] or null
+  function capsuleSpan(sg, x, z, pad = 0) {
+    const ax = sg.b.x - sg.a.x, az = sg.b.z - sg.a.z, L2 = ax * ax + az * az;
+    let t = L2 > 1e-6 ? ((x - sg.a.x) * ax + (z - sg.a.z) * az) / L2 : 0;
+    t = Math.max(0, Math.min(1, t));
+    const px = sg.a.x + ax * t, pz = sg.a.z + az * t, d2 = (x - px) ** 2 + (z - pz) ** 2, R = sg.r + pad;
+    if (d2 >= R * R) return null;
+    const yc = sg.a.y + (sg.b.y - sg.a.y) * t, d = Math.sqrt(d2);
+    const h = d < sg.r ? Math.sqrt(sg.r * sg.r - d2) : 0;
+    return [yc - h, yc + h, t, yc, d]; // bottom, top, along, centre height, distance
+  }
+  // height of the duvet sheet itself at bed-local (x, z) on the mattress
+  function sheetY(x, z, zTop, withArm = true) {
     const bodyX = lerp(0, -0.6, state.roll);
     const breathe = Math.sin(state.t * 1.6) * 0.04;
+    let y = 0.28;
+    const bx = (x - bodyX) / (0.95 + 0.25 * state.roll), bz = (z - (-l / 2 + 4.6)) / 3.2;
+    y += Math.sqrt(Math.max(0, 1 - bx * bx - bz * bz)) * (0.85 + breathe);
+    const kx = (x - bodyX + 0.2 * state.roll) / 0.8, kz = (z - (-l / 2 + 6.6)) / 0.9;
+    y += Math.max(0, 1 - kx * kx - kz * kz) * 0.35 * (1 - state.roll * 0.4);
+    y += Math.sin(x * 2.3 + z * 0.7) * 0.03 + Math.sin(z * 3.1 - x * 1.3) * 0.025;
+    y += smooth(0.35, 0, z - zTop) * 0.12; // the top edge folds over a little
+    // collide with his body: over the torso, and over the arm when it's tucked in
+    const tt = torsoTop(x, z), ts = torsoTop(x, z, true);
+    if (ts > 0) y = Math.max(y, ts + TH);
+    if (tt > 0) y = Math.max(y, tt + TH);
+    if (withArm) for (const sg of segs) {
+      const under = !state.armOver || sg.far < 1;
+      if (under) { // the cloth tents over an arm beneath it, sloping back down to the sheet
+        const sp = capsuleSpan(sg, x, z, 1.0);
+        if (sp && (!state.armOver || sp[2] < 0.5)) y = Math.max(y, sp[3] + sg.r + TH - Math.max(0, sp[4] - sg.r) * 1.4);
+        continue;
+      }
+      const sp = capsuleSpan(sg, x, z);
+      if (sp && sp[0] > (tt > 0 ? tt : 0.3)) y = Math.max(Math.min(y, sp[0] - 0.02), tt > 0 ? tt + TH : 0.22); // arm on top
+    }
+    // things tucked under the duvet (Blåhaj, at the end) lift it into a soft tent
+    if (withArm) for (const o of state.under || []) {
+      const d = Math.hypot(x - o.x, z - o.z);
+      // a rounded drape: flat-ish over the top, rolling away softly at the sides
+      const top = o.y + o.r + TH, k = d / (o.r + 0.55);
+      if (k < 1) y = Math.max(y, top - (o.r + 0.4) * k * k * (1.6 - 0.6 * k));
+    }
+    // things lying on the duvet (Blåhaj) press it down; it never comes up through them
+    if (withArm) for (const o of state.onTop || []) {
+      const d2 = (x - o.x) ** 2 + (z - o.z) ** 2;
+      if (d2 < o.r * o.r) y = Math.min(y, o.y - Math.sqrt(o.r * o.r - d2) - 0.015);
+    }
+    return y;
+  }
+  const zTopOf = () => lerp(-l / 2 + 4.4, -l / 2 + 2.3, state.cover);
+  function drape() {
+    const pos = dGeo.attributes.position;
+    const zTop = zTopOf(), zEnd = l / 2 + 0.4;
     for (let i = 0; i < pos.count; i++) {
       const u = base[i * 3] / DW + 0.5, v = base[i * 3 + 2] / DL + 0.5;
       const x = (u - 0.5) * DW;
       const z = lerp(zTop, zEnd, v);
-      let y = 0.28;
-      // his body under the covers
-      const bx = (x - bodyX) / (0.95 + 0.25 * state.roll), bz = (z - (-l / 2 + 4.6)) / 3.2;
-      const body = Math.max(0, 1 - bx * bx - bz * bz);
-      y += Math.sqrt(body) * (0.85 + breathe) ;
-      // knees
-      const kx = (x - bodyX + 0.2 * state.roll) / 0.8, kz = (z - (-l / 2 + 6.6)) / 0.9;
-      y += Math.max(0, 1 - kx * kx - kz * kz) * 0.35 * (1 - state.roll * 0.4);
-      // drape over the mattress edges
-      const over = Math.abs(x) - (w / 2 - 0.2);
-      if (over > 0) y -= Math.min(over * 3.2, 1.25) + Math.max(0, over - 0.4) * 0.6;
+      const edge = w / 2 - 0.2;
+      let y = sheetY(Math.max(-edge, Math.min(edge, x)), z, zTop);
+      // roll over the mattress edge on a soft radius, then hang with lazy folds;
+      // on the wall side (-x) it just tucks down into the gap
+      const over = Math.abs(x) - edge;
+      let xs = x;
+      if (over > 0) {
+        const wall = x < 0, R = wall ? 0.08 : 0.18;
+        const ang = Math.min(over / R, Math.PI / 2), hang = Math.max(0, over - R * Math.PI / 2);
+        const swing = wall ? 0 : (Math.sin(z * 2.2 + 0.6) * 0.07 + Math.sin(z * 4.7 + 1.3) * 0.03) * Math.min(1, hang * 1.5);
+        xs = Math.sign(x) * (edge + R * Math.sin(ang) + swing);
+        y -= R * (1 - Math.cos(ang)) + hang;
+      }
       if (z > l / 2 - 0.15) y -= (z - (l / 2 - 0.15)) * 3.5;
-      // soft wrinkles
-      y += Math.sin(x * 2.3 + z * 0.7) * 0.03 + Math.sin(z * 3.1 - x * 1.3) * 0.025;
-      // the top edge folds over a little
-      const fold = smooth(0.35, 0, z - zTop);
-      y += fold * 0.12;
-      const xs = over > 0 ? Math.sign(x) * (w / 2 - 0.2 + Math.min(over, 0.45)) : x;
       pos.setXYZ(i, xs + state.shiver * Math.sin(state.t * 40 + z) * 0.01, y, z);
     }
     pos.needsUpdate = true;
     dGeo.computeVertexNormals();
   }
-  drape();
 
-  // arm poses
-  const POSES = {
-    hug: { sh: [0.15, -0.55, -0.25], el: [0, 0.9, 0] },
-    reach: { sh: [-0.1, 0.35, -0.95], el: [0, 0.15, 0] },
-    tucked: { sh: [0.3, 0.6, 0.6], el: [0, 1.6, 0] },
-  };
+  // arm: two-bone IK to a target (bed-local)
+
+  const UA = 1.0, FA = 0.98;
+  const qa = new THREE.Quaternion(), qb = new THREE.Quaternion(), m4 = new THREE.Matrix4();
+  function solveIK(target, pole) {
+    const S = shoulder.position;
+    const d = target.clone().sub(S);
+    const dist = Math.min(UA + FA - 1e-3, Math.max(0.3, d.length()));
+    const z1 = d.normalize();
+    const y1 = pole.clone().addScaledVector(z1, -pole.dot(z1)).normalize();
+    const x1 = new THREE.Vector3().crossVectors(y1, z1);
+    const alpha = Math.acos(THREE.MathUtils.clamp((UA * UA + dist * dist - FA * FA) / (2 * UA * dist), -1, 1));
+    const up = z1.clone().multiplyScalar(Math.cos(alpha)).addScaledVector(y1, Math.sin(alpha));
+    const E = up.clone().multiplyScalar(UA);
+    const fore = z1.clone().multiplyScalar(dist).sub(E).normalize();
+    const qU = new THREE.Quaternion().setFromRotationMatrix(m4.makeBasis(x1, new THREE.Vector3().crossVectors(up, x1), up));
+    const qF = new THREE.Quaternion().setFromRotationMatrix(m4.makeBasis(x1, new THREE.Vector3().crossVectors(fore, x1), fore));
+    return [qU, qU.clone().invert().multiply(qF)];
+  }
+  const POLE = new THREE.Vector3(0.75, 1, 0.35).normalize(); // elbow out and up, over whatever he hugs
+  const TUCK_POLE = new THREE.Vector3(1, 0.2, 0.5).normalize(); // elbow down by his side
+
   const leo = {
     group: root, state, headPivot, shoulder, elbow, duvet,
     // world position where Blåhaj sits in his arms
     hugPoint: new THREE.Vector3(bed.x + 1.15, top + 0.75, bed.z - l / 2 + 3.4),
+    // a target for his hand, in world space (null = use the authored pose)
+    worldToLocal: (p) => p.clone().sub(root.position),
+    // top of whatever is under (x, z) in world space: duvet, Leo, pillow, mattress
+    surfaceAt(wx, wz) {
+      const x = wx - root.position.x, z = wz - root.position.z;
+      const edge = w / 2 - 0.2;
+      if (Math.abs(x) > edge || z < -l / 2 + 0.4 || z > l / 2) return null;
+      let y = 0.2;
+      if (z >= zTopOf()) y = sheetY(x, z, zTopOf(), false); // what Blåhaj rests on ignores Leo's arm
+      else {
+        const tt = torsoTop(x, z); if (tt > 0) y = Math.max(y, tt);
+        const px = x / 1.6, pz = (z - (-l / 2 + 1.5)) / 0.95; // pillow
+        if (px * px + pz * pz < 1) y = Math.max(y, 0.45 + 0.42 * Math.sqrt(1 - px * px - pz * pz));
+        head.getWorldPosition(_a).sub(root.position);
+        const hd = (x - _a.x) ** 2 + (z - _a.z) ** 2;
+        if (hd < 0.25) y = Math.max(y, _a.y + Math.sqrt(0.25 - hd));
+      }
+      return root.position.y + y;
+    },
     update(dt, s = {}) {
       Object.assign(state, s);
       state.t += dt;
-      const target = POSES[state.arm] || POSES.hug;
-      const prev = POSES[state.prevArm || state.arm] || target;
-      const k = smooth(0, 1, state.armT);
-      shoulder.rotation.set(lerp(prev.sh[0], target.sh[0], k), lerp(prev.sh[1], target.sh[1], k), lerp(prev.sh[2], target.sh[2], k));
-      elbow.rotation.set(lerp(prev.el[0], target.el[0], k), lerp(prev.el[1], target.el[1], k), lerp(prev.el[2], target.el[2], k));
       shoulder.position.x = lerp(0.75, 0.05, state.roll);
+      // the arm always reaches for something: by default his hand rests tucked on
+      // his chest under the covers; state.ik (bed-local) pulls it elsewhere
+      const tuck = new THREE.Vector3(lerp(0.35, -0.2, state.roll), 0.62, -l / 2 + 3.35);
+      const w_ = state.ik ? state.ikW : 0;
+      const goal = w_ > 0 ? tuck.clone().lerp(state.ik, w_) : tuck;
+      const pole = TUCK_POLE.clone().lerp(state.pole || POLE, w_).normalize();
+      const [qU, qE] = solveIK(goal, pole);
+      shoulder.quaternion.copy(qU); elbow.quaternion.copy(qE);
       headPivot.rotation.z = lerp(-0.15, 0.85, state.roll) + Math.sin(state.t * 0.7) * 0.02;
       headPivot.position.x = lerp(0.1, -0.35, state.roll);
       torso.position.x = lerp(0, -0.5, state.roll); torso.rotation.z = lerp(0, 0.6, state.roll);
       head.position.y = Math.sin(state.t * 1.6) * 0.01 + state.shiver * Math.sin(state.t * 47) * 0.012;
+      refreshArm();
       drape();
     },
+    // what lies beneath the duvet at world (x, z): the mattress, or Leo himself
+    underAt(wx, wz) {
+      const x = wx - root.position.x, z = wz - root.position.z;
+      if (Math.abs(x) > w / 2 - 0.2 || z < -l / 2 + 0.4 || z > l / 2) return null;
+      const tt = torsoTop(x, z);
+      return root.position.y + Math.max(0.2, tt);
+    },
+    // top of his arm above (x, z) in world space, or null (things can rest on it)
+    armTopAt(wx, wz) {
+      const x = wx - root.position.x, z = wz - root.position.z;
+      let best = null;
+      for (const sg of segs) { const sp = capsuleSpan(sg, x, z); if (sp && (best === null || sp[1] > best)) best = sp[1]; }
+      return best === null ? null : root.position.y + best;
+    },
+    // a cradle: his arm slides under whatever sits at world (x, z) and the hand
+    // curls up around its far side. Returns { ik, pole } in bed-local space.
+    cradle(wx, wz) {
+      const x = wx - root.position.x, z = wz - root.position.z;
+      return { ik: new THREE.Vector3(x + 0.62, 0.72, z + 0.4), pole: new THREE.Vector3(0.2, -1, -0.1).normalize() };
+    },
+    // where the edge of the duvet is right now, beside his arm (world space)
+    coverEdge() {
+      const z = zTopOf() + 0.12, x = 1.0;
+      return new THREE.Vector3(root.position.x + x, root.position.y + sheetY(x, z, zTopOf()) + 0.12, root.position.z + z);
+    },
   };
+  refreshArm();
+  drape();
   return leo;
 }
 
@@ -292,8 +429,12 @@ export function createKnot(r = 1) {
 }
 
 // ------------------------------------------------------------------ dog --
+// Biscuit is a golden retriever: ~57 cm at the shoulder, about as long as
+// Blåhaj is from nose to tail-tip twice over. Modelled at 1/0.68 and scaled.
+export const DOG_SCALE = 0.68;
 export function createDog() {
   const g = new THREE.Group();
+  g.scale.setScalar(DOG_SCALE);
   const fur = furMat(0xe4ae66, 0xffe6b8);
   const light = furMat(0xf2d2a0, 0xfff4e0);
   fur.emissive = new THREE.Color(0x3a2410); fur.emissiveIntensity = 0.35; light.emissive = new THREE.Color(0x3a2a18); light.emissiveIntensity = 0.35;
@@ -338,7 +479,7 @@ export function createDog() {
       dog.pose = pose; dog.t += dt;
       const t = dog.t;
       tail.rotation.y = Math.sin(t * (pose === 'sleep' ? 1.2 : 9)) * (pose === 'sleep' ? 0.1 : 0.6);
-      if (pose === 'walk' || pose === 'stand' || pose === 'carry') {
+      if (pose === 'walk' || pose === 'stand' || pose === 'carry' || pose === 'pickup') {
         body.position.y = 2.7 + (speed > 0 ? Math.abs(Math.sin(t * 7)) * 0.08 : 0);
         body.rotation.x += (0 - body.rotation.x) * Math.min(1, dt * 6);
         legs.forEach((L, i) => {
@@ -346,9 +487,11 @@ export function createDog() {
           L.hip.rotation.x = speed > 0 ? Math.sin(t * 7 + ph) * 0.5 : 0;
           L.knee.rotation.x = speed > 0 ? Math.max(0, -Math.sin(t * 7 + ph)) * 0.6 * (L.front ? -1 : 1) : 0;
         });
-        neck.rotation.x = pose === 'carry' ? 0.15 : Math.sin(t * 1.5) * 0.05;
-        jaw.rotation.x = pose === 'carry' ? 0.12 : 0.25 + Math.sin(t * 6) * 0.08; // panting
-        tongue.visible = pose !== 'carry';
+        const neckT = pose === 'carry' ? 0.15 : pose === 'pickup' ? 1.75 : Math.sin(t * 1.5) * 0.05;
+        neck.rotation.x += (neckT - neck.rotation.x) * Math.min(1, dt * 8);
+        if (pose === 'pickup') { body.rotation.x += (0.32 - body.rotation.x) * Math.min(1, dt * 6); body.position.y = 2.4; }
+        jaw.rotation.x = pose === 'carry' ? 0.12 : pose === 'pickup' ? 0.4 : 0.25 + Math.sin(t * 6) * 0.08; // panting
+        tongue.visible = pose !== 'carry' && pose !== 'pickup';
       } else if (pose === 'rear') {
         body.rotation.x += (-0.95 - body.rotation.x) * Math.min(1, dt * 5);
         body.position.y = 3.3;

@@ -22,6 +22,22 @@ export function vnoise(x, y, P, seed = 0) {
   const x0 = mod(xi, P), x1 = mod(xi + 1, P), y0 = mod(yi, P), y1 = mod(yi + 1, P);
   return lerp(lerp(hash(x0, y0, seed), hash(x1, y0, seed), u), lerp(hash(x0, y1, seed), hash(x1, y1, seed), u), v);
 }
+// value noise with separate integer periods per axis (for stretched grain)
+export function vnoise2(x, y, Px, Py, seed = 0) {
+  const xi = Math.floor(x), yi = Math.floor(y);
+  const u = smooth(x - xi), v = smooth(y - yi);
+  const x0 = mod(xi, Px), x1 = mod(xi + 1, Px), y0 = mod(yi, Py), y1 = mod(yi + 1, Py);
+  return lerp(lerp(hash(x0, y0, seed), hash(x1, y0, seed), u), lerp(hash(x0, y1, seed), hash(x1, y1, seed), u), v);
+}
+export function fbm2(x, y, Px, Py, oct = 4, seed = 0) {
+  let a = 0.5, f = 1, s = 0, n = 0;
+  for (let o = 0; o < oct; o++) {
+    s += a * vnoise2(x * f, y * f, Px * f, Py * f, seed + o * 17);
+    n += a; a *= 0.5; f *= 2;
+  }
+  return s / n;
+}
+const sstep = (a, b, x) => { const t = clamp01((x - a) / (b - a)); return t * t * (3 - 2 * t); };
 export function fbm(x, y, P, oct = 4, seed = 0) {
   let a = 0.5, f = 1, s = 0, n = 0;
   for (let o = 0; o < oct; o++) {
@@ -48,6 +64,9 @@ export function worley(x, y, P, seed = 0) {
 const cache = new Map();
 let maxAniso = 8;
 export function setMaxAnisotropy(a) { maxAniso = Math.min(16, a); }
+// High/Ultra build hero textures (wood, paint, bedding, upholstery) at twice the base resolution.
+let detail = 1;
+export function setTextureDetail(d) { detail = d; }
 
 function dataTex(data, size, srgb) {
   const t = new THREE.DataTexture(data, size, size, THREE.RGBAFormat);
@@ -66,7 +85,11 @@ function dataTex(data, size, srgb) {
  * fn(u, v) -> [r, g, b, height, roughness]  (all 0..1, u/v in 0..1)
  * Returns { map, normalMap, roughnessMap }.
  */
-export function makeSet(key, size, strength, fn) {
+export function makeSet(key, size, strength, fn, hi = false) {
+  const full = hi ? Math.min(1024, size * detail) : size; // only hero surfaces get the extra resolution
+  strength *= full / size; // same bump per texel distance at any resolution
+  size = full;
+  key += '@' + size;
   if (cache.has(key)) return cache.get(key);
   const n = size * size;
   const col = new Uint8Array(n * 4), nrm = new Uint8Array(n * 4), rgh = new Uint8Array(n * 4);
@@ -125,42 +148,59 @@ export const Tex = {
     });
   },
   // fine linen weave (book covers, sign boards)
+  // fine linen weave (book covers, sign boards)
   linen() {
-    return makeSet('linen', 256, 3, (u, v) => {
-      const a = Math.sin(u * Math.PI * 2 * 64) * 0.5 + 0.5, b = Math.sin(v * Math.PI * 2 * 64) * 0.5 + 0.5;
+    return makeSet('linen', 512, 3, (u, v) => {
+      const T = 96;
+      const a = Math.sin(u * Math.PI * 2 * T) * 0.5 + 0.5, b = Math.sin(v * Math.PI * 2 * T) * 0.5 + 0.5;
       const n = fbm(u * 16, v * 16, 16, 3, 3);
-      const hgt = (((Math.floor(u * 64) + Math.floor(v * 64)) & 1) ? a : b) * 0.6 + n * 0.4;
-      const s = 0.82 + hgt * 0.18;
+      const slub = vnoise2(u * 6, v * 192, 6, 192, 4) * 0.5 + vnoise2(u * 192, v * 6, 192, 6, 5) * 0.5;
+      const hgt = (((Math.floor(u * T) + Math.floor(v * T)) & 1) ? a : b) * 0.55 + n * 0.3 + slub * 0.15;
+      const s = 0.8 + hgt * 0.16 + slub * 0.04;
       return [s, s, s, hgt, 0.8 + n * 0.15];
     });
   },
   // wood: base / grain colours; planks=true adds plank seams
+  // Wood: grain runs along v. Fine latewood lines, open pores, a lazy figure,
+  // and (planks=true) boards with seams and staggered end joints.
   wood(key, base, dark, planks = false, ringScale = 1) {
     const A = hex(base), B = hex(dark);
-    return makeSet('wood' + key, 512, 4, (u, v) => {
-      const warp = fbm(u * 4, v * 1, 4, 4, 11) * 6 * ringScale;
-      const ring = Math.sin((u * 10 * ringScale + warp) * Math.PI * 2) * 0.5 + 0.5;
-      const fine = vnoise(u * 180, v * 6, 180, 4);
-      let t = Math.pow(ring, 3) * 0.6 + fine * 0.3;
-      let seam = 1;
+    const lines = Math.max(6, Math.round(22 * ringScale));
+    return makeSet('wood' + key, 512, 3, (u, v) => {
+      let shift = 0, tint = 0, seam = 1;
       if (planks) {
-        const py = v * 4; const sy = Math.abs(py - Math.round(py));
-        seam = clamp01(sy * 60);
-        const shift = hash(Math.floor(py), 0, 3) * 0.2;
-        t = t * 0.8 + shift;
+        const N = 4, pi = Math.floor(u * N), fu = u * N - pi;
+        const vv = v * 2 + hash(pi, 0, 5), bi = mod(Math.floor(vv), 2), fv = vv - Math.floor(vv);
+        const du = Math.min(fu, 1 - fu) / N, dv = Math.min(fv, 1 - fv) / 2;
+        seam = sstep(0.0008, 0.0026, Math.min(du, dv));
+        shift = hash(pi, bi, 3) * 9; tint = (hash(pi, bi, 4) - 0.5) * 0.16;
       }
-      const c = mul3(mix3(A, B, clamp01(t)), 0.75 + 0.25 * seam);
-      return [c[0], c[1], c[2], t * 0.4 + seam * 0.6, 0.55 + fine * 0.2 + (1 - seam) * 0.3];
-    });
+      const warp = fbm2(u * 3, v * 2, 3, 2, 4, 11) * 4.2 + vnoise2(u * 24, v * 3, 24, 3, 12) * 0.3;
+      const x = u * lines + warp + shift;
+      const f = x - Math.floor(x);
+      const late = sstep(0.5, 0.92, f) * (1 - sstep(0.94, 1, f));
+      const streak = vnoise2(u * 256, v * 6, 256, 6, 13);
+      const poreN = vnoise2(u * 384, v * 20, 384, 20, 14);
+      const pore = sstep(0.68, 0.9, poreN) * (0.4 + late * 0.6);
+      const figure = fbm2(u * 3, v * 3, 3, 3, 3, 15);
+      const t = clamp01(late * 0.32 + streak * 0.2 + pore * 0.3 + (figure - 0.5) * 0.45 + 0.08);
+      const c = mul3(mix3(A, B, t), (1 + tint + (figure - 0.5) * 0.1) * (0.55 + 0.45 * seam));
+      const hgt = seam * 0.6 + (1 - late) * 0.12 - pore * 0.25 + streak * 0.05;
+      return [c[0], c[1], c[2], hgt, 0.5 + pore * 0.25 + late * 0.08 + (1 - seam) * 0.3];
+    }, true);
   },
   // glossy painted wood for toy blocks (greyscale, tinted)
+  // satin paint over wood: faint grain shows through, soft brush marks
   painted() {
-    return makeSet('painted', 256, 1.5, (u, v) => {
-      const n = fbm(u * 8, v * 2, 8, 4, 21);
-      const brush = vnoise(u * 120, v * 4, 120, 2);
-      const s = 0.93 + n * 0.05 + brush * 0.02;
-      return [s, s, s, n * 0.6 + brush * 0.4, 0.32 + brush * 0.12];
-    });
+    return makeSet('painted', 512, 1.6, (u, v) => {
+      const warp = fbm2(u * 4, v * 2, 4, 2, 3, 23) * 2.4;
+      const x = u * 32 + warp, f = x - Math.floor(x);
+      const grain = sstep(0.6, 0.9, f) * (1 - sstep(0.92, 1, f));
+      const n = fbm(u * 8, v * 8, 8, 4, 21);
+      const brush = vnoise2(u * 160, v * 4, 160, 4, 22);
+      const s = 0.93 + n * 0.04 + brush * 0.02 - grain * 0.012;
+      return [s, s, s, n * 0.35 + brush * 0.3 - grain * 0.35, 0.34 + brush * 0.1 + n * 0.06];
+    }, true);
   },
   marble() {
     return makeSet('marble', 512, 1.5, (u, v) => {
@@ -238,15 +278,29 @@ export const Tex = {
       return [c[0], c[1], c[2], tape ? 0.6 : corr * 0.3 + n * 0.4, tape ? 0.3 : 0.9];
     });
   },
+  // quilted cotton: soft domed diamonds, stitched seams with thread dashes,
+  // a twill weave you can see up close and a sprinkle of printed stars
   quilt() {
-    return makeSet('quilt', 512, 9, (u, v) => {
+    return makeSet('quilt', 512, 7, (u, v) => {
       const a = (u + v) * 6, b = (u - v) * 6;
-      const da = Math.abs(a - Math.round(a)), db = Math.abs(b - Math.round(b));
-      const puff = Math.sin(clamp01(Math.min(da, db) * 2) * Math.PI / 2);
-      const n = fbm(u * 64, v * 64, 64, 2, 101);
-      const s = 0.75 + puff * 0.22 + n * 0.03;
-      return [s, s, s, puff * 0.9 + n * 0.1, 0.92];
-    });
+      const ia = Math.floor(a), ib = Math.floor(b), fa = a - ia, fb = b - ib;
+      const puff = Math.pow(Math.sin(fa * Math.PI) * Math.sin(fb * Math.PI), 0.45);
+      const da = Math.min(fa, 1 - fa), db = Math.min(fb, 1 - fb);
+      const along = da < db ? fb : fa;
+      const dash = (along * 10 - Math.floor(along * 10)) < 0.62 ? 1 : 0.35;
+      const stitch = (1 - sstep(0.0, 0.03, Math.min(da, db))) * dash;
+      const tw = u * 160 + v * 160, twill = Math.sin((tw - Math.floor(tw)) * Math.PI);
+      const n = fbm(u * 32, v * 32, 32, 3, 101);
+      // printed star in some diamonds (cells counted mod 6 so it tiles)
+      let star = 0;
+      if (hash(mod(ia, 6), mod(ib, 6), 77) > 0.55) {
+        const px = (fa - 0.5) * 0.7071 + (fb - 0.5) * 0.7071, py = (fa - 0.5) * 0.7071 - (fb - 0.5) * 0.7071;
+        const ang = Math.atan2(py, px) + hash(mod(ia, 6), mod(ib, 6), 78) * 6.28, r = Math.hypot(px, py);
+        star = 1 - sstep(0.105, 0.125, r / (0.62 + 0.38 * Math.cos(5 * ang)) * 0.62);
+      }
+      const s = 0.74 + puff * 0.16 - stitch * 0.16 + twill * 0.03 + n * 0.04 + star * 0.22;
+      return [s, s, s, puff * 0.85 - stitch * 0.25 + twill * 0.03 + n * 0.05, 0.9 - star * 0.15];
+    }, true);
   },
   grass() {
     return makeSet('grass', 512, 4, (u, v) => {
@@ -327,20 +381,27 @@ Object.assign(Tex, {
     });
   },
   // woven upholstery
+  // woven upholstery / mattress ticking
   weave() {
     return makeSet('weave', 512, 4, (u, v) => {
-      const a = Math.sin(u * Math.PI * 2 * 96) * 0.5 + 0.5, b = Math.sin(v * Math.PI * 2 * 96) * 0.5 + 0.5;
-      const over = ((Math.floor(u * 96) + Math.floor(v * 96)) & 1) ? a : b;
-      const n = fbm(u * 24, v * 24, 24, 3, 221), sl = vnoise(u * 400, v * 40, 400, 222);
-      const s = 0.8 + over * 0.12 + n * 0.06 + sl * 0.04;
-      return [s, s, s, over * 0.7 + n * 0.3, 0.95];
-    });
+      const T = 128;
+      const a = Math.sin(u * Math.PI * 2 * T) * 0.5 + 0.5, b = Math.sin(v * Math.PI * 2 * T) * 0.5 + 0.5;
+      const over = ((Math.floor(u * T) + Math.floor(v * T)) & 1) ? a : b;
+      const n = fbm(u * 24, v * 24, 24, 3, 221);
+      const sl = vnoise2(u * 512, v * 32, 512, 32, 222) * 0.6 + vnoise2(u * 32, v * 512, 32, 512, 223) * 0.4;
+      const s = 0.8 + over * 0.11 + n * 0.06 + sl * 0.05;
+      return [s, s, s, over * 0.65 + n * 0.25 + sl * 0.1, 0.95];
+    }, true);
   },
+  // cut-pile carpet: individual tufts with a little colour drift
   carpet() {
     return makeSet('carpet', 512, 6, (u, v) => {
-      const n = vnoise(u * 220, v * 220, 220, 231) * 0.6 + fbm(u * 16, v * 16, 16, 3, 232) * 0.4;
-      const s = 0.82 + n * 0.18;
-      return [s, s, s, n, 1];
+      const [f1, , id] = worley(u * 120, v * 120, 120, 231);
+      const tuft = clamp01(1 - f1 * 1.5);
+      const drift = fbm(u * 12, v * 12, 12, 3, 232);
+      const fib = vnoise(u * 480, v * 480, 480, 233);
+      const s = 0.74 + tuft * 0.14 + (id - 0.5) * 0.08 + drift * 0.08 + fib * 0.04;
+      return [s, s, s, tuft * 0.7 + fib * 0.2 + drift * 0.1, 1];
     });
   },
   // brushed/leathery grain for book covers, toy plastic, etc.

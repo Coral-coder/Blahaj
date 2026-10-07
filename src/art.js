@@ -339,6 +339,35 @@ export function createProceduralBlahaj() {
 // Modified: re-materialled with a plush sheen and animated in the vertex
 // shader (tail wag, fin flaps). The mesh has no skeleton, so we bend it.
 let blahajModel = null;
+
+// The fins are low-poly plates; split their triangles (twice) so the floppy
+// fin deform can curl them smoothly. Attributes are interpolated linearly.
+const isFin = (x, y, z) => (x > -1.6 && x < 0.7 && y > 0.85) || (x > 2.1 && y > 0.4) || (Math.abs(z) > 0.75 && y < 0.8 && x > -1.7 && x < 1.0);
+function subdivideFins(geo, passes = 2) {
+  let g = geo.index ? geo.toNonIndexed() : geo;
+  for (let pass = 0; pass < passes; pass++) {
+    const names = Object.keys(g.attributes), src = names.map((n) => g.attributes[n]);
+    const out = names.map(() => []);
+    const P = g.attributes.position, n = P.count;
+    const vert = (k, i) => { const a = src[k]; const r = []; for (let c = 0; c < a.itemSize; c++) r.push(a.array[i * a.itemSize + c]); return r; };
+    const mid = (a, b) => a.map((v, i) => (v + b[i]) / 2);
+    for (let t = 0; t < n; t += 3) {
+      const cx = (P.getX(t) + P.getX(t + 1) + P.getX(t + 2)) / 3, cy = (P.getY(t) + P.getY(t + 1) + P.getY(t + 2)) / 3, cz = (P.getZ(t) + P.getZ(t + 1) + P.getZ(t + 2)) / 3;
+      const split = isFin(cx, cy, cz);
+      names.forEach((_, k) => {
+        const a = vert(k, t), b = vert(k, t + 1), c = vert(k, t + 2);
+        if (!split) { out[k].push(...a, ...b, ...c); return; }
+        const ab = mid(a, b), bc = mid(b, c), ca = mid(c, a);
+        out[k].push(...a, ...ab, ...ca, ...ab, ...b, ...bc, ...ca, ...bc, ...c, ...ab, ...bc, ...ca);
+      });
+    }
+    const ng = new THREE.BufferGeometry();
+    names.forEach((nm, k) => ng.setAttribute(nm, new THREE.BufferAttribute(new Float32Array(out[k]), src[k].itemSize)));
+    g = ng;
+  }
+  g.computeBoundingSphere();
+  return g;
+}
 let blahajMaps = null;
 // Textures are embedded as data: images (not blob: URLs) so strict viewers,
 // like the Claude artifact frame, can still load them.
@@ -360,7 +389,7 @@ export function loadBlahajModel() {
       new GLTFLoader().parse(buf, '', (gltf) => {
         const meshes = [];
         gltf.scene.traverse((o) => { if (o.isMesh) meshes.push(o); });
-        blahajModel = meshes.map((m) => ({ name: m.name, geometry: m.geometry, material: m.material }));
+        blahajModel = meshes.map((m) => ({ name: m.name, geometry: m.material.name === 'teef' ? m.geometry : subdivideFins(m.geometry), material: m.material }));
         resolve(true);
       }, (err) => { console.warn('Blåhaj model failed to load, using the procedural one', err); resolve(false); });
     } catch (err) { console.warn('Blåhaj model failed to load, using the procedural one', err); resolve(false); }
@@ -429,12 +458,27 @@ const BLAHAJ_DEFORM = `
   float fz = abs(position.z);
   float fk = smoothstep(0.8, 1.3, fz) * (1.0 - smoothstep(0.2, 0.7, position.y)) * step(-1.5, position.x) * step(position.x, 0.8);
   transformed.y += flap * fk * (fz - 0.8) * 1.6;
+  // well-loved fins: years of cuddles have squashed the stuffing out of them.
+  // The side fins droop, and the dorsal fin and top of the tail slump over and
+  // curl (more toward the tip), swinging a little as he moves.
+  transformed.y -= fk * (fz - 0.8) * 0.6;
+  float dm = smoothstep(-1.5, -1.2, position.x) * (1.0 - smoothstep(0.3, 0.55, position.x));
+  float dh = max(0.0, position.y - 0.92) * dm;
+  transformed.z -= position.z * 0.45 * smoothstep(0.0, 0.25, dh); // squashed thin
+  transformed.y -= fk * (position.y - 0.25) * 0.4;                  // side fins flattened
+  float kd = finFlop + bendH * 0.9;
+  transformed.y += sin(kd * dh) / kd - dh;
+  transformed.z += (1.0 - cos(kd * dh)) / kd;
+  float th = max(0.0, position.y - 0.5) * smoothstep(2.2, 2.7, position.x);
+  float kt = finFlop * 0.75 - wag * 2.0;
+  transformed.y += sin(kt * th) / kt - th;
+  transformed.z -= (1.0 - cos(kt * th)) / kt;
 #endif
 `;
 function addBlahajDeform(m, uni, teeth) {
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, uni);
-    sh.vertexShader = (teeth ? '#define BLAHAJ_TEETH\n' : '') + 'uniform float wag;\nuniform float flap;\nuniform float bendV;\nuniform float bendH;\n' +
+    sh.vertexShader = (teeth ? '#define BLAHAJ_TEETH\n' : '') + 'uniform float wag;\nuniform float flap;\nuniform float bendV;\nuniform float bendH;\nuniform float finFlop;\n' +
       sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n' + BLAHAJ_DEFORM);
   };
   m.customProgramCacheKey = () => (teeth ? 'blahajDeformTeeth' : 'blahajDeform');
@@ -446,7 +490,7 @@ export function createBlahaj() {
   const root = new THREE.Group();
   const body = new THREE.Group();
   root.add(body);
-  const uni = { wag: { value: 0 }, flap: { value: 0 }, bendV: { value: 0 }, bendH: { value: 0 } };
+  const uni = { wag: { value: 0 }, flap: { value: 0 }, bendV: { value: 0 }, bendH: { value: 0 }, finFlop: { value: 2.5 } };
   const S = MODEL.worldLength / MODEL.length;
   const holder = new THREE.Group();
   holder.rotation.y = Math.PI / 2;      // snout (-x) -> forward (+z)

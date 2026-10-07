@@ -92,7 +92,7 @@ export const PREFABS = {
     B(0, 0.55, -0.6, 3.5, 4.6, 0.4, { tag: 'fireBack' }),
   ],
   firewood: () => [B(0, 0, 0, 2, 2.6, 1.6, { tag: 'firewood', surface: 'wood' })],
-  dogBed: () => [B(0, 0, 0, 3.8, 0.75, 3.8, { tag: 'dogBed', surface: 'cloth' })],
+  dogBed: () => [B(0, 0, 0, 3.8, 0.4, 3.8, { tag: 'dogBed', surface: 'cloth' })], // low enough to step onto; cushion and rim are a soft surface in game.js
   ottoman: () => [B(0, 0, 0, 2.4, 1.9, 2.4, { tag: 'ottoman', type: 'bounce', surface: 'cloth' })],
   bigShelf: (p) => [B(0, 0, 0, p.w || 4.5, p.h || 8.2, p.d || 1.6, { tag: 'bigShelf', surface: 'wood' })],
   // stairwell

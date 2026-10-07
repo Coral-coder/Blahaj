@@ -11,6 +11,7 @@ import { createLeo, createDreamBubble, createShadow, createKnot, createDog, crea
 import { softDotTexture } from './textures.js';
 
 const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
+const SOFT_GROUND = { kind: 'soft', active: true, type: 'solid', tag: 'soft' };
 const EPS = 0.001;
 const angDiff = (a, b) => { let d = b - a; while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2; return d; };
 const COMFORT = { fish: 4, starfish: 25, bunny: 3, stomp: 6, knot: 15, hit: 18, lego: 10, ball: 7, cat: 6, lampMin: 70, respawn: 60, darkDrain: 9, risingDrain: 26 };
@@ -98,7 +99,7 @@ export class Game {
     if (ch.room.id === 'bedroom') {
       const bed = ch.props.find((p) => p.type === 'cabinBed');
       this.leo = createLeo(bed); scene.add(this.leo.group);
-      this.leo.update(0, { cover: 0.55, roll: ch.id === 'edge' ? 1 : 1, arm: 'tucked', armT: 1 });
+      this.leo.update(0, { cover: 0.55, roll: 1, ikW: 0, armOver: false });
       this.bubble = createDreamBubble(V(bed.x + 0.8, 8.5, bed.z - 2.2)); scene.add(this.bubble.group);
     }
     if (ch.sleepingDog) {
@@ -107,6 +108,26 @@ export class Game {
       this.dog.update(0, 'sleep'); scene.add(this.dog.group);
       this.zzz = new Particles(40, true); scene.add(this.zzz.points);
     }
+    // soft surfaces that aren't boxes: the duvet over Leo (and Leo under it),
+    // and the sunken cushion and rolled rim of the dog bed
+    this.fields = [];
+    if (this.leo) this.fields.push({ h: (x, z) => this.leo.surfaceAt(x, z) });
+    if (this.dog) { // you can clamber over a sleeping dog, not through him
+      const d = this.dog.group, fx = Math.sin(d.rotation.y), fz = Math.cos(d.rotation.y);
+      this.fields.push({ h: (x, z) => {
+        if (this.dog.pose !== 'sleep') return null;
+        const dx = x - d.position.x, dz = z - d.position.z, u = (dx * fx + dz * fz - 0.3) / 1.6, v = (dx * fz - dz * fx) / 0.75;
+        const e = u * u + v * v;
+        return e < 1 ? 1.25 * Math.sqrt(1 - e) : null;
+      } });
+    }
+    for (const p of ch.props) if (p.type === 'dogBed') this.fields.push({ h: (x, z) => {
+      const r = Math.hypot(x - p.x, z - p.z);
+      if (r < 1.32) return 0.5;
+      if (r < 1.95) return 0.45 + Math.sqrt(Math.max(0, 0.2025 - (r - 1.5) ** 2));
+      return null;
+    } });
+    this.softHeight = (x, z) => { let best = null; for (const f of this.fields) { const h = f.h(x, z); if (h !== null && (best === null || h > best)) best = h; } return best; };
     this.cats = [];
     for (const p of ch.props) if (p.type === 'cat') {
       const c = createCat(); c.group.position.set(p.x, p.y || 0, p.z); c.group.rotation.y = (p.rot || 0) * Math.PI / 2 + Math.PI / 2;
@@ -165,7 +186,7 @@ export class Game {
     };
     this.respawn = { pos: V(sx, sy, sz), dark: ch.rising ? ch.rising.from : 0 };
     this.fill = new THREE.PointLight(0xfff0e0, 2.6, 7, 2); scene.add(this.fill);
-    this.cam = { yaw: ch.camYaw !== undefined ? ch.camYaw : angDiff(0, (ch.spawnYaw || 0) + Math.PI), pitch: 0.32, dist: 6.6, target: V(sx, sy, sz), idle: 0, fovKick: 0, shake: 0 };
+    this.cam = { yaw: ch.camYaw !== undefined ? ch.camYaw : angDiff(0, (ch.spawnYaw || 0) + Math.PI), pitch: 0.36, dist: 8.8, target: V(sx, sy, sz), idle: 0, fovKick: 0, shake: 0 };
     this.R.build(scene, this.camera, { bloom: 0.55, threshold: 0.85, exposure: 1.05, vignette: 0.42, warmth: 0.02 });
     this.updateCamera(1, true);
   }
@@ -241,7 +262,7 @@ export class Game {
   // ----------------------------------------------------------------- update --
   update(dt) {
     this.clock += dt;
-    if (this.cine) { this.cine.update(dt, this); this.visuals(dt); this.input.endFrame(); return; }
+    if (this.cine) { if (!this.cine.done) this.cine.update(dt, this); this.visuals(dt); this.input.endFrame(); return; }
     if (this.attract) { this.time += dt; this.cam.yaw += dt * 0.08; this.visuals(dt); this.input.endFrame(); return; }
     if (this.state === 'play' || this.state === 'respawning') {
       this.acc = (this.acc || 0) + Math.min(dt, 0.1);
@@ -383,6 +404,14 @@ export class Game {
         this.rig.impulse(sup ? 9 : 6);
         this.sparks.burst(P.pos.clone(), sup ? 26 : 10, { color: new THREE.Color(sup ? 0xffe066 : 0xfff3b0), speed: sup ? 8 : 4, life: 0.6, size: 0.25 });
       } else P.vel.y = 0;
+    }
+    // soft surfaces: stand on whatever is really there
+    for (const f of this.fields) {
+      const h = f.h(P.pos.x, P.pos.z);
+      if (h === null || P.pos.y >= h || P.pos.y < h - 0.9 || P.vel.y > 0.5) continue;
+      if (!wasGrounded && !P.grounded) this.onLand(fallSpeed);
+      P.pos.y = h; P.vel.y = 0;
+      P.grounded = true; P.ground = SOFT_GROUND; P.canDouble = false; P.dashUsed = false; P.pound = 0;
     }
     // push out if a mover shoved into us
     for (const s of active) {
@@ -630,7 +659,16 @@ export class Game {
       this.zzz.update(dt);
     }
     if (this.leo && !this.cine) this.leo.update(dt, {});
-    if (this.bubble) this.bubble.update(dt, t, this.cine && this.cine.dream !== undefined ? this.cine.dream : c01);
+    if (this.bubble) {
+      this.bubble.update(dt, t, this.cine && this.cine.dream !== undefined ? this.cine.dream : c01);
+      // in play, don't let Leo's dream cloud get between the camera and Blåhaj
+      if (!this.cine) {
+        const c = this.bubble.group.position, cam = this.camera.position, d = P.pos.clone().add(V(0, 0.5, 0)).sub(cam);
+        const L = d.length(); d.divideScalar(L);
+        const tc = Math.max(0, Math.min(L, c.clone().sub(cam).dot(d)));
+        this.bubble.group.visible = cam.clone().addScaledVector(d, tc).distanceTo(c) > 3.4;
+      } else this.bubble.group.visible = true;
+    }
     this.goalMarker.visible = !this.cine;
     const goalReady = !(this.ch.goal.needsKnots && this.knotsLeft > 0);
     this.goalMarker.material.opacity = goalReady ? 0.13 + Math.sin(t * 2) * 0.04 : 0.03;
@@ -646,6 +684,8 @@ export class Game {
     }
     let groundY = -2;
     for (const s of this.solids) if (s.active && P.pos.x > s.min.x && P.pos.x < s.max.x && P.pos.z > s.min.z && P.pos.z < s.max.z && s.max.y <= P.pos.y + 0.05) groundY = Math.max(groundY, s.max.y);
+    const soft = this.softHeight(P.pos.x, P.pos.z);
+    if (soft !== null && soft <= P.pos.y + 0.05) groundY = Math.max(groundY, soft);
     this.rig.blob.position.y = groundY - P.pos.y + 0.03;
     const hgt = P.pos.y - groundY;
     this.rig.blob.material.opacity = Math.max(0, 0.4 - hgt * 0.05);
@@ -706,11 +746,11 @@ export class Game {
     // when something solid is right behind Blåhaj, swing the camera up and look down instead
     const probe = V(Math.sin(C.yaw) * Math.cos(C.pitch), Math.sin(C.pitch), Math.cos(C.yaw) * Math.cos(C.pitch));
     const blocked = this.rayHit(look, probe, C.dist) < C.dist * 0.6;
-    C.lift = (C.lift || 0) + ((blocked ? 0.55 : 0) - (C.lift || 0)) * Math.min(1, dt * (snap ? 60 : 2.5));
+    C.lift = (C.lift || 0) + ((blocked ? 0.75 : 0) - (C.lift || 0)) * Math.min(1, dt * (snap ? 60 : 2.5));
     const pitch = Math.min(1.25, C.pitch + C.lift);
     const dir = V(Math.sin(C.yaw) * Math.cos(pitch), Math.sin(pitch), Math.cos(C.yaw) * Math.cos(pitch));
     const hit = this.rayHit(look, dir, C.dist);
-    const want = Math.max(1.4, hit - 0.3);
+    const want = Math.max(2.4, hit - 0.3);
     C.cur = snap || C.cur === undefined ? want : (want < C.cur ? want : C.cur + (want - C.cur) * Math.min(1, dt * 3));
     this.camera.position.copy(look).addScaledVector(dir, C.cur);
     // never leave the room (e.g. out through a window)

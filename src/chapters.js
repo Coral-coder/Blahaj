@@ -27,7 +27,7 @@ export const CHAPTERS = [
     goalText: 'Climb back up to Leo',
     intro: 'prologue', outro: 'dog',
     abilities: { doubleJump: true },
-    spawn: [-1.6, 0, -5.2], spawnYaw: Math.PI / 2, camYaw: 0.95,
+    spawn: [0.0, 0, -5.9], spawnYaw: Math.PI / 2, camYaw: 0.95,
     drain: 0.8,
     props: [
       BED, BEDSIDE, DESK, BOOKCASE, WALLSHELF, WARDROBE,
@@ -65,7 +65,7 @@ export const CHAPTERS = [
       { type: 'shadow', path: [[-3.6, 0, 6.6], [0.6, 0, 6.2]], speed: 1.2 },
       { type: 'shadow', path: [[-0.4, 0, -3.0], [-0.4, 0, -1.6]], speed: 0.8 },
     ],
-    bunnies: [[-3.0, 0, 4.9], [4.4, 0, -5.8], [-2.2, 0, 0.6]],
+    bunnies: [[-3.0, 0, 4.9], [2.2, 0, -7.6], [-2.2, 0, 0.6]],
     goal: { x: 3.5, y: 4.6, z: -9.0, r: 3.0, label: 'windowsill' },
     route: ['moon', 'blocks', 'drawer1', 'drawer2', 'drawer3', 'dresser', 'shelf', 'bookcase', 'sill'],
   },
@@ -80,7 +80,7 @@ export const CHAPTERS = [
       windows: [{ wall: '-z', at: 7.5, w: 6.5, y0: 3.4, y1: 9.6, sill: 0.7 }],
     },
     abilities: { doubleJump: true, flop: true },
-    spawn: [-8.6, 0.8, -5.6], spawnYaw: 0, camYaw: Math.PI * 0.85,
+    spawn: [-8.6, 0.5, -5.6], spawnYaw: 0, camYaw: 1.35,
     drain: 1.0,
     props: [
       { type: 'dogBed', x: -8.6, z: -5.6 },
@@ -102,6 +102,7 @@ export const CHAPTERS = [
     ],
     safe: [
       { x: -9.6, z: 0.5, r: 5.0 },                                       // fireplace glow
+      { x: -8.6, z: -5.6, r: 2.6 },                                      // Biscuit's warm dog bed
       { x: 6.4, z: -6.4, r: 1.8 }, { x: 8.6, z: -6.4, r: 1.8 },          // moonlight
       { x: 11.2, z: 7.5, r: 2.6 },                                       // hallway light spilling in
       { x: 0.5, z: 9.4, r: 2.0 },                                        // TV standby glow
@@ -123,7 +124,7 @@ export const CHAPTERS = [
       { type: 'shadow', path: [[-2.0, 0, 9.0], [4.0, 0, 8.6]], speed: 1.3 },
       { type: 'shadow', path: [[7.6, 0, -9.4], [9.8, 0, -4.0]], speed: 1.2 },
     ],
-    sleepingDog: { x: -6.6, z: -2.2, rot: 0.9 },
+    sleepingDog: { x: -9.3, z: -1.0, rot: 0 },                          // curled up by the fire
     bunnies: [[-2.0, 0, -1.0], [6.0, 0, 8.4], [9.4, 0, -8.6]],
     goal: { x: 12.2, y: 0, z: 7.5, r: 2.4, label: 'hallway' },
   },

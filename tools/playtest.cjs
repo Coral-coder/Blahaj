@@ -51,7 +51,14 @@ const server = http.createServer((req, res) => {
   }
   if (!failures) {
     try {
-      await page.waitForFunction(() => !document.getElementById('ending').classList.contains('hidden'), null, { timeout: 60000 });
+      // the outro starts on a short timer; keep stepping cutscenes until the ending shows
+      let shown = false;
+      for (let i = 0; i < 120 && !shown; i++) {
+        await playCines();
+        shown = await page.evaluate(() => !document.getElementById('ending').classList.contains('hidden'));
+        if (!shown) await page.waitForTimeout(500);
+      }
+      if (!shown) throw new Error('no ending');
       console.log('PASS ending screen reached');
     } catch (e) { failures++; console.log('FAIL ending screen never appeared'); }
   }

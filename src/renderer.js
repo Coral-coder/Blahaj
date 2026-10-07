@@ -6,7 +6,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
-import { setMaxAnisotropy } from './textures.js';
+import { setMaxAnisotropy, setTextureDetail } from './textures.js';
 
 export const QUALITY = {
   ultra: { label: 'Ultra', pr: 2, shadow: 4096, ao: true, bloom: true, msaa: 4 },
@@ -62,6 +62,7 @@ export class Renderer {
 
   setQuality(q) {
     this.quality = QUALITY[q] ? q : 'high';
+    setTextureDetail(this.quality === 'high' || this.quality === 'ultra' ? 2 : 1);
     if (this.scene) this.build(this.scene, this.camera, this.look);
   }
 
