@@ -1,0 +1,19 @@
+{
+  "name": "blahaj-adventure",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Bl\u00e5haj's Big Adventure: a cute 3D platformer starring a plush shark.",
+  "type": "module",
+  "scripts": {
+    "build": "esbuild src/main.js --bundle --minify --format=iife --target=es2020 --outfile=dist/game.js",
+    "watch": "esbuild src/main.js --bundle --sourcemap --format=iife --target=es2020 --outfile=dist/game.js --watch",
+    "check": "node tools/check-levels.js",
+    "serve": "python3 -m http.server 8080",
+    "playtest": "node tools/playtest.cjs"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2",
+    "three": "^0.186.1",
+    "playwright-core": "^1.56.1"
+  }
+}
