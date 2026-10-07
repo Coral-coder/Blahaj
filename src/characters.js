@@ -59,12 +59,22 @@ export function createLeo(bed) {
   part(new THREE.SphereGeometry(0.06, 12, 8), skin, head, 0, -0.06, 0.5);
   const mouth = part(new THREE.TorusGeometry(0.06, 0.012, 6, 12, Math.PI), new THREE.MeshStandardMaterial({ color: 0xa8584e }), head, 0, -0.22, 0.45); mouth.rotation.z = Math.PI; mouth.castShadow = false;
 
-  // shoulders peeking out of the duvet
-  const torso = part(new THREE.CapsuleGeometry(0.62, 1.2, 8, 16), pj, root, 0, 0.55, -l / 2 + 3.1); torso.rotation.x = Math.PI / 2; torso.scale.set(1.25, 1, 0.75);
+  // his body, chest to hips: a rounded torso (broad at the shoulders, narrower
+  // at the waist) that rolls about its long axis when he turns onto his side.
+  // Body frame: x across his shoulders (+x his right), y out of his chest, z to his feet.
+  const TA = 0.7, TB = 0.42; // half shoulder width, half chest depth
+  const torsoProfile = (s) => lerp(1.0, 0.86, smooth(-0.55, 0.45, s)) + 0.05 * smooth(0.6, 1.1, s);
+  const torsoGeo = new THREE.CapsuleGeometry(1, 2, 10, 24);
+  { const tp = torsoGeo.attributes.position;
+    for (let i = 0; i < tp.count; i++) { const zz = tp.getY(i) * 0.62, pr = torsoProfile(zz); tp.setXYZ(i, tp.getX(i) * TA * pr, -tp.getZ(i) * TB * pr, zz); }
+    torsoGeo.computeVertexNormals(); }
+  const torsoPivot = new THREE.Group(); torsoPivot.position.set(0, 0.55, -l / 2 + 3.1); root.add(torsoPivot);
+  const torso = part(torsoGeo, pj, torsoPivot, 0, 0, 0);
 
   // two arms: shoulder pivot -> upper arm -> elbow -> forearm -> hand (+x is his right)
   function buildArm(side) {
     const shoulder = new THREE.Group(); shoulder.position.set(side * 0.75, 0.75, -l / 2 + 2.65); root.add(shoulder);
+    part(new THREE.SphereGeometry(0.25, 16, 12), pj, shoulder, 0, 0, 0); // the round of his shoulder
     const upper = part(new THREE.CapsuleGeometry(0.2, 0.75, 6, 12), pj, shoulder, 0, 0, 0.5); upper.rotation.x = Math.PI / 2;
     const elbow = new THREE.Group(); elbow.position.set(0, 0, 1.0); shoulder.add(elbow);
     const fore = part(new THREE.CapsuleGeometry(0.17, 0.7, 6, 12), pj, elbow, 0, 0, 0.45); fore.rotation.x = Math.PI / 2;
@@ -93,18 +103,30 @@ export function createLeo(bed) {
   const torsoZ = -l / 2 + 3.1;
   // top of Leo's torso (an elliptical capsule) at bed-local (x, z), or -1
   // soft = true gives the tent the cloth makes over him: wider, no cliffs
+  // where his torso is: centre (cx, cy) in the bed's cross-section, rolled by a
+  const torsoFrame = () => {
+    const a = THREE.MathUtils.clamp(state.roll, -1, 1) * 1.35, c = Math.cos(a), s = Math.sin(a);
+    const hy = Math.sqrt(TA * TA * s * s + TB * TB * c * c); // half his height as he lies
+    return { a, c, s, cx: -0.5 * state.roll, cy: 0.1 + hy };
+  };
   function torsoTop(x, z, soft = false) {
-    const ar = Math.abs(state.roll), tx = -0.5 * state.roll, pad = soft ? 0.45 : 0;
-    const ry = lerp(0.465, 0.6, ar); // on his side he's narrower and taller
-    const dz = Math.max(0, Math.abs(z - torsoZ) - 0.6);
+    const { c, s, cx, cy } = torsoFrame(), pad = soft ? 0.45 : 0;
+    const dz = Math.max(0, Math.abs(z - torsoZ) - 0.62);
     if (dz >= 0.62 + pad) return -1;
-    const k = Math.sqrt(Math.max(0, 1 - (dz / (0.62 + pad)) ** 2)), rx = (lerp(0.775, 0.55, ar) + pad) * k, dx = x - tx;
-    if (Math.abs(dx) >= rx) return -1;
+    const k = Math.sqrt(Math.max(0, 1 - (dz / (0.62 + pad)) ** 2)), pr = torsoProfile(z - torsoZ);
+    const A = TA * pr * k, B = TB * pr * k, dx = x - cx;
     if (soft) { // the tent: from his top, sloping away at ~50 degrees
-      const rr = Math.hypot(dx, dz);
-      return 0.55 + ry - Math.max(0, rr - 0.25) * 1.2;
+      const hy = Math.sqrt(A * A * s * s + B * B * c * c), hw = Math.sqrt(A * A * c * c + B * B * s * s) + pad * k;
+      if (Math.abs(dx) >= hw) return -1;
+      const xt = hy > 1e-4 ? (A * A - B * B) * s * c / hy : 0; // x of his highest point
+      return cy + hy - Math.max(0, Math.hypot(dx - xt, dz) - 0.25) * 1.2;
     }
-    return 0.55 + ry * k * Math.sqrt(1 - (dx / rx) ** 2);
+    if (A < 1e-3) return -1;
+    // top of the rolled ellipse ((u/A)^2 + (v/B)^2 = 1) above dx
+    const qa = s * s / (A * A) + c * c / (B * B), qb = 2 * dx * c * s * (1 / (A * A) - 1 / (B * B)), qc = dx * dx * (c * c / (A * A) + s * s / (B * B)) - 1;
+    const disc = qb * qb - 4 * qa * qc;
+    if (disc <= 0) return -1;
+    return cy + (-qb + Math.sqrt(disc)) / (2 * qa);
   }
   // arm capsules in bed-local space, refreshed after posing
   const segs = [];
@@ -295,8 +317,10 @@ export function createLeo(bed) {
       state.t += dt;
       // roll > 0: over toward the wall; roll < 0: onto his right side, facing the room
       const rp = Math.max(0, state.roll), rn = Math.max(0, -state.roll);
-      armR.shoulder.position.set(0.75 - 0.7 * rp + 0.2 * rn, 0.75 - 0.15 * rn, -l / 2 + 2.65);
-      armL.shoulder.position.set(-0.75 - 0.1 * rp + 0.95 * rn, 0.75 - 0.1 * rp + 0.4 * rn, -l / 2 + 2.65);
+      // his torso rolls with him; the arms hang off its shoulders
+      const tf = torsoFrame();
+      torsoPivot.position.set(tf.cx, tf.cy, torsoZ); torsoPivot.rotation.z = tf.a;
+      for (const [arm, sx] of [[armR, 0.6], [armL, -0.6]]) arm.shoulder.position.set(tf.cx + sx * tf.c - 0.12 * tf.s, tf.cy + sx * tf.s + 0.12 * tf.c, -l / 2 + 2.65);
       // each arm always reaches for something: by default the hand rests tucked on
       // his chest under the covers; state.ik / state.ikL (bed-local) pull it elsewhere
       const arms = [
@@ -313,7 +337,6 @@ export function createLeo(bed) {
       }
       headPivot.rotation.z = -0.15 + state.roll + Math.sin(state.t * 0.7) * 0.02;
       headPivot.position.x = 0.1 - 0.45 * state.roll;
-      torso.position.x = -0.5 * state.roll; torso.rotation.z = 0.6 * state.roll;
       head.position.y = Math.sin(state.t * 1.6) * 0.01 + state.shiver * Math.sin(state.t * 47) * 0.012;
       refreshArm();
       drape();
@@ -549,8 +572,20 @@ export function createDog() {
     part(new THREE.SphereGeometry(0.26, 14, 10), light, knee, 0, -1.0, 0.1).scale.set(1, 0.6, 1.3);
     legs.push({ hip, knee, front: z > 0, up });
   }
-  const tail = new THREE.Group(); tail.position.set(0, 0.35, -1.95); body.add(tail);
-  const tm = part(new THREE.CapsuleGeometry(0.2, 1.4, 6, 12), fur, tail, 0, 0.6, -0.3); tm.rotation.x = -0.6;
+  // tail: sticks out behind him (along -z) from the top of his rump, with a
+  // slight upward curl at the tip. rotation.x lifts it; rotation.y wags it side
+  // to side (Euler XYZ: the wag happens first, then the lift tilts its plane),
+  // so it sweeps behind him and never over his back.
+  const tail = new THREE.Group(); tail.position.set(0, 0.45, -2.05); body.add(tail);
+  part(new THREE.SphereGeometry(0.24, 12, 10), fur, tail, 0, 0, 0);
+  part(new THREE.CapsuleGeometry(0.2, 0.9, 6, 12), fur, tail, 0, 0, -0.6).rotation.x = Math.PI / 2;
+  const tailTip = new THREE.Group(); tailTip.position.set(0, 0, -1.1); tailTip.rotation.x = 0.35; tail.add(tailTip);
+  part(new THREE.CapsuleGeometry(0.16, 0.6, 6, 12), fur, tailTip, 0, 0, -0.4).rotation.x = Math.PI / 2;
+  const TAIL = { // pose -> [lift, sideways, wag amount, wag speed]
+    stand: [0.35, 0, 0.55, 9], walk: [0.22, 0, 0.45, 9], carry: [0.4, 0, 0.6, 10], pickup: [0.35, 0, 0.5, 9],
+    bow: [0.7, 0, 0.75, 14], shake: [0.7, 0, 0.7, 14], toss: [0.75, 0, 0.6, 12], yawn: [0.25, 0, 0.15, 3],
+    rear: [-0.2, 0, 0.3, 8], sleep: [-0.55, 1.6, 0.06, 1.2],
+  };
   const zzz = new THREE.Group(); g.add(zzz);
   const dog = {
     group: g, body, head, neck, jaw, tail, legs, mouthPoint: new THREE.Object3D(),
@@ -558,7 +593,11 @@ export function createDog() {
     update(dt, pose = dog.pose, speed = 0) {
       dog.pose = pose; dog.t += dt;
       const t = dog.t;
-      tail.rotation.y = Math.sin(t * (pose === 'sleep' ? 1.2 : 9)) * (pose === 'sleep' ? 0.1 : 0.6);
+      const [lift, side, wag, wagHz] = TAIL[pose] || TAIL.stand, ease = Math.min(1, dt * 6);
+      tail.rotation.x += (lift - tail.rotation.x) * ease; tail.rotation.z += (0 - tail.rotation.z) * ease;
+      dog.tailSide = (dog.tailSide || 0) + (side - (dog.tailSide || 0)) * ease;
+      tail.rotation.y = dog.tailSide + Math.sin(t * wagHz) * wag;
+      tailTip.rotation.y = Math.sin(t * wagHz - 0.9) * wag * 0.5; // the tip follows through
       if (pose === 'walk' || pose === 'stand' || pose === 'carry' || pose === 'pickup') {
         body.position.y = 2.7 + (speed > 0 ? Math.abs(Math.sin(t * 7)) * 0.08 : 0);
         body.rotation.x += (0 - body.rotation.x) * Math.min(1, dt * 6);
@@ -585,7 +624,6 @@ export function createDog() {
         neck.rotation.y = pose === 'shake' ? Math.sin(t * 22) * 0.45 : neck.rotation.y * 0.85;
         jaw.rotation.x = pose === 'yawn' ? 0.75 : pose === 'toss' ? 0.5 : 0.12;
         tongue.visible = pose === 'yawn';
-        tail.rotation.y = Math.sin(t * 14) * 0.8;
       } else if (pose === 'rear') {
         body.rotation.x += (-0.95 - body.rotation.x) * Math.min(1, dt * 5);
         body.position.y = 3.3;
@@ -599,7 +637,6 @@ export function createDog() {
           else { L.hip.rotation.x = -1.2; L.knee.rotation.x = 2.3; }
         });
         neck.rotation.x = 1.0; jaw.rotation.x = 0.0; tongue.visible = false;
-        tail.rotation.x = 1.9; tail.rotation.z = 0.6;
         eyes.forEach((e) => (e.scale.y = 0.12));
       }
     },

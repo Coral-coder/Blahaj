@@ -41,9 +41,10 @@ const HELD_Q = yawQ(Math.PI).multiply(new THREE.Quaternion().setFromEuler(new TH
 export const SNUG_BEND = -1.0;
 export function snuggle(leo, bx, bz, pose) {
   const L = leo.worldToLocal(V(bx, 0, bz));
-  const ik = new THREE.Vector3(L.x + 0.5, 0.55, L.z + 0.05);
-  const ikL = pose ? leo.worldToLocal(pose.com.clone().add(V(0.42, 0.25, 0.1))) : new THREE.Vector3(L.x + 0.42, 1.3, L.z + 0.2);
-  return { roll: -0.85, curl: 0.7, ik, ikW: 1, pole: V(0.2, -1, -0.1).normalize(), armOver: true, ikL, ikWL: 1, poleL: V(-0.2, 1, -0.3), armOverL: true };
+  const ik = new THREE.Vector3(L.x + 0.3, 0.5, L.z + 0.15);
+  const ikL = pose ? leo.worldToLocal(pose.com.clone().add(V(0.42, 0.2, 0.25))) : new THREE.Vector3(L.x + 0.42, 1.25, L.z + 0.35);
+  // top arm: the elbow lies forward along Blåhaj's back (toward his head), not up in the air
+  return { roll: -0.85, curl: 0.7, ik, ikW: 1, pole: V(0.2, -1, -0.1).normalize(), armOver: true, ikL, ikWL: 1, poleL: V(0.55, 0.55, -0.65).normalize(), armOverL: true };
 }
 const snugX = (leo) => leo.hugPoint.x + 0.12; // right up against his chest
 const snugZ = (leo) => leo.hugPoint.z + 0.15;
@@ -513,7 +514,7 @@ export function ending(game, hooks) {
     const spheres = onTopOf(leo, pose);
     leo.update(dt, {
       cover: 0.86, roll, curl, shiver: 0,
-      ik: sn.ik, ikW: sm(t, 3.8, 5.6), pole: sn.pole, armOver: tuck < 0.5,
+      ik: sn.ik, ikW: sm(t, 3.8, 5.6), pole: sn.pole, armOver: false, // his lower arm stays under the covers, under Blåhaj
       ikL: sn.ikL, ikWL: sm(t, 4.2, 6.0), poleL: sn.poleL, armOverL: tuck < 0.5,
       onTop: tuck < 1 ? spheres.map((o) => Object.assign({}, o, { r: o.r * (1 - tuck) })) : [],
       under: tuck > 0 ? spheres.map((o) => Object.assign({}, o, { r: o.r * tuck })) : [],

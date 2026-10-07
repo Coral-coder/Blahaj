@@ -57,6 +57,13 @@ export class Game {
     const movingVis = new Set(ch.props.filter((p) => p.move).map((p) => p._visual));
     for (const grp of [this.roomFx.shell, this.roomFx.props]) grp.traverse((o) => { let n = o, moving = false; while (n) { if (movingVis.has(n)) { moving = true; break; } n = n.parent; } if (!moving) { o.updateMatrix(); o.matrixAutoUpdate = false; } });
     scene.environmentIntensity = 0.25;
+    // furniture that fades out when it comes between the camera and Blåhaj
+    this.fadeables = [];
+    this.roomFx.props.traverse((o) => { if (o.isMesh && !Array.isArray(o.material) && !o.material.transparent && !o.material.isShaderMaterial) this.fadeables.push(o); });
+    this.faded = new Map();
+    this.roomFx.props.updateMatrixWorld(true);
+    for (const m of this.fadeables) { if (!m.geometry.boundingBox) m.geometry.computeBoundingBox(); m.userData.box = m.geometry.boundingBox.clone().applyMatrix4(m.matrixWorld); }
+    this.ray = new THREE.Raycaster();
 
     // collision
     this.solids = [];
@@ -66,7 +73,7 @@ export class Game {
       this.solids.push(s);
       return s;
     };
-    for (const b of roomBoxes(ch.room)) addBox(b);
+    for (const b of roomBoxes(ch.room)) { const s = addBox(b); if (s) s.room = true; } // walls, floor, ceiling: the camera can't pass these
     this.movers = [];
     for (const p of ch.props) {
       if (p.move) {
@@ -731,10 +738,10 @@ export class Game {
   }
 
   // camera ray vs boxes (slab test); returns nearest hit distance
-  rayHit(o, d, maxD) {
+  rayHit(o, d, maxD, roomOnly = false) {
     let best = maxD;
     for (const s of this.solids) {
-      if (!s.active || s.mover) continue;
+      if (!s.active || s.mover || (roomOnly && !s.room)) continue;
       if ((s.max.x - s.min.x) < 0.5 && (s.max.z - s.min.z) < 0.5) continue; // thin legs/posts don't block the view
       let t0 = 0, t1 = best;
       let ok = true;
@@ -771,26 +778,60 @@ export class Game {
       C.target.y += (goal.y - C.target.y) * Math.min(1, dt * (P.grounded ? 6 : 3));
     }
     const look = C.target.clone().add(V(0, 1.0, 0));
-    // when something solid is right behind Blåhaj, swing the camera up and look down instead
-    const probe = V(Math.sin(C.yaw) * Math.cos(C.pitch), Math.sin(C.pitch), Math.cos(C.yaw) * Math.cos(C.pitch));
-    const blocked = this.rayHit(look, probe, C.dist) < C.dist * 0.6;
-    C.lift = (C.lift || 0) + ((blocked ? 0.75 : 0) - (C.lift || 0)) * Math.min(1, dt * (snap ? 60 : 2.5));
-    const pitch = Math.min(1.25, C.pitch + C.lift);
-    const dir = V(Math.sin(C.yaw) * Math.cos(pitch), Math.sin(pitch), Math.cos(C.yaw) * Math.cos(pitch));
-    const hit = this.rayHit(look, dir, C.dist);
-    const want = Math.max(2.4, hit - 0.3);
-    C.cur = snap || C.cur === undefined ? want : (want < C.cur ? want : C.cur + (want - C.cur) * Math.min(1, dt * 3));
+    // The camera keeps its distance: furniture in the way fades out (fadeOccluders)
+    // instead of pulling the camera in. Only the room itself (walls, ceiling) can
+    // push it closer, and then it eases in and swings up a little to look down.
+    // Backed up against a wall? Rise up and look down over it rather than zoom in:
+    // the lowest swing up (or, under the ceiling, down) that leaves room to stay back.
+    const dirAt = (p) => V(Math.sin(C.yaw) * Math.cos(p), Math.sin(p), Math.cos(C.yaw) * Math.cos(p));
+    let liftGoal = 0, bestHit = -1;
+    for (const k of [0, 0.12, 0.24, 0.36, 0.5, 0.65, 0.8, -0.12, -0.24]) {
+      const p = THREE.MathUtils.clamp(C.pitch + k, -0.1, 1.3), h = this.rayHit(look, dirAt(p), C.dist + 0.4, true);
+      if (h >= C.dist + 0.35) { liftGoal = p - C.pitch; bestHit = h; break; }
+      if (h > bestHit) { bestHit = h; liftGoal = p - C.pitch; }
+    }
+    C.lift = (C.lift || 0) + (liftGoal - (C.lift || 0)) * Math.min(1, dt * (snap ? 60 : 2.2));
+    const pitch = THREE.MathUtils.clamp(C.pitch + C.lift, -0.1, 1.3);
+    const dir = dirAt(pitch);
+    const hit = this.rayHit(look, dir, C.dist + 0.4, true);
+    const want = Math.max(3.2, Math.min(C.dist, hit - 0.4));
+    C.cur = snap || C.cur === undefined ? want : C.cur + (want - C.cur) * Math.min(1, dt * (want < C.cur ? 5 : 1.5));
     this.camera.position.copy(look).addScaledVector(dir, C.cur);
-    // never leave the room (e.g. out through a window)
-    const r = this.ch.room;
-    this.camera.position.x = THREE.MathUtils.clamp(this.camera.position.x, r.x0 + 0.35, r.x1 - 0.35);
-    this.camera.position.z = THREE.MathUtils.clamp(this.camera.position.z, r.z0 + 0.35, r.z1 - 0.35);
+    // never leave the room (e.g. out through a window), and keep well off the
+    // walls so they don't fill the screen edge-on: from there it looks across at Blåhaj
+    const r = this.ch.room, M = 1.5;
+    this.camera.position.x = THREE.MathUtils.clamp(this.camera.position.x, r.x0 + M, r.x1 - M);
+    this.camera.position.z = THREE.MathUtils.clamp(this.camera.position.z, r.z0 + M, r.z1 - M);
     this.camera.position.y = THREE.MathUtils.clamp(this.camera.position.y, 0.4, r.h - 0.35);
     if (C.shake) { C.shake = Math.max(0, C.shake - dt); this.camera.position.add(V(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(C.shake * 0.5)); }
     this.camera.lookAt(look);
+    this.fadeOccluders(look, snap ? 1 : dt);
     C.fovKick = Math.max(0, (C.fovKick || 0) - dt * 30);
     const fov = 58 + C.fovKick;
     if (Math.abs(this.camera.fov - fov) > 0.01) { this.camera.fov = fov; this.camera.updateProjectionMatrix(); }
+  }
+
+  // see-through furniture: anything between the camera and Blåhaj fades to a ghost
+  fadeOccluders(look, dt) {
+    const cam = this.camera.position, hits = new Set(), d = V();
+    for (const tgt of [look, this.p.pos.clone().add(V(0, 0.35, 0))]) {
+      d.subVectors(tgt, cam); const len = d.length();
+      if (len < 0.5) continue;
+      this.ray.set(cam, d.divideScalar(len)); this.ray.near = 0; this.ray.far = len - 0.35;
+      for (const h of this.ray.intersectObjects(this.fadeables, false)) hits.add(h.object);
+    }
+    // and anything right up against the lens (a lamp, a curtain beside the camera)
+    for (const m of this.fadeables) {
+      const box = m.matrixAutoUpdate ? (m.userData.box.copy(m.geometry.boundingBox).applyMatrix4(m.matrixWorld)) : m.userData.box;
+      if (box.distanceToPoint(cam) < 1.1) hits.add(m);
+    }
+    for (const m of hits) if (!this.faded.has(m)) this.faded.set(m, 1);
+    for (const [m, a0] of this.faded) {
+      const a = a0 + ((hits.has(m) ? 0.18 : 1) - a0) * Math.min(1, dt * 8);
+      if (a > 0.98 && !hits.has(m)) { m.material = m.userData.solidMat; this.faded.delete(m); continue; }
+      if (!m.userData.fadeMat) { m.userData.solidMat = m.material; m.userData.fadeMat = m.material.clone(); m.userData.fadeMat.onBeforeCompile = m.material.onBeforeCompile; m.userData.fadeMat.transparent = true; m.userData.fadeMat.depthWrite = false; }
+      m.material = m.userData.fadeMat; m.material.opacity = a; this.faded.set(m, a);
+    }
   }
 
   render() { this.R.render(this.clock); }
