@@ -22,9 +22,10 @@ function loadSave() {
   try { s = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch (e) { /* storage unavailable */ }
   s = s || {};
   s.completed = s.completed || [];
-  s.teddies = s.teddies || [];
+  s.stars = s.stars || s.teddies || [];
+  delete s.teddies;
   s.best = s.best || [];
-  CHAPTERS.forEach((c, i) => { s.teddies[i] = s.teddies[i] || [false, false, false]; });
+  CHAPTERS.forEach((c, i) => { s.stars[i] = s.stars[i] || [false, false, false]; });
   s.quality = s.quality || 'high';
   return s;
 }
@@ -55,7 +56,7 @@ const hooks = {
   pop(text) { const c = $('combo'); c.textContent = text; c.classList.add('show'); clearTimeout(popTimer); popTimer = setTimeout(() => c.classList.remove('show'), 900); },
   hint(t) { const h = $('hint'); if (t) { h.textContent = t; h.style.opacity = 1; } else h.style.opacity = 0; },
   fade(on) { $('fade').classList.toggle('on', on); },
-  teddy(i) { if (!save.teddies[current][i]) { save.teddies[current][i] = true; persist(); } },
+  star(i) { if (!save.stars[current][i]) { save.stars[current][i] = true; persist(); } },
   subtitle(text) { const s = $('subtitle'); if (text) { s.textContent = text; s.classList.add('show'); } else s.classList.remove('show'); },
   letterbox(on) { document.body.classList.toggle('cinema', on); },
   complete: onComplete,
@@ -68,7 +69,7 @@ function newGame(i, opts = {}) {
   hooks.subtitle(null); hooks.letterbox(false); $('skip').classList.add('hidden'); cineDone = null;
   current = i;
   perf.reset();
-  game = new Game(renderer, input, CHAPTERS[i], i, hooks, { savedTeddies: save.teddies[i] });
+  game = new Game(renderer, input, CHAPTERS[i], i, hooks, { savedStars: save.stars[i] });
   return game;
 }
 
@@ -110,7 +111,7 @@ function startChapter(i, withIntro) {
     show(null);
     $('chapterName').textContent = `${i + 1}. ${ch.title}`;
     $('objective').textContent = ch.goalText;
-    $('teddyTotal').textContent = ch.teddies.length;
+    $('fishTotal').textContent = ch.fish.length;
     updateHud();
     Audio.startMusic(ch.music);
     if (withIntro && ch.intro && CINES[ch.intro]) runCine(CINES[ch.intro](game, hooks), () => chapterTitle(i));
@@ -163,13 +164,15 @@ function updateHud() {
   bar.style.width = `${c}%`;
   $('dream').classList.toggle('low', c < 30);
   $('dreamLabel').textContent = c > 66 ? 'Sweet dreams' : c > 33 ? 'Restless…' : 'Nightmare!';
-  $('teddies').textContent = game.teddies.filter((t) => t.taken || save.teddies[current][t.i]).length;
+  $('fish').textContent = game.stats.fish;
+  $('stars').innerHTML = game.stars.map((st) => `<span class="${st.taken || save.stars[current][st.i] ? '' : 'off'}">⭐</span>`).join('');
 }
 
 function onComplete(r) {
   const i = current, ch = CHAPTERS[i];
   save.completed[i] = true;
-  r.teddies.forEach((t, k) => { if (t) save.teddies[i][k] = true; });
+  r.stars.forEach((t, k) => { if (t) save.stars[i][k] = true; });
+  save.bestFish = save.bestFish || []; save.bestFish[i] = Math.max(save.bestFish[i] || 0, r.fish);
   save.best[i] = save.best[i] ? Math.min(save.best[i], r.time) : r.time;
   persist();
   const after = () => {
@@ -181,8 +184,8 @@ function onComplete(r) {
 }
 
 function showEnding() {
-  const total = save.teddies.reduce((a, t) => a + t.filter(Boolean).length, 0);
-  $('endTeddies').textContent = `${total} / ${CHAPTERS.length * 3}`;
+  const total = save.stars.reduce((a, t) => a + t.filter(Boolean).length, 0);
+  $('endStars').textContent = `${total} / ${CHAPTERS.length * 3}`;
   hooks.fade(false);
   show('ending');
 }
@@ -194,7 +197,7 @@ function buildChapterList() {
     const open = unlocked(i);
     const d = document.createElement('button');
     d.className = 'chap' + (open ? '' : ' locked');
-    const td = save.teddies[i].map((t) => `<span class="${t ? '' : 'off'}">🧸</span>`).join('');
+    const td = save.stars[i].map((t) => `<span class="${t ? '' : 'off'}">⭐</span>`).join('') + (save.completed[i] ? ` <span style="font-size:13px">🐟 ${(save.bestFish || [])[i] || 0}/${ch.fish.length}</span>` : '');
     d.innerHTML = `<span class="num">Chapter ${i + 1}</span><span class="name">${ch.title}</span><span class="goal">${open ? ch.goalText : '🔒 Finish the chapter before'}</span><span class="td">${td}</span><span class="meta">${save.completed[i] ? '⏱ best ' + fmt(save.best[i]) : ''}</span>`;
     if (open) d.onclick = () => { Audio.init(); Audio.click(); story = false; startChapter(i, true); };
     grid.appendChild(d);

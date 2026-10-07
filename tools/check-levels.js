@@ -1,4 +1,4 @@
-// Verifies every chapter's goal and teddy bears are reachable with the moves
+// Verifies every chapter's goal and starfish are reachable with the moves
 // the player has in that chapter, using the game's real colliders and jump
 // physics.   node tools/check-levels.js
 import { CFG } from '../src/config.js';
@@ -64,19 +64,19 @@ CHAPTERS.forEach((ch, i) => {
   const ab = ch.abilities;
   const { nodes, seen } = reach(ch, ab);
   const goal = pointOK([ch.goal.x, ch.goal.y + 0.6, ch.goal.z], nodes, seen, ab);
-  const ted = ch.teddies.map((t) => pointOK(t, nodes, seen, ab));
+  const ted = ch.starfish.map((t) => pointOK(t, nodes, seen, ab));
   let need = '';
   if (ch.newAbility) {
     const ab2 = Object.assign({}, ab); delete ab2[ch.newAbility];
     const r2 = reach(ch, ab2);
     const g2 = pointOK([ch.goal.x, ch.goal.y + 0.6, ch.goal.z], r2.nodes, r2.seen, ab2);
-    const t2 = ch.teddies.map((t) => pointOK(t, r2.nodes, r2.seen, ab2)).filter(Boolean).length;
-    need = `  without ${ch.newAbility}: goal ${g2 ? 'reachable' : 'blocked'}, teddies ${t2}/${ch.teddies.length}`;
+    const t2 = ch.starfish.map((t) => pointOK(t, r2.nodes, r2.seen, ab2)).filter(Boolean).length;
+    need = `  without ${ch.newAbility}: goal ${g2 ? 'reachable' : 'blocked'}, starfish ${t2}/${ch.starfish.length}`;
   }
   const ov = overlaps(ch);
   if (ov.length) console.log('   overlapping furniture:', ov.join('; '));
   const ok = goal && ted.every(Boolean) && !ov.length;
   if (!ok) fails++;
-  console.log(`${ok ? 'OK  ' : 'FAIL'} ${i + 1}. ${ch.title} goal:${goal} teddies:${ted.map((x) => (x ? '🧸' : '✗')).join('')}${need}`);
+  console.log(`${ok ? 'OK  ' : 'FAIL'} ${i + 1}. ${ch.title} goal:${goal} starfish:${ted.map((x) => (x ? '⭐' : '✗')).join('')}${need}`);
 });
 process.exit(fails ? 1 : 0);

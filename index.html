@@ -44,6 +44,7 @@
   .chap .name { font-family: Fraunces, serif; font-size: 21px; font-weight: 800; }
   .chap .goal, .chap .meta { font-size: 13px; color: var(--muted); }
   .off { opacity: .25; filter: grayscale(1); }
+  #stars span { font-size: 16px; }
 
   #hud { position: absolute; inset: 0; pointer-events: none; }
   .hudrow { position: absolute; top: max(14px, env(safe-area-inset-top)); left: 16px; right: 16px; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
@@ -103,7 +104,7 @@
   <div id="hud" class="hidden">
     <div class="hudrow">
       <div class="pill"><div id="chapterName">Chapter</div><div id="objective"></div></div>
-      <div class="right"><div class="pill">🧸 <span id="teddies">0</span> / <span id="teddyTotal">3</span></div><div class="pill" id="timer" style="font-size:13px">0:00</div></div>
+      <div class="right"><div class="pill">🐟 <span id="fish">0</span><span style="opacity:.55;font-size:13px"> / <span id="fishTotal">0</span></span></div><div class="pill" id="stars"></div><div class="pill" id="timer" style="font-size:13px">0:00</div></div>
     </div>
     <div id="dream"><div id="dreamLabel">Sweet dreams</div><div class="bar"><div id="dreamFill"></div></div></div>
     <div id="combo"></div>
@@ -144,7 +145,7 @@
         <div><kbd>Esc</kbd> pause · <kbd>Enter</kbd> skip scene</div>
         <div>Gamepad and touch work too</div>
       </div>
-      <p>The meter at the top is <b>Leo’s dream</b>. It slowly fades while he’s alone, and it drains fast when you walk on the <b>dark floor</b>, where the nightmares live. Pools of light, rugs and furniture are safe. Gather glowing dream stars, switch on lamps, and find the hidden teddy bears to keep the dream sweet. Jump on nightmares to make them go poof.</p>
+      <p>The meter at the top is <b>Leo’s dream</b>. It slowly fades while he’s alone, and it drains fast when you walk on the <b>dark floor</b>, where the nightmares live. Pools of light, rugs and furniture are safe. Collect 🐟 fish, switch on lamps, and find the three hidden ⭐ starfish in every chapter to keep the dream sweet. The 🐰 dust bunnies are friends: land on one for a big, giggly bounce. Jump on nightmares to make them go poof.</p>
       <button class="btn" id="btnHowBack">Got it</button>
     </div>
   </div>
@@ -162,7 +163,7 @@
     <div class="card" style="max-width:560px;text-align:center">
       <h2>Sweet dreams, Leo.</h2>
       <p>Blåhaj made it all the way back: off the edge, downstairs with Biscuit, up the big stairs, and into Leo’s arms just in time.</p>
-      <p>Teddy bears found: <b id="endTeddies"></b></p>
+      <p>Starfish found: <b id="endStars"></b></p>
       <button class="btn" id="btnEndTitle">Back to the title</button>
     </div>
   </div>

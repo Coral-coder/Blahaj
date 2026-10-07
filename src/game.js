@@ -7,13 +7,13 @@ import * as Art from './art.js';
 import { Particles } from './particles.js';
 import { expand, roomBoxes } from './prefabs.js';
 import { buildRoom, createDarkFloor, createRisingDark, createLamp } from './rooms.js';
-import { createLeo, createDreamBubble, createTeddy, createShadow, createKnot, createDog, createCat, updateShadowTime } from './characters.js';
+import { createLeo, createDreamBubble, createShadow, createKnot, createDog, createCat, updateShadowTime } from './characters.js';
 import { softDotTexture } from './textures.js';
 
 const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 const EPS = 0.001;
 const angDiff = (a, b) => { let d = b - a; while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2; return d; };
-const COMFORT = { mote: 4, teddy: 25, stomp: 6, knot: 15, hit: 18, lego: 10, ball: 7, cat: 6, lampMin: 70, respawn: 60, darkDrain: 9, risingDrain: 26 };
+const COMFORT = { fish: 4, starfish: 25, bunny: 3, stomp: 6, knot: 15, hit: 18, lego: 10, ball: 7, cat: 6, lampMin: 70, respawn: 60, darkDrain: 9, risingDrain: 26 };
 
 function pathPoint(path, dist) {
   // position along a closed polyline at arc length `dist`
@@ -38,9 +38,9 @@ export class Game {
   constructor(renderer, input, chapter, index, hooks, opts = {}) {
     this.R = renderer; this.input = input; this.ch = chapter; this.index = index; this.hooks = hooks;
     this.ab = chapter.abilities;
-    this.savedTeddies = (opts.savedTeddies || []).slice();
+    this.savedStars = (opts.savedStars || []).slice();
     this.clock = 0; this.time = 0; this.state = 'play';
-    this.stats = { motes: 0, teddies: 0, nightmares: 0, time: 0, scares: 0 };
+    this.stats = { fish: 0, starfish: 0, nightmares: 0, bunnyHops: 0, time: 0, scares: 0 };
     this.comfort = 100;
     this.build();
   }
@@ -113,24 +113,23 @@ export class Game {
       scene.add(c.group); this.cats.push({ c, p, cool: 0 });
     }
 
-    // dream motes: little warm wisps of a good dream
-    const moteMat = new THREE.SpriteMaterial({ map: softDotTexture(), color: 0xffd98a, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
-    this.motes = ch.motes.map((m, i) => {
-      const g = new THREE.Group();
-      const core = new THREE.Sprite(moteMat); core.scale.set(0.5, 0.5, 1); g.add(core);
-      const star = Art.createStar(); star.scale.setScalar(0.32); star.children.forEach((c) => { if (c.isSprite) c.visible = false; }); g.add(star);
-      g.position.set(m[0], m[1], m[2]); scene.add(g);
-      return { g, star, pos: V(...m), taken: false, ph: i * 0.7, out: 0 };
+    // fish: the little golden fish from the first build, they keep the dream sweet
+    this.fish = ch.fish.map((f, i) => {
+      const m = Art.createFish(); m.position.set(...f); scene.add(m);
+      return { m, pos: V(...f), taken: false, ph: i * 0.37, out: 0 };
     });
-    // hidden teddy bears
-    this.teddies = ch.teddies.map((t, i) => {
-      const td = createTeddy(0.75); td.group.position.set(...t); scene.add(td.group);
-      const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: softDotTexture(), color: 0xffc27a, transparent: true, opacity: 0.5, depthWrite: false, blending: THREE.AdditiveBlending }));
-      halo.scale.set(2.4, 2.4, 1); halo.position.y = 1.0; td.group.add(halo);
-      if (this.savedTeddies[i]) td.group.traverse((o) => { if (o.material && !o.isSprite) { o.material = o.material.clone(); o.material.transparent = true; o.material.opacity = 0.45; } });
-      return { td, pos: V(...t), taken: false, i, out: 0 };
+    // three hidden starfish per chapter
+    this.stars = ch.starfish.map((t, i) => {
+      const m = Art.createStar(); m.position.set(...t); scene.add(m);
+      if (this.savedStars[i]) m.traverse((o) => { if (o.material && !o.isSprite) { o.material = o.material.clone(); o.material.transparent = true; o.material.opacity = 0.45; } });
+      return { m, pos: V(...t), taken: false, i, out: 0 };
     });
-    this.runTeddies = this.teddies.map(() => false);
+    this.runStars = this.stars.map(() => false);
+    // friendly dust bunnies: soft, giggly, and very bouncy
+    this.bunnies = (ch.bunnies || []).map((b, i) => {
+      const m = Art.createBunny(); m.position.set(...b); scene.add(m);
+      return { m, home: V(...b), pos: V(...b), vel: V(), t: i * 1.7, wander: V(...b), cool: 0, squish: 0, ph: i };
+    });
 
     // creatures
     this.enemies = [];
@@ -430,22 +429,39 @@ export class Game {
   interact(dt) {
     const P = this.p, ch = this.ch;
     const c = P.pos.clone().add(V(0, CFG.height / 2, 0));
-    for (const m of this.motes) {
-      if (m.taken || m.pos.distanceToSquared(c) > 1.1) continue;
-      m.taken = true; m.out = 0.001; this.stats.motes++;
-      this.addComfort(COMFORT.mote);
-      Audio.collect(this.stats.motes % 12);
-      this.sparks.burst(m.pos, 8, { color: new THREE.Color(0xffd98a), speed: 3, life: 0.45, size: 0.2 });
+    for (const f of this.fish) {
+      if (f.taken || f.pos.distanceToSquared(c) > 0.95) continue;
+      f.taken = true; f.out = 0.001; this.stats.fish++;
+      this.addComfort(COMFORT.fish);
+      Audio.collect(this.stats.fish % 12);
+      this.sparks.burst(f.pos, 8, { color: new THREE.Color(0xffc56b), speed: 3, life: 0.45, size: 0.22 });
     }
-    for (const t of this.teddies) {
-      if (t.taken || t.pos.distanceToSquared(c) > 1.6) continue;
-      t.taken = true; t.out = 0.001; this.runTeddies[t.i] = true; this.stats.teddies++;
-      this.addComfort(COMFORT.teddy);
+    for (const st of this.stars) {
+      if (st.taken || st.pos.distanceToSquared(c) > 1.3) continue;
+      st.taken = true; st.out = 0.001; this.runStars[st.i] = true; this.stats.starfish++;
+      this.addComfort(COMFORT.starfish);
       Audio.star();
-      this.sparks.burst(t.pos.clone().add(V(0, 0.8, 0)), 40, { color: new THREE.Color(0xffc27a), speed: 6, life: 1, size: 0.3 });
-      this.hooks.teddy(t.i);
-      const n = this.teddies.filter((x) => x.taken || this.savedTeddies[x.i]).length;
-      this.hooks.toast('Teddy bear found!', `${n} of ${this.teddies.length} in this chapter`);
+      this.sparks.burst(st.pos, 40, { color: new THREE.Color(0xffd84a), speed: 7, life: 1, size: 0.35 });
+      this.hooks.star(st.i);
+      const n = this.stars.filter((x) => x.taken || this.savedStars[x.i]).length;
+      this.hooks.toast(this.savedStars[st.i] ? 'Starfish again!' : 'Starfish found!', `${n} of ${this.stars.length} in this chapter`);
+    }
+    // dust bunnies: land on one for a giggly bounce; bump one and it hops aside. Nobody gets hurt.
+    for (const b of this.bunnies) {
+      b.cool -= dt;
+      const dx = P.pos.x - b.pos.x, dz = P.pos.z - b.pos.z, d = Math.hypot(dx, dz);
+      if (d > 1.0 || P.pos.y > b.pos.y + 1.25 || P.pos.y + CFG.height < b.pos.y) continue;
+      if (P.vel.y < 0 && P.pos.y > b.pos.y + 0.5) {
+        P.vel.y = this.input.jumpHeld() ? CFG.bounce : CFG.bounce * 0.85; P.pos.y = b.pos.y + 1.25;
+        P.grounded = false; P.pound = 0; P.canDouble = !!this.ab.doubleJump; P.dashUsed = false;
+        b.squish = 1; this.rig.impulse(6);
+        Audio.bounce(); Audio.tone(880, { type: 'sine', dur: 0.12, vol: 0.12, delay: 0.05 }); Audio.tone(1175, { type: 'sine', dur: 0.14, vol: 0.1, delay: 0.12 });
+        this.sparks.burst(b.pos.clone().add(V(0, 1.1, 0)), 12, { color: new THREE.Color(0xff9fbf), speed: 3.5, life: 0.7, size: 0.28 });
+        if (b.cool <= 0) { b.cool = 1.2; this.stats.bunnyHops++; this.addComfort(COMFORT.bunny); this.hooks.pop(['Boing! 💕', 'Hee hee!', 'Wheee!'][this.stats.bunnyHops % 3]); }
+      } else if (d > 0.01) {
+        b.vel.set((-dx / d) * 4, 3.5, (-dz / d) * 4); // giggle and hop out of the way
+        if (b.cool <= 0) { b.cool = 1; Audio.tone(990, { type: 'sine', dur: 0.1, vol: 0.08 }); }
+      }
     }
     for (const lamp of this.lamps) {
       if (lamp.on && lamp.def.on) continue;
@@ -553,7 +569,7 @@ export class Game {
     Audio.win();
     this.hooks.complete(this.result());
   }
-  result() { return { time: this.stats.time, motes: this.stats.motes, moteTotal: this.ch.motes.length, nightmares: this.stats.nightmares, scares: this.stats.scares, teddies: this.runTeddies.slice(), comfort: this.comfort }; }
+  result() { return { time: this.stats.time, fish: this.stats.fish, fishTotal: this.ch.fish.length, nightmares: this.stats.nightmares, scares: this.stats.scares, stars: this.runStars.slice(), comfort: this.comfort }; }
 
   // ---------------------------------------------------------------- visuals --
   visuals(dt) {
@@ -575,14 +591,36 @@ export class Game {
         if (Math.random() < 0.2) this.puffs.emit({ p: e.pos.clone().add(V((Math.random() - 0.5) * 1.2, 0.3, (Math.random() - 0.5) * 1.2)), v: V(0, 0.8, 0), life: 0.9, size: 0.5, color: new THREE.Color(0x14081f), alpha: 0.5, drag: 1 });
       } else e.s.group.position.copy(e.pos);
     }
-    for (const m of this.motes) {
-      if (m.out) { m.out += dt; const k = Math.max(0, 1 - m.out * 4); m.g.position.lerp(P.pos.clone().add(V(0, 0.6, 0)), Math.min(1, dt * 14)); m.g.scale.setScalar(k); if (k <= 0) m.g.visible = false; continue; }
-      m.g.position.y = m.pos.y + Math.sin(t * 2.4 + m.ph) * 0.12;
-      m.star.rotation.y = t * 2 + m.ph;
+    for (const f of this.fish) {
+      if (f.out) { f.out += dt; const k = Math.max(0, 1 - f.out * 4); f.m.position.lerp(P.pos.clone().add(V(0, 0.6, 0)), Math.min(1, dt * 14)); f.m.scale.setScalar(Math.max(0.001, k)); if (k <= 0) f.m.visible = false; continue; }
+      f.m.rotation.y = t * 2.5 + f.ph;
+      f.m.position.y = f.pos.y + Math.sin(t * 3 + f.ph) * 0.12;
     }
-    for (const td of this.teddies) {
-      if (td.out) { td.out += dt; td.td.group.scale.setScalar(Math.max(0.001, 0.75 * (1 - td.out * 2))); td.td.group.position.y += dt * 3; if (td.out > 0.5) td.td.group.visible = false; continue; }
-      td.td.group.rotation.y = t * 1.2; td.td.group.position.y = td.pos.y + Math.sin(t * 1.8) * 0.1;
+    for (const st of this.stars) {
+      if (st.out) { st.out += dt; st.m.scale.setScalar(1 + st.out * 2); st.m.position.y += dt * 3; st.m.rotation.y += dt * 20; if (st.out > 0.5) st.m.visible = false; continue; }
+      st.m.rotation.y = t * 1.6; st.m.position.y = st.pos.y + Math.sin(t * 2) * 0.15;
+      if (Math.random() < 0.08) this.sparks.emit({ p: st.pos.clone().add(V(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5)), v: V(0, 0.6, 0), life: 0.9, size: 0.18, color: new THREE.Color(0xffe38a) });
+    }
+    for (const b of this.bunnies) {
+      b.t += dt;
+      // wander around home, hop when moving, never wander into the furniture
+      if (b.vel.lengthSq() > 0.01) { b.pos.addScaledVector(b.vel, dt); b.vel.y -= 14 * dt; if (b.pos.y < b.home.y) { b.pos.y = b.home.y; b.vel.set(0, 0, 0); } }
+      else {
+        if (b.wander.distanceTo(b.pos) < 0.1 || Math.random() < 0.003) { const a = Math.random() * Math.PI * 2, r = Math.random() * 1.4; b.wander.set(b.home.x + Math.cos(a) * r, b.home.y, b.home.z + Math.sin(a) * r); }
+        const w = b.wander.clone().sub(b.pos).setY(0);
+        if (w.length() > 0.05) { b.pos.addScaledVector(w.normalize(), dt * 0.9); b.m.rotation.y += angDiff(b.m.rotation.y, Math.atan2(w.x, w.z)) * Math.min(1, dt * 5); }
+      }
+      const off = b.pos.clone().sub(b.home).setY(0);
+      if (off.length() > 2.2) b.pos.copy(b.home).add(off.setLength(2.2)).setY(b.pos.y);
+      for (const s_ of this.solids) if (s_.kind !== 'floor' && s_.active && b.pos.x > s_.min.x - 0.4 && b.pos.x < s_.max.x + 0.4 && b.pos.z > s_.min.z - 0.4 && b.pos.z < s_.max.z + 0.4 && s_.max.y > b.pos.y + 0.2 && s_.min.y < b.pos.y + 1) { b.pos.x = b.home.x; b.pos.z = b.home.z; }
+      b.squish = Math.max(0, b.squish - dt * 2.5);
+      const inner = b.m.userData.inner;
+      const hop = Math.abs(Math.sin(b.t * 5 + b.ph));
+      inner.position.y = (b.vel.lengthSq() > 0.01 ? 0 : hop * 0.18);
+      const sq = Math.sin(b.squish * Math.PI * 2) * b.squish * 0.35;
+      inner.scale.set(1 + sq * 0.6, 1 - sq, 1 + sq * 0.6);
+      b.m.position.copy(b.pos);
+      if (b.cool > 0.6 && Math.random() < 0.15) this.sparks.emit({ p: b.pos.clone().add(V((Math.random() - 0.5) * 0.6, 1.3, (Math.random() - 0.5) * 0.6)), v: V(0, 1, 0), life: 0.8, size: 0.2, color: new THREE.Color(0xff9fbf) });
     }
     for (const l of this.lamps) l.update(t);
     for (const cat of this.cats) cat.c.update(dt);
