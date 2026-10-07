@@ -157,11 +157,11 @@ export function prologue(game, hooks) {
       ik = t < 15.8 ? sn.ik.clone().lerp(e0, letGo) : pullTo;
       pole = t < 15.8 ? sn.pole.clone().lerp(PULL, letGo) : PULL;
       if (t > 17.4) { // let go: the hand settles on the covers over his side as he rolls
-        // (along his side toward his hip, over the covers, as he rolls toward the wall)
-        const rx = -0.5 * (-0.85 + 1.85 * rollT) + 0.15, rz = -0.35;
-        const rest = V(rx, leo.underAt(leo.group.position.x + rx, leo.group.position.z + rz) - leo.group.position.y + 0.27, rz);
-        ik = SHOULDER.clone().lerp(rest, seg(t, 17.4, 18.8));
-        pole = PULL.clone().lerp(V(0.3, 1, 0.2).normalize(), seg(t, 17.4, 18.8));
+        // (down in front of his chest, over the covers, as he rolls to face the wall)
+        const rx = -0.5 * (-0.85 + 1.85 * rollT) - 0.85, rz = -1.35;
+        const rest = V(rx, leo.underAt(leo.group.position.x + rx, leo.group.position.z + rz) - leo.group.position.y + 0.32, rz);
+        ik = SHOULDER.clone().lerp(rest, seg(t, 17.4, 19.6));
+        pole = PULL.clone().lerp(V(-0.3, 0.6, 0.75).normalize(), seg(t, 17.4, 19.6));
       }
     }
     const grabbing = t >= 14.95 && t < 17.4;
@@ -528,21 +528,25 @@ export function ending(game, hooks) {
     const t = (c.t += dt);
     c.subtitles(t);
     // Blåhaj hops up onto the bare sheet by the pillow, beside Leo's face
-    const R0 = leo.group.position, land = V(R0.x + 2.0, 0, R0.z - 2.6), snug = V(snugX(leo), 0, snugZ(leo));
+    const R0 = leo.group.position, land = V(R0.x + 2.0, 0, R0.z - 2.6), snug = V(R0.x + 1.35, 0, R0.z - 1.5); // against his chest, clear of his knees
     // Leo stirs, rolls over to face him and curls up
-    const roll = 1 - 1.85 * sm(t, 2.0, 4.6), curl = 0.7 * sm(t, 2.6, 5.0);
+    const roll = 1 - 1.85 * sm(t, 2.0, 4.6), curl = 0.3 * sm(t, 2.6, 5.0); // knees drawn up a little, not under Blåhaj
     // ...lifts the covers with his top hand (from underneath, so they rise with it),
     // Blåhaj is drawn in under them against his chest, and the covers come down over him
     const pull = sm(t, 5.6, 7.6);
     const b = lerpV(land, snug, pull); b.x += Math.sin(pull * Math.PI) * 0.15;
     const sn = snuggle(leo, b.x, b.z, pose);
+    sn.ik.y = 0.28; // his lower arm lies flat on the mattress, under Blåhaj
     const L = (x, y, z) => V(x, y, z); // bed-local
     if (!c.under) c.under = L(1.05, 0.62, leo.worldToLocal(leo.edgePoint(1.05)).z + 0.3); // just inside the edge
-    const UP = L(1.5, 1.85, -1.45), DOWN = L(1.3, 1.15, -1.9);
+    const UP = L(1.5, 1.8, -1.5), DOWN = L(1.4, 0.95, -2.05);
     let ikL, ikWL, poleL = V(0.2, 1, -0.5).normalize();
     if (t < 6.4) { ikL = c.under.clone().lerp(UP, sm(t, 5.0, 6.4)); ikWL = sm(t, 3.9, 5.0); }
     else if (t < 8.8) { const k = sm(t, 7.4, 8.8); ikL = UP.clone().lerp(DOWN, k); ikL.y += Math.sin(k * Math.PI) * 0.25; ikWL = 1; }
-    else { ikL = DOWN.clone().lerp(sn.ikL.clone().add(V(0, 0.14, 0)), sm(t, 8.8, 10.4)); ikWL = 1; poleL = poleL.clone().lerp(sn.poleL.clone().normalize(), sm(t, 8.8, 10.4)); }
+    else { // then wraps round him, low over his back, elbow toward his tail (under the covers with him)
+      const hugL = leo.worldToLocal(pose.com.clone().add(V(0.45, 0.02, 0.3)));
+      ikL = DOWN.clone().lerp(hugL, sm(t, 8.8, 10.6)); ikWL = 1; poleL = poleL.clone().lerp(V(0.35, 0.4, 0.85).normalize(), sm(t, 8.8, 10.6));
+    }
     const grabL = t >= 5.0 && t < 8.8;
     leo.update(dt, {
       cover: grabL ? null : t < 5 ? 0.55 : 0.84, roll, curl, shiver: 0,
@@ -568,7 +572,7 @@ export function ending(game, hooks) {
     if (t < 4.4) camShot(game, V(-1.0, 7.6, -3.9), V(-1.3, 7.4, -4.6), V(-4.0, 5.0, -6.0), V(-4.2, 4.9, -6.6), sm(t, 0, 4.4), 42);
     else if (t < 9.8) camShot(game, V(-0.8, 7.5, -9.0), V(-1.1, 7.3, -8.8), V(-4.1, 5.0, -6.3), V(-4.2, 4.9, -6.1), sm(t, 4.4, 9.8), 44); // facing the opening as he lifts the covers
     else camShot(game, V(-1.1, 7.3, -8.8), V(5.5, 8.6, 6.5), V(-4.2, 4.9, -6.1), V(-4.2, 6.6, -5.6), sm(t, 9.8, 15.6), 48);
-    for (const f of game.fish) f.m.visible = f.m.position.distanceTo(game.camera.position) > 3.2; // nothing right in the lens
+    for (const f of game.fish) f.m.visible = f.m.position.distanceTo(game.camera.position) > 5; // nothing right in the lens
     if (t > 14.8) hooks.fade(true);
     if (t >= c.length) { c.done = true; hooks.subtitle(null); }
   };

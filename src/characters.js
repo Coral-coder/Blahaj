@@ -104,7 +104,9 @@ export function createLeo(bed) {
   // sides, folds without passing through itself, and his hands can grab it.
   const DW = w + 2.2, DL = l * 0.82, CNX = 40, CNZ = 38;
   const cloth = createCloth({ nx: CNX, nz: CNZ, width: DW, length: DL, thickness: 0.075, iterations: 5, gravity: 24, damping: 0.982, friction: 0.6, bend: 0.4 });
-  const dGeo = new THREE.PlaneGeometry(DW, DL, CNX - 1, CNZ - 1);
+  // drawn at twice the simulation's resolution (smooth Catmull-Rom in between), so folds read as fabric
+  const RNX = CNX * 2 - 1, RNZ = CNZ * 2 - 1;
+  const dGeo = new THREE.PlaneGeometry(DW, DL, RNX - 1, RNZ - 1);
   dGeo.rotateX(-Math.PI / 2);
   const dMat = Mat.quilt(0x4a6fb0).clone();
   for (const k of ['map', 'normalMap', 'roughnessMap']) { dMat[k] = dMat[k].clone(); dMat[k].repeat.set(1.85, 2.2); dMat[k].needsUpdate = true; }
@@ -244,19 +246,21 @@ export function createLeo(bed) {
 
   // ---- hands grabbing the cloth ----
   const grabs = { R: null, L: null }; // { list: [[p, ox, oy, oz]], from: Vector3 }
+  // a pinch: the bit of the edge nearest his hand (two weave points wide, two deep);
+  // the rest of the blanket hangs from it in its own folds
   function grab(tag) {
-    const h = hands[tag], list = [];
-    for (let k = 0; k < 4; k++) for (let i = 0; i < CNX; i++) {
-      const p = cloth.idx(i, k), d = Math.hypot(cloth.P[p * 3] - h.x, cloth.P[p * 3 + 1] - h.y, cloth.P[p * 3 + 2] - h.z);
-      if (d < 0.5) list.push([p, d]);
+    const h = hands[tag];
+    let bi = 0, bd = 1e9;
+    for (let i = 0; i < CNX; i++) { const p = cloth.idx(i, 0), d = Math.hypot(cloth.P[p * 3] - h.x, cloth.P[p * 3 + 1] - h.y, cloth.P[p * 3 + 2] - h.z); if (d < bd) { bd = d; bi = i; } }
+    const list = [];
+    for (const i of [bi - 1, bi, bi + 1]) for (const k of [0, 1]) {
+      if (i < 0 || i >= CNX) continue;
+      const p = cloth.idx(i, k), o = V(cloth.P[p * 3] - h.x, cloth.P[p * 3 + 1] - h.y, cloth.P[p * 3 + 2] - h.z);
+      const goal = o.clone().setLength(Math.min(o.length(), 0.12 + 0.1 * Math.abs(i - bi) + 0.08 * k)); // gathered into the fist
+      list.push([p, o, goal]);
     }
-    if (!list.length) { // nothing right under the hand: take the nearest bit of the edge
-      let best = -1, bd = 1e9;
-      for (let i = 0; i < CNX; i++) { const p = cloth.idx(i, 0), d = Math.hypot(cloth.P[p * 3] - h.x, cloth.P[p * 3 + 1] - h.y, cloth.P[p * 3 + 2] - h.z); if (d < bd) { bd = d; best = p; } }
-      list.push([best, bd]);
-    }
-    grabs[tag] = { list: list.map(([p]) => [p, (cloth.P[p * 3] - h.x) * 0.3, (cloth.P[p * 3 + 1] - h.y) * 0.3 - 0.12, (cloth.P[p * 3 + 2] - h.z) * 0.3]), from: h.clone() };
-    for (const [p] of grabs[tag].list) cloth.W[p] = 0;
+    grabs[tag] = { list, age: 0 };
+    for (const [p] of list) cloth.W[p] = 0;
   }
   function release(tag) {
     for (const [p] of grabs[tag].list) { cloth.W[p] = 1; cloth.pins.delete(p); }
@@ -308,7 +312,7 @@ export function createLeo(bed) {
     lastSig = sig;
     coverZ = zTopOf(state.cover ?? 0.6);
     cloth.setColliders(cols);
-    if (!force && awake <= 0) return;
+    if (!force && awake <= 0) return false;
     acc = Math.min(acc + dt, H * 3);
     // the fabric only folds over itself while a hand is moving it (and as it falls after)
     if (grabs.R || grabs.L) folding = 1.5; else folding = Math.max(0, folding - dt);
@@ -319,17 +323,32 @@ export function createLeo(bed) {
       const a0 = j / n, a1 = (j + 1) / n;
       for (const tag of ['R', 'L']) if (grabs[tag]) {
         const hp = prevHands[tag].clone().lerp(hands[tag], a1);
-        for (const [p, ox, oy, oz] of grabs[tag].list) cloth.pins.set(p, [hp.x + ox, hp.y + oy, hp.z + oz]);
+        const g = grabs[tag], e = Math.min(1, (g.age += H) / 0.4), k = e * e * (3 - 2 * e); // the fist closes, no snap
+        for (const [p, o, goal] of g.list) { const ox = o.x + (goal.x - o.x) * k, oy = o.y + (goal.y - o.y) * k, oz = o.z + (goal.z - o.z) * k; cloth.pins.set(p, [hp.x + ox, hp.y + oy, hp.z + oz]); }
       }
       cloth.step(H, a0, a1);
     }
     if (n > 0 && !(grabs.R || grabs.L) && cloth.speed() < 4e-4) awake--;
     else if (n > 0) awake = Math.max(awake, 20);
+    return n > 0;
   }
+  const RA = new Float32Array(RNX * CNZ * 3); // rows of the sim, columns doubled
+  const cr = (a, b, c, d) => (-a + 9 * b + 9 * c - d) / 16; // Catmull-Rom midpoint
   function writeMesh() {
-    const pos = dGeo.attributes.position, P = cloth.P;
-    for (let p = 0; p < cloth.N; p++) pos.setXYZ(p, P[p * 3] + state.shiver * Math.sin(state.t * 40 + P[p * 3 + 2]) * 0.008, P[p * 3 + 1], P[p * 3 + 2]);
-    pos.needsUpdate = true;
+    const pos = dGeo.attributes.position.array, P = cloth.P;
+    const sp = (i, k, c) => P[(k * CNX + Math.max(0, Math.min(CNX - 1, i))) * 3 + c];
+    for (let k = 0; k < CNZ; k++) for (let u = 0; u < RNX; u++) for (let c = 0; c < 3; c++) {
+      const i = u >> 1;
+      RA[(k * RNX + u) * 3 + c] = u & 1 ? cr(sp(i - 1, k, c), sp(i, k, c), sp(i + 1, k, c), sp(i + 2, k, c)) : sp(i, k, c);
+    }
+    const ra = (u, k, c) => RA[(Math.max(0, Math.min(CNZ - 1, k)) * RNX + u) * 3 + c];
+    const sh_ = state.shiver * 0.008;
+    for (let v = 0; v < RNZ; v++) for (let u = 0; u < RNX; u++) {
+      const k = v >> 1, o = (v * RNX + u) * 3;
+      for (let c = 0; c < 3; c++) pos[o + c] = v & 1 ? cr(ra(u, k - 1, c), ra(u, k, c), ra(u, k + 1, c), ra(u, k + 2, c)) : ra(u, k, c);
+      if (sh_) pos[o] += Math.sin(state.t * 40 + pos[o + 2]) * sh_;
+    }
+    dGeo.attributes.position.needsUpdate = true;
     dGeo.computeVertexNormals();
   }
 
@@ -429,8 +448,7 @@ export function createLeo(bed) {
         const want = tag === 'R' ? state.grabR : state.grabL;
         if (want && !grabs[tag]) grab(tag); else if (!want && grabs[tag]) release(tag);
       }
-      simulate(dt);
-      writeMesh();
+      if (simulate(dt) || state.shiver) writeMesh(); // (a resting blanket isn't redrawn)
     },
     // jump the cloth to a fresh drape for the current pose (after a cut)
     settle(seconds = 2.5) {
