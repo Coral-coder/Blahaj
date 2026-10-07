@@ -9,6 +9,7 @@ import { expand, roomBoxes } from './prefabs.js';
 import { buildRoom, createDarkFloor, createRisingDark, createLamp } from './rooms.js';
 import { createLeo, createDreamBubble, createShadow, createKnot, createDog, createCat, updateShadowTime } from './characters.js';
 import { softDotTexture } from './textures.js';
+import { BLAHAJ_SPHERES } from './tumble.js';
 
 const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 const SOFT_GROUND = { kind: 'soft', active: true, type: 'solid', tag: 'soft' };
@@ -106,7 +107,11 @@ export class Game {
     if (ch.room.id === 'bedroom') {
       const bed = ch.props.find((p) => p.type === 'cabinBed');
       this.leo = createLeo(bed); scene.add(this.leo.group);
+      // the cloth duvet bumps into the walls, the floor and the bedside table too
+      const bx0 = bed.x - 8, bx1 = bed.x + 8, bz0 = bed.z - 9, bz1 = bed.z + 9;
+      this.leo.setObstacles(this.solids.filter((s) => !s.mover && s.tag !== 'bed' && s.tag !== 'headboard' && s.max.x > bx0 && s.min.x < bx1 && s.max.z > bz0 && s.min.z < bz1));
       this.leo.update(0, { cover: 0.55, roll: 1, ikW: 0, armOver: false });
+      this.leo.settle(3);
       this.bubble = createDreamBubble(V(bed.x + 0.8, 8.5, bed.z - 2.2)); scene.add(this.bubble.group);
     }
     if (ch.sleepingDog) {
@@ -690,7 +695,16 @@ export class Game {
       if (Math.random() < 0.02) this.zzz.emit({ p: this.dog.head.getWorldPosition(V()).add(V(0, 0.8, 0)), v: V(0.2, 0.9, 0), life: 2.2, size: 0.35, color: new THREE.Color(0xcfd8ff), drag: 0.1 });
       this.zzz.update(dt);
     }
-    if (this.leo && !this.cine) this.leo.update(dt, {});
+    if (this.leo && !this.cine) { // Blåhaj dents the duvet as he walks over it
+      const lp = this.leo.group.position, near = Math.abs(P.pos.x - lp.x) < 4.5 && Math.abs(P.pos.z - lp.z) < 6 && P.pos.y > lp.y - 1.5;
+      let spheres = [];
+      if (near) { // his real body, as drawn: the rig's body space is the collision spheres' space
+        const body = this.rig.body; body.updateWorldMatrix(true, false);
+        const k = body.getWorldScale(V()).x;
+        spheres = BLAHAJ_SPHERES.map(([x, y, z, r]) => { const p = V(x, y, z).applyMatrix4(body.matrixWorld); return { x: p.x - lp.x, y: p.y - lp.y, z: p.z - lp.z, r: r * k + 0.04 }; });
+      }
+      this.leo.update(dt, { blahaj: spheres });
+    }
     if (this.bubble) {
       this.bubble.update(dt, t, this.cine && this.cine.dream !== undefined ? this.cine.dream : c01);
       // in play, don't let Leo's dream cloud get between the camera and Blåhaj

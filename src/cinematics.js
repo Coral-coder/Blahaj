@@ -50,11 +50,12 @@ const snugX = (leo) => leo.hugPoint.x + 0.12; // right up against his chest
 const snugZ = (leo) => leo.hugPoint.z + 0.15;
 export function restingHug(game, dt, extra = {}) {
   const leo = game.leo, t = (game._hugT = (game._hugT || 0) + dt), bx = snugX(leo), bz = snugZ(leo);
-  leo.update(dt, Object.assign({ cover: 0.3, shiver: 0, onTop: game._hugPose ? onTopOf(leo, game._hugPose) : [] }, snuggle(leo, bx, bz, game._hugPose), extra));
-  const com = restOnBed(leo, bx, bz, HELD_Q); com.y += Math.sin(t * 1.6) * 0.015;
+  leo.update(dt, Object.assign({ cover: 0.3, shiver: 0, grabR: false, grabL: false, blahaj: game._hugPose ? onTopOf(leo, game._hugPose) : [] }, snuggle(leo, bx, bz, game._hugPose), extra));
+  if (!game._hugSettled && game._hugPose) { game._hugSettled = true; leo.settle(3); } // lay the blanket over him once
+  const com = restOnBed(leo, bx, bz, HELD_Q), still = com.clone(); com.y += Math.sin(t * 1.6) * 0.015;
   game.rig.update(dt, { speed: 0, grounded: true, vx: 0, vy: 0, vz: 0, bend: SNUG_BEND });
   poseRig(game, com, HELD_Q);
-  game._hugPose = { com: com.clone(), q: HELD_Q };
+  game._hugPose = { com: still, q: HELD_Q }; // (the blanket feels where he lies, not his breathing)
   return game._hugPose;
 }
 
@@ -146,10 +147,30 @@ export function prologue(game, hooks) {
     const sn = snuggle(leo, snugX(leo), snugZ(leo), lastPose), letGo = seg(t, 14.0, 14.9), rollT = seg(t, 17.6, 19.8);
     let ik = sn.ik, ikW = 1, pole = sn.pole;
     const PULL = V(1, -0.15, 0.4).normalize(); // elbow out to the side and low, the way you tug a blanket
-    if (t >= 14.0 && t < 15.8) { ik = sn.ik.clone().lerp(toLocal(leo.coverEdge()), letGo); pole = sn.pole.clone().lerp(PULL, letGo); }
-    else if (t >= 15.8) { ik = toLocal(leo.coverEdge()); ikW = 1 - seg(t, 17.3, 18.2); pole = PULL; }
-    const onTop = lastPose ? onTopOf(leo, lastPose) : [];
-    leo.update(dt, { cover, roll: -0.85 + 1.85 * rollT, curl: 0.7 * (1 - rollT), shiver, ik, ikW, pole, armOver: t < 17.8, ikL: sn.ikL, ikWL: 1 - letGo, poleL: sn.poleL, armOverL: t < 14.9, onTop });
+    // he reaches for the edge where it lies (looked up once, so the hand never chases the cloth),
+    // grips it, and tugs it up to his shoulder along a fixed path; then his hand rests on top
+    if (t >= 14.0 && !c.edge0) c.edge0 = toLocal(leo.edgePoint(0.95)).add(V(0.05, 0.12, 0.05));
+    const SHOULDER = V(0.85, 1.0, -1.85);
+    if (t >= 14.0) {
+      const e0 = c.edge0, k = seg(t, 15.8, 17.4);
+      const pullTo = e0.clone().lerp(SHOULDER, k); pullTo.y += Math.sin(k * Math.PI) * 0.45; // lift it clear of himself
+      ik = t < 15.8 ? sn.ik.clone().lerp(e0, letGo) : pullTo;
+      pole = t < 15.8 ? sn.pole.clone().lerp(PULL, letGo) : PULL;
+      if (t > 17.4) { // let go: the hand settles on the covers over his side as he rolls
+        // (along his side toward his hip, over the covers, as he rolls toward the wall)
+        const rx = -0.5 * (-0.85 + 1.85 * rollT) + 0.15, rz = -0.35;
+        const rest = V(rx, leo.underAt(leo.group.position.x + rx, leo.group.position.z + rz) - leo.group.position.y + 0.27, rz);
+        ik = SHOULDER.clone().lerp(rest, seg(t, 17.4, 18.8));
+        pole = PULL.clone().lerp(V(0.3, 1, 0.2).normalize(), seg(t, 17.4, 18.8));
+      }
+    }
+    const grabbing = t >= 14.95 && t < 17.4;
+    const blahaj = lastPose && lastPose.com.y > leo.group.position.y - 0.6 ? onTopOf(leo, lastPose) : [];
+    if (!c.settled) { // from the title's pose to this one: lay the blanket fresh
+      const p0 = { cover, roll: -0.85, curl: 0.7, shiver, ik, ikW, pole, ikL: sn.ikL, ikWL: 1, poleL: sn.poleL, armOver: true, armOverL: true, grabR: false, grabL: false };
+      leo.update(0, p0); leo.update(0, Object.assign(p0, { blahaj: onTopOf(leo, { com: restingCom(), q: heldQ }) })); leo.settle(3); c.settled = true;
+    }
+    leo.update(dt, { cover: grabbing ? null : t < 15 ? cover : 0.82, roll: -0.85 + 1.85 * rollT, curl: 0.7 * (1 - rollT), shiver, ik, ikW, pole, ikL: sn.ikL, ikWL: 1 - letGo, poleL: sn.poleL, grabR: grabbing, grabL: false, blahaj });
     // Blåhaj: snug in his arm, then (real physics) rolling off the bed
     rig.root.visible = true;
     let com, q, vel = V(), grounded = true;
@@ -206,7 +227,8 @@ export function prologue(game, hooks) {
     c.done = true; hooks.subtitle(null); hooks.letterbox(false);
     for (const e of game.enemies) { e.s.group.visible = true; e.s.group.scale.setScalar(1); }
     for (const f of game.fish) { f.m.visible = true; f.m.scale.setScalar(1); }
-    leo.update(0, { cover: 1.05, roll: 1, curl: 0, shiver: 0, ikW: 0, ikWL: 0, armOver: false, armOverL: false });
+    leo.update(0, { cover: 1.05, roll: 1, curl: 0, shiver: 0, ikW: 0, ikWL: 0, armOver: false, armOverL: false, grabR: false, grabL: false, blahaj: [] });
+    leo.settle(3);
     rig.body.rotation.set(0, 0, 0); rig.body.position.set(0, 0, 0);
     game.p.pos.copy(floor); game.p.yaw = game.ch.spawnYaw; game.p.vel.set(0, 0, 0);
     game.comfort = 80; game.cam.yaw = game.ch.camYaw; game.cam.pitch = 0.3; // same angle as the last shot
@@ -505,22 +527,31 @@ export function ending(game, hooks) {
   c.update = (dt) => {
     const t = (c.t += dt);
     c.subtitles(t);
-    // where Blåhaj lies: landed beside him, then drawn in against his chest
-    const pull = sm(t, 4.4, 6.4), tuck = sm(t, 6.2, 8.0);
-    const bx = lerpV(V(bedX + 1.85, 0, 0), V(snugX(leo), 0, 0), pull).x, bz = snugZ(leo);
-    // Leo: rolls toward him and curls up; right arm slides underneath, left arm over the top
+    // Blåhaj hops up onto the bare sheet by the pillow, beside Leo's face
+    const R0 = leo.group.position, land = V(R0.x + 2.0, 0, R0.z - 2.6), snug = V(snugX(leo), 0, snugZ(leo));
+    // Leo stirs, rolls over to face him and curls up
     const roll = 1 - 1.85 * sm(t, 2.0, 4.6), curl = 0.7 * sm(t, 2.6, 5.0);
-    const sn = snuggle(leo, bx, bz, pose);
-    const spheres = onTopOf(leo, pose);
+    // ...lifts the covers with his top hand (from underneath, so they rise with it),
+    // Blåhaj is drawn in under them against his chest, and the covers come down over him
+    const pull = sm(t, 5.6, 7.6);
+    const b = lerpV(land, snug, pull); b.x += Math.sin(pull * Math.PI) * 0.15;
+    const sn = snuggle(leo, b.x, b.z, pose);
+    const L = (x, y, z) => V(x, y, z); // bed-local
+    if (!c.under) c.under = L(1.05, 0.62, leo.worldToLocal(leo.edgePoint(1.05)).z + 0.3); // just inside the edge
+    const UP = L(1.5, 1.85, -1.45), DOWN = L(1.3, 1.15, -1.9);
+    let ikL, ikWL, poleL = V(0.2, 1, -0.5).normalize();
+    if (t < 6.4) { ikL = c.under.clone().lerp(UP, sm(t, 5.0, 6.4)); ikWL = sm(t, 3.9, 5.0); }
+    else if (t < 8.8) { const k = sm(t, 7.4, 8.8); ikL = UP.clone().lerp(DOWN, k); ikL.y += Math.sin(k * Math.PI) * 0.25; ikWL = 1; }
+    else { ikL = DOWN.clone().lerp(sn.ikL.clone().add(V(0, 0.14, 0)), sm(t, 8.8, 10.4)); ikWL = 1; poleL = poleL.clone().lerp(sn.poleL.clone().normalize(), sm(t, 8.8, 10.4)); }
+    const grabL = t >= 5.0 && t < 8.8;
     leo.update(dt, {
-      cover: 0.86, roll, curl, shiver: 0,
-      ik: sn.ik, ikW: sm(t, 3.8, 5.6), pole: sn.pole, armOver: false, // his lower arm stays under the covers, under Blåhaj
-      ikL: sn.ikL, ikWL: sm(t, 4.2, 6.0), poleL: sn.poleL, armOverL: tuck < 0.5,
-      onTop: tuck < 1 ? spheres.map((o) => Object.assign({}, o, { r: o.r * (1 - tuck) })) : [],
-      under: tuck > 0 ? spheres.map((o) => Object.assign({}, o, { r: o.r * tuck })) : [],
+      cover: grabL ? null : t < 5 ? 0.55 : 0.84, roll, curl, shiver: 0,
+      ik: sn.ik, ikW: sm(t, 5.6, 7.0), pole: sn.pole, // his lower arm slides under Blåhaj as he comes in
+      ikL, ikWL, poleL, grabL, grabR: false,
+      blahaj: onTopOf(leo, pose),
     });
-    const rest = restOnBed(leo, bx, bz, heldQ).lerp(restOnBed(leo, bx, bz, heldQ, true), tuck);
-    // Blåhaj hops up beside him, lands softly, then is held
+    const rest = restOnBed(leo, b.x, b.z, heldQ, true);
+    // Blåhaj hops up beside him, lands softly, then is drawn in
     let com, q, vel = V(), grounded = true;
     if (t < 1.8) {
       const k = sm(t, 0, 1.8);
@@ -528,14 +559,16 @@ export function ending(game, hooks) {
       q = fromQ.clone().slerp(heldQ, k); vel.set(0, Math.cos(k * Math.PI) * 6, 0); grounded = k > 0.97;
       if (t + dt >= 1.8 && !c.landed) { c.landed = true; rig.impulse(-6); Audio.land(); }
     } else { com = rest; q = heldQ; com.y += Math.sin(t * 1.6) * 0.015; }
-    rig.update(dt, { speed: t < 1.8 ? 0.4 : 0, grounded, vx: vel.x, vy: vel.y, vz: vel.z, bend: t > 3.8 ? SNUG_BEND * sm(t, 3.8, 5.6) : undefined });
+    rig.update(dt, { speed: t < 1.8 ? 0.4 : 0, grounded, vx: vel.x, vy: vel.y, vz: vel.z, bend: t > 6.0 ? SNUG_BEND * sm(t, 6.0, 7.8) : undefined });
     poseRig(game, com, q);
     pose = { com: com.clone(), q: q.clone() };
     c.dream = Math.min(1, game.comfort / 100 + seg(t, 6, 10));
     game.comfort = Math.max(game.comfort, c.dream * 100);
     if (t > 5 && t < 10 && Math.random() < 0.6) game.sparks.emit({ p: hug.clone().add(V((Math.random() - 0.5) * 6, Math.random() * 4, (Math.random() - 0.5) * 6)), v: V(0, 0.8, 0), life: 2, size: 0.3, color: new THREE.Color().setHSL(0.1 + Math.random() * 0.1, 0.8, 0.75), drag: 0.3 });
-    if (t < 8.4) camShot(game, V(-1.0, 7.6, -3.9), V(-1.6, 7.8, -5.0), V(-4.0, 5.0, -6.0), V(-4.4, 4.9, -6.9), sm(t, 0, 8.4), 42);
-    else camShot(game, V(-1.6, 7.8, -5.0), V(5.5, 8.6, 6.5), V(-4.4, 4.9, -6.9), V(-4.2, 6.6, -5.6), sm(t, 8.4, 15.6), 48);
+    if (t < 4.4) camShot(game, V(-1.0, 7.6, -3.9), V(-1.3, 7.4, -4.6), V(-4.0, 5.0, -6.0), V(-4.2, 4.9, -6.6), sm(t, 0, 4.4), 42);
+    else if (t < 9.8) camShot(game, V(-0.8, 7.5, -9.0), V(-1.1, 7.3, -8.8), V(-4.1, 5.0, -6.3), V(-4.2, 4.9, -6.1), sm(t, 4.4, 9.8), 44); // facing the opening as he lifts the covers
+    else camShot(game, V(-1.1, 7.3, -8.8), V(5.5, 8.6, 6.5), V(-4.2, 4.9, -6.1), V(-4.2, 6.6, -5.6), sm(t, 9.8, 15.6), 48);
+    for (const f of game.fish) f.m.visible = f.m.position.distanceTo(game.camera.position) > 3.2; // nothing right in the lens
     if (t > 14.8) hooks.fade(true);
     if (t >= c.length) { c.done = true; hooks.subtitle(null); }
   };
