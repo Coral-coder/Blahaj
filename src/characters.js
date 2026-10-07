@@ -77,7 +77,7 @@ export function createLeo(bed) {
   // duvet: a quilted sheet draped over the mattress and over Leo. It is
   // collided against his body (torso, tucked arm) so nothing pokes through,
   // and it slides under the arm whenever that arm is out on top.
-  const DW = w + 2.4, DL = l * 0.8, NX = 96, NZ = 84;
+  const DW = w + 2.2, DL = l * 0.82, NX = 96, NZ = 84;
   const dGeo = new THREE.PlaneGeometry(DW, DL, NX, NZ);
   dGeo.rotateX(-Math.PI / 2);
   const base = dGeo.attributes.position.array.slice();
@@ -138,8 +138,9 @@ export function createLeo(bed) {
     const bodyX = -0.6 * state.roll;
     const breathe = Math.sin(state.t * 1.6) * 0.04;
     let y = 0.28;
-    const bx = (x - bodyX) / (0.95 + 0.25 * ar), bz = (z - (-l / 2 + 4.6 - 0.5 * cu)) / (3.2 - 0.8 * cu);
-    y += Math.sqrt(Math.max(0, 1 - bx * bx - bz * bz)) * (0.85 + breathe);
+    // his body under the covers: on his side he's narrower and a little taller
+    const bx = (x - bodyX) / lerp(0.95, 0.62, ar), bz = (z - (-l / 2 + 4.6 - 0.5 * cu)) / (3.2 - 0.8 * cu);
+    y += Math.sqrt(Math.max(0, 1 - bx * bx - bz * bz)) * (0.85 + 0.15 * ar + breathe);
     // knees: drawn up toward the side he faces when he curls
     const kneeX = bodyX - 0.2 * state.roll + (state.roll < 0 ? 0.65 : -0.65) * cu;
     const kx = (x - kneeX) / 0.8, kz = (z - (-l / 2 + 6.6 - 1.5 * cu)) / (0.9 + 0.2 * cu);
@@ -220,19 +221,25 @@ export function createLeo(bed) {
     for (let i = 0; i < NV; i++) {
       const x = X(i), z = Z(i);
       let y = cy[i];
-      // roll over the mattress edge on a soft radius, then hang with lazy folds;
-      // on the wall side (-x) it just tucks down into the gap
+      // roll over the mattress edge on a curve that lands clear of the bed frame
+      // (which sticks out past the mattress), then hang straight down and stop
+      // above the drawers; on the wall side it just tucks into the gap
       const over = Math.abs(x) - edge;
-      let xs = x;
+      let xs = x, zs = z;
       if (over > 0) {
-        const wall = x < 0, R = wall ? 0.08 : 0.18;
-        const ang = Math.min(over / R, Math.PI / 2), hang = Math.max(0, over - R * Math.PI / 2);
-        const swing = wall ? 0 : (Math.sin(z * 2.2 + 0.6) * 0.07 + Math.sin(z * 4.7 + 1.3) * 0.03) * Math.min(1, hang * 1.5);
+        const wall = x < 0, R = wall ? 0.14 : 0.31;
+        const ang = Math.min(over / R, Math.PI / 2), hang = Math.min(wall ? 0.3 : 0.78, Math.max(0, over - R * Math.PI / 2));
+        const swing = wall ? 0 : (Math.sin(z * 2.2 + 0.6) * 0.04 + Math.sin(z * 4.7 + 1.3) * 0.02 + 0.03) * Math.min(1, hang * 1.5);
         xs = Math.sign(x) * (edge + R * Math.sin(ang) + swing);
         y -= R * (1 - Math.cos(ang)) + hang;
       }
-      if (z > l / 2 - 0.15) y -= (z - (l / 2 - 0.15)) * 3.5;
-      pos.setXYZ(i, xs + state.shiver * Math.sin(state.t * 40 + z) * 0.01, y, z);
+      const footEdge = l / 2 - 0.25, overZ = z - footEdge; // the foot end rolls over the same way
+      if (overZ > 0) {
+        const R = 0.3, ang = Math.min(overZ / R, Math.PI / 2), hang = Math.min(0.75, Math.max(0, overZ - R * Math.PI / 2));
+        zs = footEdge + R * Math.sin(ang) + 0.02 * Math.min(1, hang * 2);
+        y -= R * (1 - Math.cos(ang)) + hang;
+      }
+      pos.setXYZ(i, xs + state.shiver * Math.sin(state.t * 40 + z) * 0.01, y, zs);
     }
     pos.needsUpdate = true;
     dGeo.computeVertexNormals();

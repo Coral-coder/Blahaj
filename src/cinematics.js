@@ -35,12 +35,23 @@ const onTopOf = (leo, pose) => blahajSpheres(pose.com, pose.q, true).map((o) => 
 // The resting hug (title screen and the start of the story): the blanket has
 // slipped down, and Blåhaj lies on it in the crook of Leo's arm.
 const HELD_Q = yawQ(Math.PI).multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0, 0.3)));
+// The snuggle: Leo on his side facing Blåhaj, knees drawn up; his lower arm runs
+// under Blåhaj's middle (Blåhaj drapes over it, ends drooping like a pool
+// noodle) and his top arm wraps over and round him. bx, bz: where Blåhaj lies.
+export const SNUG_BEND = -1.0;
+export function snuggle(leo, bx, bz, pose) {
+  const L = leo.worldToLocal(V(bx, 0, bz));
+  const ik = new THREE.Vector3(L.x + 0.6, 0.55, L.z + 0.05);
+  const ikL = pose ? leo.worldToLocal(pose.com.clone().add(V(0.5, 0.3, 0.1))) : new THREE.Vector3(L.x + 0.5, 1.4, L.z + 0.2);
+  return { roll: -0.85, curl: 0.7, ik, ikW: 1, pole: V(0.2, -1, -0.1).normalize(), armOver: true, ikL, ikWL: 1, poleL: V(-0.2, 1, -0.3), armOverL: true };
+}
+const snugX = (leo) => leo.hugPoint.x + 0.42;
+const snugZ = (leo) => leo.hugPoint.z + 0.45; // against his chest, not in his face
 export function restingHug(game, dt, extra = {}) {
-  const leo = game.leo, hug = leo.hugPoint, t = (game._hugT = (game._hugT || 0) + dt);
-  const cr = leo.cradle(hug.x, hug.z);
-  leo.update(dt, Object.assign({ cover: 0.3, roll: 0, curl: 0, shiver: 0, ik: cr.ik, ikW: 1, pole: cr.pole, armOver: true, ikWL: 0, armOverL: false, onTop: game._hugPose ? onTopOf(leo, game._hugPose) : [] }, extra));
-  const com = restOnBed(leo, hug.x, hug.z, HELD_Q); com.y += Math.sin(t * 1.6) * 0.015;
-  game.rig.update(dt, { speed: 0, grounded: true, vx: 0, vy: 0, vz: 0 });
+  const leo = game.leo, t = (game._hugT = (game._hugT || 0) + dt), bx = snugX(leo), bz = snugZ(leo);
+  leo.update(dt, Object.assign({ cover: 0.3, shiver: 0, onTop: game._hugPose ? onTopOf(leo, game._hugPose) : [] }, snuggle(leo, bx, bz, game._hugPose), extra));
+  const com = restOnBed(leo, bx, bz, HELD_Q); com.y += Math.sin(t * 1.6) * 0.015;
+  game.rig.update(dt, { speed: 0, grounded: true, vx: 0, vy: 0, vz: 0, bend: SNUG_BEND });
   poseRig(game, com, HELD_Q);
   game._hugPose = { com: com.clone(), q: HELD_Q };
   return game._hugPose;
@@ -99,7 +110,7 @@ export function prologue(game, hooks) {
   const RELEASE = 14.25, UPRIGHT = 25.5;
   // Blåhaj lies on whatever is under him (duvet, mattress), never inside it
   const heldQ = yawQ(Math.PI).multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0, 0.3)));
-  const restingCom = () => restOnBed(leo, hug.x, hug.z, heldQ);
+  const restingCom = () => restOnBed(leo, snugX(leo), snugZ(leo), heldQ);
   const toLocal = (p) => leo.worldToLocal(p);
   let heldCom = restingCom();
   // the fall is baked when Leo rolls, against the real duvet surface
@@ -128,16 +139,16 @@ export function prologue(game, hooks) {
     // Leo: hugs Blåhaj, gets cold, lets go to grab the duvet's edge and pull
     // it up, then rolls over with his arm tucked under the covers
     const cover = t < 15.8 ? 0.3 : t < 17.6 ? 0.3 + seg(t, 15.8, 17.4) * 0.55 : 0.85 + seg(t, 17.6, 19.6) * 0.2; // already slipped down
-    const roll = seg(t, 17.6, 19.8);
     const shiver = t > 9.5 && t < 15.8 ? 1 : 0;
-    // his arm cradles Blåhaj from underneath; he slides it out to reach the duvet
-    const cr = leo.cradle(hug.x, hug.z);
-    let ik = cr.ik, ikW = 1, pole = cr.pole;
+    // snuggled on his side with Blåhaj draped over his arm; he slides that arm
+    // out to reach the duvet, pulls it up, then rolls over toward the wall
+    const sn = snuggle(leo, snugX(leo), snugZ(leo), lastPose), letGo = seg(t, 14.0, 14.9), rollT = seg(t, 17.6, 19.8);
+    let ik = sn.ik, ikW = 1, pole = sn.pole;
     const PULL = V(1, -0.15, 0.4).normalize(); // elbow out to the side and low, the way you tug a blanket
-    if (t >= 14.0 && t < 15.8) { const k = seg(t, 14.0, 14.9); ik = cr.ik.clone().lerp(toLocal(leo.coverEdge()), k); pole = cr.pole.clone().lerp(PULL, k); }
+    if (t >= 14.0 && t < 15.8) { ik = sn.ik.clone().lerp(toLocal(leo.coverEdge()), letGo); pole = sn.pole.clone().lerp(PULL, letGo); }
     else if (t >= 15.8) { ik = toLocal(leo.coverEdge()); ikW = 1 - seg(t, 17.3, 18.2); pole = PULL; }
     const onTop = lastPose ? onTopOf(leo, lastPose) : [];
-    leo.update(dt, { cover, roll, shiver, ik, ikW, pole, armOver: t < 17.8, onTop });
+    leo.update(dt, { cover, roll: -0.85 + 1.85 * rollT, curl: 0.7 * (1 - rollT), shiver, ik, ikW, pole, armOver: t < 17.8, ikL: sn.ikL, ikWL: 1 - letGo, poleL: sn.poleL, armOverL: t < 14.9, onTop });
     // Blåhaj: snug in his arm, then (real physics) rolling off the bed
     rig.root.visible = true;
     let com, q, vel = V(), grounded = true;
@@ -168,7 +179,7 @@ export function prologue(game, hooks) {
         vel = V(0, Math.cos(k * Math.PI) * 3, 0); grounded = k <= 0 || k >= 1;
       }
     }
-    rig.update(dt, { speed: 0, grounded, vx: vel.x, vy: vel.y, vz: vel.z });
+    rig.update(dt, { speed: 0, grounded, vx: vel.x, vy: vel.y, vz: vel.z, bend: t < RELEASE ? SNUG_BEND : undefined });
     poseRig(game, com, q);
     c.blahaj = com; lastPose = { com: com.clone(), q: q.clone() };
     // the dream fish ripple into being once he wakes up on the floor
@@ -194,7 +205,7 @@ export function prologue(game, hooks) {
     c.done = true; hooks.subtitle(null); hooks.letterbox(false);
     for (const e of game.enemies) { e.s.group.visible = true; e.s.group.scale.setScalar(1); }
     for (const f of game.fish) { f.m.visible = true; f.m.scale.setScalar(1); }
-    leo.update(0, { cover: 1.05, roll: 1, shiver: 0, ikW: 0, armOver: false });
+    leo.update(0, { cover: 1.05, roll: 1, curl: 0, shiver: 0, ikW: 0, ikWL: 0, armOver: false, armOverL: false });
     rig.body.rotation.set(0, 0, 0); rig.body.position.set(0, 0, 0);
     game.p.pos.copy(floor); game.p.yaw = game.ch.spawnYaw; game.p.vel.set(0, 0, 0);
     game.comfort = 80; game.cam.yaw = game.ch.camYaw; game.cam.pitch = 0.3; // same angle as the last shot
@@ -491,16 +502,15 @@ export function ending(game, hooks) {
     c.subtitles(t);
     // where Blåhaj lies: landed beside him, then drawn in against his chest
     const pull = sm(t, 4.4, 6.4), tuck = sm(t, 6.2, 8.0);
-    const bx = bedX + lerpV(V(1.85, 0, 0), V(1.42, 0, 0), pull).x, bz = hug.z - 0.05;
+    const bx = bedX + lerpV(V(1.85, 0, 0), V(1.57, 0, 0), pull).x, bz = snugZ(leo);
     // Leo: rolls toward him and curls up; right arm slides underneath, left arm over the top
-    const roll = 1 - 1.85 * sm(t, 2.0, 4.6), curl = sm(t, 2.6, 5.0);
-    const cr = leo.cradle(bx, bz);
-    const over = leo.worldToLocal(pose.com.clone().add(V(0.5, 0.3, 0.1)));
+    const roll = 1 - 1.85 * sm(t, 2.0, 4.6), curl = 0.7 * sm(t, 2.6, 5.0);
+    const sn = snuggle(leo, bx, bz, pose);
     const spheres = onTopOf(leo, pose);
     leo.update(dt, {
       cover: 0.86, roll, curl, shiver: 0,
-      ik: cr.ik, ikW: sm(t, 3.8, 5.6), pole: cr.pole, armOver: tuck < 0.5,
-      ikL: over, ikWL: sm(t, 4.2, 6.0), poleL: V(-0.2, 1, -0.3), armOverL: tuck < 0.5,
+      ik: sn.ik, ikW: sm(t, 3.8, 5.6), pole: sn.pole, armOver: tuck < 0.5,
+      ikL: sn.ikL, ikWL: sm(t, 4.2, 6.0), poleL: sn.poleL, armOverL: tuck < 0.5,
       onTop: tuck < 1 ? spheres.map((o) => Object.assign({}, o, { r: o.r * (1 - tuck) })) : [],
       under: tuck > 0 ? spheres.map((o) => Object.assign({}, o, { r: o.r * tuck })) : [],
     });
@@ -513,7 +523,7 @@ export function ending(game, hooks) {
       q = fromQ.clone().slerp(heldQ, k); vel.set(0, Math.cos(k * Math.PI) * 6, 0); grounded = k > 0.97;
       if (t + dt >= 1.8 && !c.landed) { c.landed = true; rig.impulse(-6); Audio.land(); }
     } else { com = rest; q = heldQ; com.y += Math.sin(t * 1.6) * 0.015; }
-    rig.update(dt, { speed: t < 1.8 ? 0.4 : 0, grounded, vx: vel.x, vy: vel.y, vz: vel.z });
+    rig.update(dt, { speed: t < 1.8 ? 0.4 : 0, grounded, vx: vel.x, vy: vel.y, vz: vel.z, bend: t > 3.8 ? SNUG_BEND * sm(t, 3.8, 5.6) : undefined });
     poseRig(game, com, q);
     pose = { com: com.clone(), q: q.clone() };
     c.dream = Math.min(1, game.comfort / 100 + seg(t, 6, 10));

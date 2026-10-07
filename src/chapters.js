@@ -27,7 +27,7 @@ export const CHAPTERS = [
     goalText: 'Climb back up to Leo',
     intro: 'prologue', outro: 'dog',
     abilities: {}, // just a hop: double jump is learned downstairs
-    spawn: [0.0, 0, -5.9], spawnYaw: Math.PI / 2, camYaw: 0.95,
+    spawn: [-1.1, 0, -5.8], spawnYaw: Math.PI / 2, camYaw: 0.95,
     drain: 0.8,
     props: [
       BED, BEDSIDE, DESK, BOOKCASE, WALLSHELF, WARDROBE,

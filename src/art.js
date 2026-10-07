@@ -532,6 +532,7 @@ export function createBlahaj() {
     noodle.hVel += (-aRight * NOODLE.gainH - NOODLE.k * (noodle.h - swayTarget) - NOODLE.damp * noodle.hVel) * step;
     noodle.v = THREE.MathUtils.clamp(noodle.v + noodle.vVel * step, -NOODLE.max, NOODLE.max);
     noodle.h = THREE.MathUtils.clamp(noodle.h + noodle.hVel * step, -NOODLE.max, NOODLE.max);
+    if (st.bend !== undefined) { noodle.v = st.bend; noodle.vVel = 0; } // held in a bend (draped over something)
     uni.bendV.value = noodle.v;
     uni.bendH.value = noodle.h;
 
