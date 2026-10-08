@@ -60,7 +60,7 @@ window.__bot = {
         if (up && P.pos.y >= (o.rise ?? y + 1.5)) up = false; // high enough: head for the target
         const [tx, tz] = up ? [wx, wz] : [x, z];
         face(tx, tz);
-        const keys = ['Space'];
+        const keys = up || P.pos.y > y + 0.6 ? ['Space'] : []; // let go of jump just before landing
         if (hd(tx, tz) > (up ? 0.15 : 0.35)) keys.push('KeyW');
         tick(keys);
         if (P.grounded && t > 0.3 && !up) { stop(6); const ok = P.pos.y > y - 0.4 && P.pos.y < y + 1.3 && hd(x, z) < 2.6; return ok ? true : `landed ${where()} wanted (${x},${y},${z})`; }

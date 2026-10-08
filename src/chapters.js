@@ -564,6 +564,66 @@ export const CHAPTERS = [
   },
   // ---------------------------------------------------------------------------
   {
+    id: 'bathroom', title: 'Bubble Bath', music: 2,
+    goalText: 'Rescue Leo’s five rubber ducks',
+    intro: 'bathroom',
+    room: {
+      id: 'bathroom', x0: -12, x1: 12, z0: -10, z1: 10, h: 12, floor: 'tile', wall: 'bathWall', ambient: 1.7,
+      doors: [{ wall: '+z', at: -1, w: 4.5, h: 9.5 }, { wall: '-x', at: -0.8, w: 4.0, h: 9.2 }],
+      windows: [{ wall: '-z', at: 4.0, w: 4, y0: 5.6, y1: 9.4 }],
+    },
+    abilities: { doubleJump: true, flop: true, dash: true, glide: true },
+    spawn: [-1.0, 0, 5.0], spawnYaw: 2.61, camYaw: -0.53,
+    drain: 1.0,
+    props: [
+      { type: 'bathtub', x: 3.6, z: -7.6 },
+      { type: 'soapBubble', x: 1.4, y: 2.4, z: -7.6, move: { path3: [[1.4, 2.4, -7.6], [1.4, 8.2, -7.6]], speed: 1.2, wait: 1.0, noTurn: true } },
+      { type: 'soapBubble', x: 4.0, y: 8.2, z: -7.0, move: { path3: [[4.0, 8.2, -7.0], [4.0, 2.4, -7.0]], speed: 1.0, wait: 1.0, noTurn: true } },
+      { type: 'soapBubble', x: 6.6, y: 2.4, z: -7.6, move: { path3: [[6.6, 2.4, -7.6], [6.6, 8.2, -7.6]], speed: 1.5, wait: 0.6, noTurn: true } },
+      { type: 'bathMat', x: 3.6, z: -4.2, w: 4.4, d: 2.0 },
+      { type: 'duckFamily', x: -0.4, y: 3.0, z: -5.75, n: 3 },
+      { type: 'vanity', x: 10.7, z: 1.0, rot: 3 },
+      { type: 'stepStool', x: 8.2, z: 1.0, rot: 3 },
+      { type: 'toilet', x: -10.2, z: 5.6, rot: 1 },
+      { type: 'towelShelf', x: -11.4, z: 2.9, rot: 1, w: 2.6, top: 7.0 },
+      { type: 'toiletRolls', x: -7.6, z: 8.4 },
+      { type: 'shower', x: -8.8, z: -6.8 },
+      { type: 'hamper', x: -3.6, z: 8.4 },
+      { type: 'bathScale', x: -4.0, z: -1.6 },
+      { type: 'bathPlant', x: 10.8, z: 8.6 },
+      { type: 'bathMat', x: 9.4, z: 1.0, w: 2.0, d: 4.0, color: 0xe8b4c4 },
+    ],
+    wind: [{ x: -9.6, z: -7.6, r: 1.6, y0: 0, y1: 10.8, color: 0xf2f8ff }], // steam from the hot shower
+    safe: [
+      { x: -1.0, z: 7.4, r: 2.6 },     // the hall light under the door
+      { x: 3.6, z: -4.2, r: 2.0 },     // the bath mat in the window's moonlight
+    ],
+    lamps: [
+      { x: 11.8, y: 1.2, z: 6.2, kind: 'plugLight', safe: { x: 10.0, z: 6.2, r: 2.0 } },
+      { x: -11.8, y: 1.2, z: -2.6, kind: 'plugLight', safe: { x: -10.2, z: -1.8, r: 2.0 } },
+    ],
+    collect: { kind: 'duck', label: 'rubber ducks', hint: 'Bounce on the bubble bath — and ride the bubbles!', done: 'Quack! All five ducks are safe', items: [
+      [4.0, 10.6, -7.0], [11.0, 8.6, 1.0], [-11.4, 8.0, 2.9], [-9.6, 10.2, -7.6], [7.9, 4.0, -7.6],
+    ] },
+    fish: F(
+      line([-1.0, 0.6, 3.0], [3.0, 0.6, -3.0], 3), line([-0.6, 3.6, -7.6], [7.6, 3.6, -7.6], 4), line([1.4, 6.0, -7.6], [6.6, 9.4, -7.6], 4),
+      line([8.2, 3.0, 1.0], [10.0, 5.2, 1.0], 2), line([10.6, 8.6, -1.2], [10.6, 8.6, 3.2], 3), line([-9.0, 2.8, 5.6], [-11.0, 5.0, 5.6], 2),
+      line([-9.6, 2.0, -7.6], [-9.6, 8.6, -7.6], 4), line([-6.0, 0.6, -2.0], [-6.0, 0.6, 3.0], 3), line([-3.6, 3.6, 8.4], [-3.6, 6.6, 8.4], 2)),
+    starfish: [[-11.3, 0.9, -9.3], [8.4, 10.8, -9.2], [-3.6, 8.8, 8.4]],
+    enemies: [
+      { type: 'moth', path: [[0.0, 10.6, -4.6], [8.0, 10.9, -4.6], [8.0, 10.6, -3.0], [0.0, 10.9, -3.0]], speed: 1.3 },
+      { type: 'moth', path: [[-8.0, 6.0, 7.0], [-6.0, 6.6, 3.0], [-8.0, 6.0, 0.0], [-9.0, 6.6, 4.0]], speed: 1.2, phase: 2 },
+      { type: 'spider', at: [9.4, 11.6, 4.6], drop: 3.2, period: 3.8 },
+      { type: 'shadow', path: [[-4.0, 0, 2.0], [4.0, 0, 3.0]], speed: 1.4 },
+      { type: 'shadow', path: [[6.0, 0, -3.0], [6.0, 0, 6.0]], speed: 1.3 },
+      { type: 'shadow', path: [[-8.0, 0, -2.0], [-4.0, 0, -4.0]], speed: 1.5 },
+      { type: 'shadow', path: [[-1.0, 0, -3.0], [-1.0, 0, 1.0]], speed: 1.2 },
+    ],
+    bunnies: [[1.0, 0, 7.0]],
+    goal: { x: -11.0, y: 0, z: -0.8, r: 2.0, label: 'Mum & Dad’s room' },
+  },
+  // ---------------------------------------------------------------------------
+  {
     id: 'bed', title: 'Back to Bed', room: BEDROOM, music: 3,
     goalText: 'Chase the nightmares away from Leo',
     intro: 'bed', newAbility: 'glide', outro: 'ending',

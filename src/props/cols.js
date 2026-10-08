@@ -6,5 +6,6 @@ import { BACKYARD } from './backyard.cols.js';
 import { GARAGE } from './garage.cols.js';
 import { BASEMENT } from './basement.cols.js';
 import { HALLWAY } from './hallway.cols.js';
+import { BATHROOM } from './bathroom.cols.js';
 
-export const COLS = Object.assign({}, KITCHEN, LAUNDRY, BACKYARD, GARAGE, BASEMENT, HALLWAY);
+export const COLS = Object.assign({}, KITCHEN, LAUNDRY, BACKYARD, GARAGE, BASEMENT, HALLWAY, BATHROOM);

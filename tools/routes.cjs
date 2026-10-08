@@ -52,6 +52,11 @@ const ROUTES = {
     ['jump', 6.4, 6.4, -2.4, { double: true, glide: true, max: 7 }], ['walk', 6.5, -3.4], ['walk', 6.5, -5.4], ['jump', 6.5, 8.0, -9.0, { double: true }], ['walk', 6.5, -13.6],
     ['jump', 5.9, 8.6, -16.6], ['walk', 5.9, -17.2], ['walk', 5.2, -15.0], ['jump', -6.0, 7.0, -10.0, { double: true, glide: true, max: 7 }], ['walk', -6.2, -10.0],
     ['jump', -2.0, 0, -16.0], ['walk', 0, -20.6]],
+  bathroom: [['walk', 7.6, -3.4], ['jump', 7.9, 3.0, -5.7, { double: true }], ['walk', 7.9, -7.6], ['walk', 7.9, -5.7], ['walk', 4.0, -5.7],
+    ['waitMover', 4.0, 3.6, -7.0, 0.3], ['jump', 4.0, 3.6, -7.0], ['waitMover', 4.0, 9.4, -7.0, 0.3], ['wait', 0.3],
+    ['jump', 11.05, 7.6, 0.6, { double: true, glide: true, max: 7 }], ['walk', 11.0, 1.0], ['jump', 7.6, 0, 4.0],
+    ['walk', -6.6, 5.6], ['jump', -9.6, 2.2, 5.6, { double: true }], ['jump', -11.2, 4.0, 5.6], ['jump', -11.4, 7.0, 3.0, { double: true, up: 0.2 }], ['wait', 0.2],
+    ['jump', -7.0, 0, 0.0], ['walk', -7.0, -2.4], ['walk', -7.0, -5.0], ['updraft', -9.6, -7.6, -4.0, 0, -1.0, { rise: 9.9 }], ['walk', -11.0, -0.8]],
   bed: [['walk', 4.0, 4.6], ['jump', 4.9, 1.0, 4.0], ['jump', 6.0, 3.0, 4.0, { double: true }], ['jump', 7.2, 3.6, 3.6], ['walk', 7.4, 4.2], ['walk', 7.4, 1.9],
       ['jump', 7.7, 5.0, 0.6], ['jump', 7.5, 6.4, -1.6], ['walk', 7.6, -1.6], ['snap'], ['jump', -3.6, 4.5, -2.4, { double: true, glide: true, dash: true, hold: 0.35, max: 8 }], ['snap'], ['knots'], ['snap'], ['walk', -5.0, -6.6]],
 };

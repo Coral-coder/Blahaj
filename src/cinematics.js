@@ -558,6 +558,13 @@ export function hallwayIntro(game, hooks) {
   ], [[0.4, 'Upstairs at last. Leo’s door is shut tight…'], [3.0, 'His marbles have rolled all over the hallway.'], [6.0, 'Find all five — the way round is through the bathroom.']]);
 }
 
+export function bathroomIntro(game, hooks) {
+  return flyover(game, hooks, [
+    { d: 4.6, from: V(-2.0, 6.0, 9.0), to: V(-3.0, 9.0, 0.0), look0: V(3.6, 3.0, -7.6), look1: V(4.0, 9.0, -7.0), fov: 56 },
+    { d: 4.4, from: V(-3.0, 9.0, 0.0), to: V(3.0, 6.0, 6.0), look0: V(-9.6, 8.0, -7.6), look1: V(-11.0, 4.0, -0.8), fov: 56 },
+  ], [[0.4, 'The bathroom. Somebody left the bath running…'], [3.0, 'Leo’s rubber ducks are bobbing about up on the bubbles!'], [6.0, 'Save all five, then sneak through to Mum and Dad’s room.']]);
+}
+
 // ------------------------------------------------------------------ ending --
 export function ending(game, hooks) {
   const leo = game.leo, P = game.p, rig = game.rig;
@@ -629,4 +636,4 @@ export function ending(game, hooks) {
   return c;
 }
 
-export const CINES = { prologue, dog: dogSnatch, downstairs, kitchen: kitchenIntro, laundry: laundryIntro, backyard: backyardIntro, garage: garageIntro, basement: basementIntro, hallway: hallwayIntro, stairs: stairsIntro, bed: bedIntro, ending };
+export const CINES = { prologue, dog: dogSnatch, downstairs, kitchen: kitchenIntro, laundry: laundryIntro, backyard: backyardIntro, garage: garageIntro, basement: basementIntro, hallway: hallwayIntro, bathroom: bathroomIntro, stairs: stairsIntro, bed: bedIntro, ending };

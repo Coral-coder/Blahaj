@@ -115,6 +115,13 @@ export function createItem(kind, opt = {}) {
       glowColor = 0xffe08a;
     }
   }
+  // collectibles glow faintly from within so they read in the dark
+  inner.traverse((o) => {
+    if (!o.isMesh || !o.material.color || !o.material.emissive || o.material.userData.lit) return;
+    o.material = o.material.clone(); o.material.userData.lit = true;
+    if (o.material.emissive.getHex() === 0) { o.material.emissive.copy(o.material.color).multiplyScalar(0.4); o.material.emissiveIntensity = 1; }
+  });
+  inner.scale.setScalar(1.25);
   const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: softDotTexture(), color: glowColor, transparent: true, opacity: 0.55, depthWrite: false, blending: THREE.AdditiveBlending }));
   glow.scale.setScalar(kind === 'firefly' ? 1.3 : 1.5); g.add(glow);
   g.userData = { inner, glow };
