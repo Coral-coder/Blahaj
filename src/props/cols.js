@@ -9,5 +9,6 @@ import { HALLWAY } from './hallway.cols.js';
 import { BATHROOM } from './bathroom.cols.js';
 import { PARENTS } from './parents.cols.js';
 import { PLAYROOM } from './playroom.cols.js';
+import { ATTIC } from './attic.cols.js';
 
-export const COLS = Object.assign({}, KITCHEN, LAUNDRY, BACKYARD, GARAGE, BASEMENT, HALLWAY, BATHROOM, PARENTS, PLAYROOM);
+export const COLS = Object.assign({}, KITCHEN, LAUNDRY, BACKYARD, GARAGE, BASEMENT, HALLWAY, BATHROOM, PARENTS, PLAYROOM, ATTIC);

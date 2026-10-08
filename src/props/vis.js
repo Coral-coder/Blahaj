@@ -8,5 +8,6 @@ import { HALLWAY } from './hallway.vis.js';
 import { BATHROOM } from './bathroom.vis.js';
 import { PARENTS } from './parents.vis.js';
 import { PLAYROOM } from './playroom.vis.js';
+import { ATTIC } from './attic.vis.js';
 
-export const VIS = Object.assign({}, KITCHEN, LAUNDRY, BACKYARD, GARAGE, BASEMENT, HALLWAY, BATHROOM, PARENTS, PLAYROOM);
+export const VIS = Object.assign({}, KITCHEN, LAUNDRY, BACKYARD, GARAGE, BASEMENT, HALLWAY, BATHROOM, PARENTS, PLAYROOM, ATTIC);

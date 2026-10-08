@@ -513,7 +513,7 @@ export function bedIntro(game, hooks) {
   return flyover(game, hooks, [
     { d: 4.4, from: V(4.6, 6.5, 9.0), to: V(-0.5, 7.5, 1.0), look0: V(-4, 5, -4), look1: V(-5.2, 7.0, -4.8), fov: 50 },
     { d: 3.2, from: V(-0.5, 7.5, 1.0), to: V(4.6, 3.6, 10.0), look0: V(-5.2, 7.0, -4.8), look1: V(4.6, 1.2, 6.0), fov: 54 },
-  ], [[0.4, 'The nightmare has found Leo.'], [4.4, 'Climb up and chase it away!']]);
+  ], [[0.4, 'Leo’s room at last… but one last nightmare has found him.'], [4.4, 'Climb up and chase it away!']]);
 }
 
 export function kitchenIntro(game, hooks) {
@@ -577,6 +577,13 @@ export function playroomIntro(game, hooks) {
     { d: 4.6, from: V(11.0, 6.0, -10.0), to: V(2.0, 9.0, -2.0), look0: V(-4.0, 4.0, -10.0), look1: V(-10.0, 5.0, 4.0), fov: 56 },
     { d: 4.4, from: V(2.0, 9.0, -2.0), to: V(-6.0, 6.0, -4.0), look0: V(10.4, 5.0, 8.6), look1: V(-12.8, 10.0, -8.0), fov: 56 },
   ], [[0.4, 'The playroom! Everything’s a mountain when you’re a little shark…'], [3.0, 'Leo’s favourite puzzle is scattered all over.'], [6.0, 'Put it back together — then up the ladder to the attic.']]);
+}
+
+export function atticIntro(game, hooks) {
+  return flyover(game, hooks, [
+    { d: 4.4, from: V(-12.0, 3.0, 8.0), to: V(-6.0, 10.0, 8.0), look0: V(0.0, 5.0, 0.0), look1: V(0.0, 6.0, -2.0), fov: 56 },
+    { d: 5.0, from: V(-6.0, 10.0, 8.0), to: V(6.0, 11.0, 7.0), look0: V(0.0, 6.0, -2.0), look1: V(8.0, 8.6, 0.0), fov: 56 },
+  ], [[0.4, 'The attic… something huge is fluttering up in the dark.'], [3.0, 'The Nightmare Moth Queen! She’s been sending all the bad dreams.'], [6.2, 'Climb onto the rafters and belly-flop her — three times!']]);
 }
 
 // ------------------------------------------------------------------ ending --
@@ -650,4 +657,4 @@ export function ending(game, hooks) {
   return c;
 }
 
-export const CINES = { prologue, dog: dogSnatch, downstairs, kitchen: kitchenIntro, laundry: laundryIntro, backyard: backyardIntro, garage: garageIntro, basement: basementIntro, hallway: hallwayIntro, bathroom: bathroomIntro, parents: parentsIntro, playroom: playroomIntro, stairs: stairsIntro, bed: bedIntro, ending };
+export const CINES = { prologue, dog: dogSnatch, downstairs, kitchen: kitchenIntro, laundry: laundryIntro, backyard: backyardIntro, garage: garageIntro, basement: basementIntro, hallway: hallwayIntro, bathroom: bathroomIntro, parents: parentsIntro, playroom: playroomIntro, attic: atticIntro, stairs: stairsIntro, bed: bedIntro, ending };

@@ -749,6 +749,64 @@ export const CHAPTERS = [
   },
   // ---------------------------------------------------------------------------
   {
+    id: 'attic', title: 'The Attic', music: 2,
+    goalText: 'Defeat the Nightmare Moth Queen — belly-flop her from the rafters!',
+    intro: 'attic',
+    room: {
+      id: 'attic', x0: -16, x1: 16, z0: -10, z1: 10, h: 14, floor: 'attic', wall: 'atticWall', ambient: 1.95,
+      doors: [{ wall: '+x', at: -6.0, w: 4.0, h: 8.0 }],
+      windows: [{ wall: '+x', at: 2.6, w: 4, y0: 6.0, y1: 10.0 }],
+    },
+    abilities: { doubleJump: true, flop: true, dash: true, glide: true },
+    spawn: [-11.6, 0, 6.4], spawnYaw: 2.21, camYaw: -0.93,
+    drain: 0.9,
+    props: [
+      { type: 'roofSlope', x: 0, z: 0, l: 32, knee: 9, ridge: 14, half: 10 },
+      { type: 'tieBeam', x: -10.0, z: 0, top: 8.6, l: 14 }, { type: 'tieBeam', x: -4.0, z: 0, top: 8.6, l: 14 },
+      { type: 'tieBeam', x: 2.0, z: 0, top: 8.6, l: 14 }, { type: 'tieBeam', x: 8.0, z: 0, top: 8.6, l: 14 },
+      { type: 'plank', x: -1.0, z: 0, top: 8.8, l: 18.9 },
+      { type: 'kingpost', x: -1.0, z: 1.3, y0: 8.6, top: 11.0 },
+      { type: 'trunk', x: -14.0, z: -6.0, label: true },
+      { type: 'trunk', x: -14.0, z: -3.4, color: 0x3f5a6b }, { type: 'trunk', x: -14.0, z: -3.4, y0: 2.2, w: 2.8, d: 1.9, color: 0x6b5a3f },
+      { type: 'oldWardrobe', x: -14.4, z: 0.4, rot: 1 },
+      { type: 'cardboardBox', x: 13.8, z: 6.6, label: 'XMAS' },
+      { type: 'cardboardBox', x: 13.8, z: 4.2 }, { type: 'cardboardBox', x: 13.8, z: 4.2, y0: 1.8, w: 2.2, d: 2.2, label: 'BABY' },
+      { type: 'cardboardBox', x: 11.4, z: 4.2, label: 'LEO' }, { type: 'cardboardBox', x: 11.4, z: 4.2, y0: 1.8, w: 2.2, d: 2.2 }, { type: 'cardboardBox', x: 11.4, z: 4.2, y0: 3.6, w: 2.0, d: 2.0, label: 'TOYS' },
+      { type: 'rockingChair', x: -6.0, z: 8.0, rot: 2 },
+      { type: 'trunk', x: 3.0, z: 8.6, color: 0x8f3b3f },
+      { type: 'dressForm', x: 6.0, z: -8.2 },
+      { type: 'oldCrib', x: -6.0, z: -8.4 },
+      { type: 'sheetedMirror', x: 11.8, z: -8.6 },
+      { type: 'floorHatch', x: -11.6, z: 6.4 },
+      { type: 'dustMotes', x: 13.0, z: 2.6, y0: 1.0, w: 3, h: 8, d: 5 },
+      { type: 'atticLamp', x: -6.0, z: 0.0, y0: 11.6, ceiling: 14 }, { type: 'atticLamp', x: 6.0, z: 0.0, y0: 11.6, ceiling: 14 },
+      { type: 'cobweb', x: 15.9, z: -9.9, y0: 9.0 }, { type: 'cobweb', x: -15.9, z: 9.9, y0: 9.0, rot: 2 },
+    ],
+    safe: [
+      { x: -11.6, z: 6.4, r: 2.6 },     // light up through the hatch
+      { x: 13.4, z: 2.6, r: 2.2 },      // the moonbeam from the round window
+    ],
+    lamps: [
+      { x: -15.8, y: 1.2, z: 4.0, kind: 'plugLight', safe: { x: -14.2, z: 4.0, r: 1.8 } },
+      { x: 15.8, y: 1.2, z: 8.0, kind: 'plugLight', safe: { x: 14.2, z: 8.0, r: 1.8 } },
+    ],
+    fish: F(
+      line([-10.0, 0.6, 5.0], [-12.0, 0.6, -6.0], 4), line([-14.0, 3.0, -6.0], [-14.0, 5.2, -3.4], 2), line([-14.4, 7.4, 1.6], [-10.0, 9.4, 0.4], 3),
+      line([-10.0, 9.2, -6.0], [-10.0, 9.2, 6.0], 4), line([-9.0, 9.2, 0.0], [7.0, 9.2, 0.0], 6), line([2.0, 9.2, -6.0], [2.0, 9.2, 6.0], 4),
+      line([8.0, 9.2, 6.0], [8.0, 9.2, -6.0], 4), line([13.6, 2.4, 6.4], [11.4, 6.2, 4.2], 3), line([-4.0, 9.2, -6.0], [-4.0, 9.2, 6.0], 4)),
+    starfish: [[-1.0, 12.0, 1.3], [-15.0, 0.9, -8.8], [8.0, 10.2, -6.6]],
+    enemies: [
+      { type: 'boss', path: [[-11.0, 5.0, -4.0], [-4.0, 5.4, -5.5], [3.0, 5.0, -4.0], [9.0, 5.4, -1.0], [9.0, 5.0, 3.0], [3.0, 5.4, 5.5], [-4.0, 5.0, 4.0], [-11.0, 5.4, 1.0]], speed: 2.8, hp: 3, scale: 3 },
+      { type: 'spider', at: [12.6, 12.6, 6.0], drop: 4.0, period: 4.0 },
+      { type: 'shadow', path: [[-8.0, 0, -6.0], [-8.0, 0, 4.0]], speed: 1.3 },
+      { type: 'shadow', path: [[4.0, 0, -6.0], [4.0, 0, 6.0]], speed: 1.4 },
+      { type: 'shadow', path: [[8.0, 0, 7.0], [14.0, 0, -2.0]], speed: 1.2 },
+    ],
+    bunnies: [],
+    goal: { x: 14.6, y: 0, z: -6.0, r: 2.0, label: 'Leo’s room', needsKnots: true },
+  },
+  // ---------------------------------------------------------------------------
+  {
     id: 'bed', title: 'Back to Bed', room: BEDROOM, music: 3,
     goalText: 'Chase the nightmares away from Leo',
     intro: 'bed', newAbility: 'glide', outro: 'ending',

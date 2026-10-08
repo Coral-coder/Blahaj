@@ -67,6 +67,36 @@ window.__bot = {
       }
       return 'timeout ' + where();
     };
+    // the Moth Queen: wait on a rafter at (sx, sz); when she passes underneath, drop and belly-flop her; bounce back up
+    const bossStomp = (sx, sz, o) => {
+      for (let t = 0; t < (o.max || 60); t += step) {
+        const b = g.enemies.find((e) => e.type === 'boss' && e.alive);
+        if (!b) { stop(); return true; }
+        if (g.state !== 'play') return 'state:' + g.state;
+        const bh = Math.hypot(b.pos.x - P.pos.x, b.pos.z - P.pos.z);
+        if (P.grounded && b.inv <= 0 && bh < (o.trigger || 3.4) && b.pos.y < P.pos.y - 1.5) {
+          const hp0 = b.hp; tick(['Space', 'KeyW'], ['Space']);
+          for (let k = 0; k < 3; k += step) {
+            face(b.pos.x, b.pos.z);
+            const press = (hd(b.pos.x, b.pos.z) < 1.4 && P.vel.y < 0 && !P.pound) ? ['KeyC'] : [];
+            tick(hd(b.pos.x, b.pos.z) > 0.3 ? ['KeyW'] : [], press);
+            if (b.hp < hp0 || P.grounded) break;
+          }
+          let usedD = false;
+          for (let k = 0; k < 4 && b.hp < hp0; k += step) { // bounced off her: glide back to the rafter
+            face(sx, sz);
+            const keys = hd(sx, sz) > 0.25 ? ['KeyW'] : []; const press = [];
+            if (!usedD && P.vel.y < 0 && P.pos.y < 9.6) { press.push('Space'); usedD = true; }
+            if (usedD && P.vel.y < 0) keys.push('Space');
+            tick(keys, press);
+            if (P.grounded && k > 0.2) break;
+          }
+          if (!b.alive) { stop(); return true; }
+          if (P.pos.y < 2) return 'fell, hp left ' + b.hp + ' ' + where();
+        } else { face(sx, sz); tick(hd(sx, sz) > 0.3 ? ['KeyW'] : []); }
+      }
+      return 'timeout';
+    };
     const knots = () => {
       for (let attempt = 0; attempt < 14 && g.knotsLeft > 0; attempt++) {
         const k = g.enemies.find((e) => e.type === 'knot' && e.alive);
@@ -96,6 +126,7 @@ window.__bot = {
       else if (w[0] === 'jump') r = jump(w[1], w[2], w[3], w[4]);
       else if (w[0] === 'wait') { for (let t = 0; t < w[1]; t += step) tick([]); r = true; }
       else if (w[0] === 'knots') r = knots();
+      else if (w[0] === 'boss') r = bossStomp(w[1], w[2], w[3] || {});
       else if (w[0] === 'updraft') r = updraft(w[1], w[2], w[3], w[4], w[5], w[6] || {});
       else if (w[0] === 'waitClear') { // ['waitClear', x, y, z, r]: until no nightmare is within r of the point (time a spider)
         r = 'never clear';
