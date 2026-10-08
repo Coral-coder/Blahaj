@@ -102,6 +102,8 @@ export class Game {
 
     // lamps (checkpoints)
     this.lamps = ch.lamps.map((l) => { const lamp = createLamp(l); scene.add(lamp.group); if (l.on && l.safe) this.safe.push(l.safe); return lamp; });
+    // lamps fade out of the way like furniture when they're right in front of the camera
+    for (const lamp of this.lamps) { lamp.group.updateMatrixWorld(true); lamp.group.traverse((o) => { if (o.isMesh && !o.material.transparent) { if (!o.geometry.boundingBox) o.geometry.computeBoundingBox(); o.userData.box = o.geometry.boundingBox.clone().applyMatrix4(o.matrixWorld); o.matrixAutoUpdate = false; this.fadeables.push(o); } }); }
 
     // Leo and his dream, in the bedroom
     if (ch.room.id === 'bedroom') {
@@ -795,13 +797,13 @@ export class Game {
     // The camera keeps its distance: furniture in the way fades out (fadeOccluders)
     // instead of pulling the camera in. Only the room itself (walls, ceiling) can
     // push it closer, and then it eases in and swings up a little to look down.
-    // Backed up against a wall? Rise up and look down over it rather than zoom in:
-    // the lowest swing up (or, under the ceiling, down) that leaves room to stay back.
+    // Backed up against a wall? Ease in a little (never closer than 5), and only if
+    // even that doesn't fit, rise up and look down over it.
     const dirAt = (p) => V(Math.sin(C.yaw) * Math.cos(p), Math.sin(p), Math.cos(C.yaw) * Math.cos(p));
     let liftGoal = 0, bestHit = -1;
     for (const k of [0, 0.12, 0.24, 0.36, 0.5, 0.65, 0.8, -0.12, -0.24]) {
       const p = THREE.MathUtils.clamp(C.pitch + k, -0.1, 1.3), h = this.rayHit(look, dirAt(p), C.dist + 0.4, true);
-      if (h >= C.dist + 0.35) { liftGoal = p - C.pitch; bestHit = h; break; }
+      if (h >= Math.min(C.dist, 5.0) + 0.4) { liftGoal = p - C.pitch; bestHit = h; break; } // room for a comfortable distance
       if (h > bestHit) { bestHit = h; liftGoal = p - C.pitch; }
     }
     C.lift = (C.lift || 0) + (liftGoal - (C.lift || 0)) * Math.min(1, dt * (snap ? 60 : 2.2));
@@ -834,10 +836,14 @@ export class Game {
       this.ray.set(cam, d.divideScalar(len)); this.ray.near = 0; this.ray.far = len - 0.35;
       for (const h of this.ray.intersectObjects(this.fadeables, false)) hits.add(h.object);
     }
-    // and anything right up against the lens (a lamp, a curtain beside the camera)
+    // and anything right up against the lens (a lamp, a curtain beside the camera),
+    // or crowding the line of sight to Blåhaj
+    const sight = [];
+    for (let i = 0; i <= 8; i++) sight.push(cam.clone().lerp(look, i / 8));
     for (const m of this.fadeables) {
       const box = m.matrixAutoUpdate ? (m.userData.box.copy(m.geometry.boundingBox).applyMatrix4(m.matrixWorld)) : m.userData.box;
-      if (box.distanceToPoint(cam) < 1.1) hits.add(m);
+      if (box.distanceToPoint(cam) < 1.1) { hits.add(m); continue; }
+      for (let i = 1; i < 8; i++) if (box.distanceToPoint(sight[i]) < 0.55) { hits.add(m); break; }
     }
     for (const m of hits) if (!this.faded.has(m)) this.faded.set(m, 1);
     for (const [m, a0] of this.faded) {
