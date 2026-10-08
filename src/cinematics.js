@@ -122,10 +122,16 @@ export function prologue(game, hooks) {
   const uprightQ = yawQ(game.ch.spawnYaw);
   const uprightCom = floor.clone().add(BLAHAJ_COM.clone().applyQuaternion(uprightQ));
   function bakeFall() {
-    const body = createTumble(game.solids, { rollDrag: 3, floorDrag: 9, surface: game.softHeight });
-    body.x.copy(heldCom); body.q.copy(heldQ);
-    body.v.set(1.9, 1.8, -0.3); body.w.set(0.3, 0, -5.5); // his arm whipping out from under flips him
-    fall = body.bake(UPRIGHT - RELEASE + 0.1);
+    // his arm whipping out from under flips him off the bed. Real physics, so make
+    // sure it really does go over the edge: if a try comes to rest on the bed, flick harder
+    for (let k = 0; k < 8; k++) {
+      const body = createTumble(game.solids, { rollDrag: 3, floorDrag: 9, surface: game.softHeight });
+      body.x.copy(heldCom).add(V(0, 0.15, 0)); body.q.copy(heldQ); // (clear of the duvet he was lying on)
+      body.v.set(1.9 + 0.7 * k, 1.8 + 0.35 * k, -0.3); body.w.set(0.3, 0, -5.5 - 0.6 * k);
+      fall = body.bake(UPRIGHT - RELEASE + 0.1);
+      const off = fall.frames.findIndex((f) => f.x.y < heldCom.y - 1.0), end = fall.frames[fall.frames.length - 1];
+      if (off > 0 && end.x.y < 2.0 && fall.impacts.some((e) => e.floor)) break;
+    }
     const last = fall.frames[fall.frames.length - 1];
     restQ = last.q.clone();
     // nudge the landing so he comes to rest exactly where play begins
