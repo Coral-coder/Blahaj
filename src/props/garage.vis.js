@@ -142,15 +142,15 @@ export const GARAGE = {
     return g;
   },
   wallBike(p) {
-    const g = new THREE.Group(), frame = Mat.paint(p.color || 0x2fa3a0, 0.4), tire = Mat.paint(0x18181a, 0.9);
+    const outer = new THREE.Group(), g = new THREE.Group(), frame = Mat.paint(p.color || 0x2fa3a0, 0.4), tire = Mat.paint(0x18181a, 0.9);
     for (const s of [-1, 1]) { const w = sh(new THREE.Mesh(new THREE.TorusGeometry(1.1, 0.1, 10, 32), tire)); w.position.set(s * 1.6, 0, 0); g.add(w); }
     const bar = (x0, y0, x1, y1) => { const len = Math.hypot(x1 - x0, y1 - y0), m = cyl(g, 0.07, 0.07, len, frame, 0, 0, 0, 8); m.position.set((x0 + x1) / 2, (y0 + y1) / 2, 0); m.rotation.z = Math.atan2(x0 - x1, y1 - y0); return m; };
     bar(-1.6, 0, 0, 0.1); bar(0, 0.1, 1.6, 0); bar(0, 0.1, -0.5, 1.2); bar(-0.5, 1.2, 1.2, 1.2); bar(1.2, 1.2, 1.6, 0); bar(-1.6, 0, -0.5, 1.2);
     box(g, 0.7, 0.15, 0.3, Mat.plastic(0x2a2c30), -0.5, 1.3, 0, 0.05, 1);
     bar(1.2, 1.2, 1.3, 1.7); box(g, 0.1, 0.1, 1.0, Mat.plastic(0x2a2c30), 1.3, 1.7, 0, 0.03, 1);
     for (const x of [-1.6, 1.6]) box(g, 0.1, 0.6, 0.3, Mat.steel(), x, 1.1, -0.15, 0.02, 1); // wall hooks
-    g.position.y = p.y0 || 6;
-    return g;
+    g.position.y = p.y0 || 6; outer.add(g); // hung up on the wall (the builder places the outer group)
+    return outer;
   },
   paintCans(p) {
     const g = new THREE.Group(), cols = [0xe5484d, 0x3f8fd8, 0xf2b632, 0xffffff, 0x4fb06a];

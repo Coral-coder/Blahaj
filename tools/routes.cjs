@@ -46,6 +46,12 @@ const ROUTES = {
     ['jump', 5.0, 6.0, 1.4, { max: 6 }], ['wait', 0.2], ['jump', 7.0, 0, 6.6, { max: 6 }], ['walk', 9.0, 7.6],
     ['waitMover', 9.0, 0.3, 9.8, 0.3], ['walk', 9.0, 9.8, 0.4], ['waitMover', 9.0, 9.0, 9.8, 0.2], ['walk', 12.6, 9.8]],
   stairs: stairsRoute(),
+  hallway: [['walk', 3.0, 16.6], ['jump', 2.4, 0, 12.6, { via: [6.0, 16.6], flop: true, up: 0.8, max: 7 }],
+    ['walk', -3.2, 7.4], ['jump', -6.0, 2.8, 7.6, { double: true }], ['jump', -6.0, 5.6, 4.6, { double: true, up: 0.2 }],
+    ['jump', -6.0, 8.4, 1.4, { double: true, up: 0.2 }], ['walk', -5.6, 0.6],
+    ['jump', 6.4, 6.4, -2.4, { double: true, glide: true, max: 7 }], ['walk', 6.5, -3.4], ['walk', 6.5, -5.4], ['jump', 6.5, 8.0, -9.0, { double: true }], ['walk', 6.5, -13.6],
+    ['jump', 5.9, 8.6, -16.6], ['walk', 5.9, -17.2], ['walk', 5.2, -15.0], ['jump', -6.0, 7.0, -10.0, { double: true, glide: true, max: 7 }], ['walk', -6.2, -10.0],
+    ['jump', -2.0, 0, -16.0], ['walk', 0, -20.6]],
   bed: [['walk', 4.0, 4.6], ['jump', 4.9, 1.0, 4.0], ['jump', 6.0, 3.0, 4.0, { double: true }], ['jump', 7.2, 3.6, 3.6], ['walk', 7.4, 4.2], ['walk', 7.4, 1.9],
       ['jump', 7.7, 5.0, 0.6], ['jump', 7.5, 6.4, -1.6], ['walk', 7.6, -1.6], ['snap'], ['jump', -3.6, 4.5, -2.4, { double: true, glide: true, dash: true, hold: 0.35, max: 8 }], ['snap'], ['knots'], ['snap'], ['walk', -5.0, -6.6]],
 };

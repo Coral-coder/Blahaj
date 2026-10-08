@@ -495,7 +495,72 @@ export const CHAPTERS = [
     starfish: [[3.9, 4.4, -2.0], [-4.2, 7.3, -0.3], [4.0, 12.4, -12.6]],
     enemies: [{ type: 'ballSpawner', every: 4.2, x0: -4.0, x1: -0.6, z: -9.6 }],
     bunnies: [[3.2, 0, 2.8], [3.4, 11.4, -11.8]],
-    goal: { x: 2.4, y: 11.4, z: -13.2, r: 2.4, label: 'bedroom door' },
+    goal: { x: 2.4, y: 11.4, z: -13.2, r: 2.4, label: 'upstairs' },
+  },
+  // ---------------------------------------------------------------------------
+  {
+    id: 'hallway', title: 'The Upstairs Hallway', music: 1,
+    goalText: 'Gather Leo’s five lost marbles, then slip into the bathroom',
+    intro: 'hallway',
+    room: {
+      id: 'hallway', x0: -7, x1: 7, z0: -22, z1: 22, h: 12, floor: 'wood', wall: 'hallWall', ambient: 1.6,
+      doors: [{ wall: '+z', at: 0, w: 4.5, h: 9.5 }, { wall: '-z', at: 0, w: 4.5, h: 9.5 }],
+      windows: [{ wall: '+x', at: 9.0, w: 5, y0: 3.6, y1: 8.6 }],
+    },
+    abilities: { doubleJump: true, flop: true, dash: true, glide: true },
+    spawn: [0, 0, 15.4], spawnYaw: Math.PI,
+    drain: 1.0,
+    props: [
+      { type: 'hallRunner', x: 0, z: 0, w: 5, l: 40 },
+      { type: 'consoleTable', x: -6.1, z: 13.0, rot: 1 },
+      { type: 'hamper', x: 6.0, z: 16.6, rot: 3 },
+      { type: 'radiator', x: 6.65, z: 9.0, rot: 3 },
+      { type: 'hallBookcase', x: -6.1, z: 7.4, rot: 1, w: 2.4, shelves: [1.4, 2.8] },
+      { type: 'hallBookcase', x: -6.1, z: 4.6, rot: 1, w: 3.2, shelves: [1.9, 3.8, 5.6] },
+      { type: 'hallBookcase', x: -6.1, z: 1.4, rot: 1, w: 3.2, shelves: [2.1, 4.2, 6.3, 8.4] },
+      { type: 'pictureLedge', x: 6.5, z: -2.0, rot: 3, w: 8, top: 6.4 },
+      { type: 'pictureLedge', x: 6.5, z: -11.0, rot: 3, w: 6, top: 8.0 },
+      { type: 'linenCloset', x: 5.9, z: -17.0, rot: 3 },
+      { type: 'grandfatherClock', x: -6.2, z: -10.0, rot: 1 },
+      { type: 'hallChair', x: -5.8, z: -6.6, rot: 1 },
+      { type: 'hallToyBox', x: -5.6, z: -15.5, rot: 1 },
+      { type: 'petBed', x: 3.4, z: -6.0 },
+      { type: 'doorPanel', x: -6.9, z: -2.4, rot: 1, w: 3.8, h: 9.0, sign: 'LEO 🦈', glowUnder: true },
+      { type: 'doorPanel', x: 6.9, z: 13.2, rot: 3, w: 3.6, h: 9.0 },
+      { type: 'doorPanel', x: -6.9, z: 18.6, rot: 1, w: 3.6, h: 9.0, sign: 'PLAYROOM', signBg: '#ffe2a8' },
+      { type: 'wallFrames', x: -6.95, z: -19.4, rot: 1, n: 1, y0: 5.0 }, { type: 'wallFrames', x: 6.95, z: -16.0, rot: 3, n: 1, y0: 10.4 },
+      { type: 'pendant', x: 0, z: 12.0, y0: 10.4, ceiling: 12 }, { type: 'pendant', x: 0, z: 0.0, y0: 10.4, ceiling: 12 }, { type: 'pendant', x: 0, z: -12.0, y0: 10.4, ceiling: 12 },
+      { type: 'roomba', x: -2.0, z: 8.0, move: { path: [[-2.0, 8.0], [2.0, 8.0], [2.0, -8.0], [-2.0, -8.0]], speed: 1.8 } },
+    ],
+    safe: [
+      { x: 0, z: 17.6, r: 2.8 },     // light from the stairwell
+      { x: 0, z: -20.0, r: 2.2 },    // the bathroom nightlight under the door
+    ],
+    lamps: [
+      { x: -6.1, y: 3.2, z: 14.6, kind: 'deskLamp', safe: { x: -4.0, z: 13.0, r: 2.4 } },
+      { x: -6.8, y: 1.2, z: -4.4, kind: 'plugLight', safe: { x: -5.0, z: -4.4, r: 2.0 } },
+      { x: 6.8, y: 1.2, z: -6.8, kind: 'plugLight', safe: { x: 5.0, z: -6.8, r: 2.0 } },
+    ],
+    collect: { kind: 'marble', label: 'marbles', hint: 'Leo’s marbles rolled everywhere — look high', done: 'All five marbles! Now, the bathroom', items: [
+      [6.0, 7.0, 16.6], [-6.1, 9.4, 1.4], [6.5, 7.4, -3.0], [5.9, 9.6, -17.0], [-6.2, 8.0, -10.0],
+    ] },
+    fish: F(
+      line([0, 0.6, 13.0], [0, 0.6, 6.0], 4), arc([4.0, 0.6, 16.6], [6.0, 5.0, 16.6], 3, 1.0), line([-4.4, 3.4, 7.4], [-4.4, 8.6, 1.4], 3),
+      arc([-4.6, 10.0, 3.0], [5.6, 7.2, -1.0], 5, 1.4), line([6.5, 7.4, 1.4], [6.5, 7.4, -5.6], 3), line([6.5, 9.0, -8.6], [6.5, 9.0, -13.4], 3),
+      line([-5.8, 2.8, -6.0], [-5.8, 5.2, -7.4], 2), line([0, 0.6, -2.0], [0, 0.6, -16.0], 5), line([-5.6, 3.2, -14.2], [-5.6, 3.2, -16.8], 2)),
+    starfish: [[-6.1, 0.9, 13.0], [0.0, 9.2, 0.6], [5.9, 0.9, -17.0]],
+    enemies: [
+      { type: 'moth', path: [[-2.0, 5.0, -12.0], [2.0, 5.6, -12.0], [2.0, 5.0, -16.0], [-2.0, 5.6, -16.0]], speed: 1.4 },
+      { type: 'moth', path: [[-2.4, 4.6, 12.0], [2.4, 5.2, 12.0], [2.4, 4.6, 8.0], [-2.4, 5.2, 8.0]], speed: 1.2, phase: 1.5 },
+      { type: 'spider', at: [-4.4, 11.6, -10.0], drop: 3.2, period: 4.0 },
+      { type: 'spider', at: [3.4, 11.6, -17.0], drop: 2.8, period: 3.6, phase: 1.6 },
+      { type: 'shadow', path: [[0.0, 0, 10.0], [0.0, 0, 2.0]], speed: 1.4 },
+      { type: 'shadow', path: [[-3.0, 0, -2.0], [3.0, 0, -4.0]], speed: 1.5 },
+      { type: 'shadow', path: [[0.0, 0, -9.0], [0.0, 0, -16.0]], speed: 1.4 },
+      { type: 'shadow', path: [[3.4, 0, 12.0], [-1.0, 0, 15.0]], speed: 1.2 },
+    ],
+    bunnies: [[-3.6, 0, -18.6]],
+    goal: { x: 0, y: 0, z: -20.6, r: 2.0, label: 'bathroom' },
   },
   // ---------------------------------------------------------------------------
   {

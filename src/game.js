@@ -401,7 +401,7 @@ export class Game {
       P.glide = false;
       // glide while falling, or ride warm air upward while holding jump inside an updraft
       if (this.ab.glide && !P.grounded && inp.jumpHeld() && (P.inWind || (P.vel.y < 0 && !P.jumpHeld))) {
-        if (P.vel.y < -CFG.glideFall) P.vel.y += (-CFG.glideFall - P.vel.y) * Math.min(1, dt * 14);
+        if (P.vel.y < -CFG.glideFall) P.vel.y = Math.min(-CFG.glideFall, P.vel.y + (CFG.gravity + 90) * dt); // brake quickly to the glide speed
         P.glide = true;
       }
       applyWind(this, dt); // warm air from vents and fans

@@ -26,7 +26,7 @@ window.__bot = {
       for (let t = 0; t < (o.max || 5); t += step) {
         if (g.state !== 'play') return 'state:' + g.state;
         if (!bounced && P.vel.y > 12 && t > 0.1) { bounced = true; usedD = false; tb = t; } // the bounce gives the double jump back
-        const [tx, tz] = bounced ? [x, z] : o.via;
+        const [tx, tz] = !bounced ? o.via : o.pre && t < o.pre[2] ? o.pre : [x, z]; // pre: [x, z, t] step out from under a shelf first
         face(tx, tz);
         const keys = [];
         const d = hd(tx, tz);
