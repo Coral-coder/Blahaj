@@ -57,6 +57,13 @@ const ROUTES = {
     ['jump', 11.05, 7.6, 0.6, { double: true, glide: true, max: 7 }], ['walk', 11.0, 1.0], ['jump', 7.6, 0, 4.0],
     ['walk', -6.6, 5.6], ['jump', -9.6, 2.2, 5.6, { double: true }], ['jump', -11.2, 4.0, 5.6], ['jump', -11.4, 7.0, 3.0, { double: true, up: 0.2 }], ['wait', 0.2],
     ['jump', -7.0, 0, 0.0], ['walk', -7.0, -2.4], ['walk', -7.0, -5.0], ['updraft', -9.6, -7.6, -4.0, 0, -1.0, { rise: 9.9 }], ['walk', -11.0, -0.8]],
+  parents: [['walk', 7.6, 7.4], ['jump', 10.0, 2.0, 7.4, { double: true }], ['jump', 11.8, 5.0, 7.4, { double: true, up: 0.2 }], ['wait', 0.2],
+    ['jump', 7.1, 5.4, 10.4, { double: true }], ['jump', 3.0, 0, 6.0], ['walk', 0.0, 3.2], ['jump', 0.0, 1.7, 0.2],
+    ['jump', 0.0, 9.4, 4.0, { via: [0.0, -2.4], flop: true, up: 0.3, glide: true, double: true, djAt: -1, max: 7 }], ['wait', 0.2],
+    ['waitMover', 3.0, 8.8, 4.0, 0.7], ['jump', 3.2, 8.8, 4.0, { max: 6 }], ['jump', 0.0, 1.7, 0.4, { max: 6 }], ['jump', -6.4, 0, 1.6], ['walk', -6.6, -7.2], ['jump', -6.6, 3.0, -10.4, { double: true }],
+    ['jump', 6.6, 3.0, -10.6, { via: [0.0, -10.9], flop: true, up: 1.0, max: 8 }], ['wait', 0.3], ['updraft', 2.3, -8.8, -7.4, 0, -3.0, { noWalk: true, rise: 10.4 }],
+    ['walk', -7.6, 6.0], ['jump', -12.8, 6.6, 8.0, { via: [-9.8, 8.0], flop: true, max: 7 }], ['jump', -12.8, 9.6, 4.6, { double: true }], ['walk', -12.8, 3.0],
+    ['jump', -10.6, 0, -4.0, { glide: true, double: true, max: 7 }], ['walk', -13.0, -6.0]],
   bed: [['walk', 4.0, 4.6], ['jump', 4.9, 1.0, 4.0], ['jump', 6.0, 3.0, 4.0, { double: true }], ['jump', 7.2, 3.6, 3.6], ['walk', 7.4, 4.2], ['walk', 7.4, 1.9],
       ['jump', 7.7, 5.0, 0.6], ['jump', 7.5, 6.4, -1.6], ['walk', 7.6, -1.6], ['snap'], ['jump', -3.6, 4.5, -2.4, { double: true, glide: true, dash: true, hold: 0.35, max: 8 }], ['snap'], ['knots'], ['snap'], ['walk', -5.0, -6.6]],
 };

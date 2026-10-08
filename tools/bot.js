@@ -52,7 +52,7 @@ window.__bot = {
     };
     // ride an updraft: walk into it, jump, hold jump to float up to `rise`, then glide over to the target
     const updraft = (wx, wz, x, y, z, o) => {
-      const w0 = walk(wx, wz, 0.25); if (w0 !== true) return 'walk ' + w0;
+      if (!o.noWalk) { const w0 = walk(wx, wz, 0.25); if (w0 !== true) return 'walk ' + w0; } // noWalk: jump in from where you stand
       tick(['Space'], ['Space']);
       let up = true;
       for (let t = 0; t < (o.max || 8); t += step) {

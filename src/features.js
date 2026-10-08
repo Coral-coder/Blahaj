@@ -209,7 +209,7 @@ export function pathPoint3(mv, t) {
   let u = ((t + (mv.phase || 0)) % mv._T + mv._T) % mv._T;
   for (const l of mv._legs) {
     if (u <= l.T) {
-      const k0 = l.T > 0 ? u / l.T : 1, k = k0 * k0 * (3 - 2 * k0); // ease in and out
+      const k0 = l.T > 0 ? u / l.T : 1, k = mv.linear ? k0 : k0 * k0 * (3 - 2 * k0); // ease in and out (or steady, for things going round)
       return [l.a[0] + (l.b[0] - l.a[0]) * k, l.a[1] + (l.b[1] - l.a[1]) * k, l.a[2] + (l.b[2] - l.a[2]) * k, Math.atan2(l.b[0] - l.a[0], l.b[2] - l.a[2])];
     }
     u -= l.T;

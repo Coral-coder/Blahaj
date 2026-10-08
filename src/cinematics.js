@@ -565,6 +565,13 @@ export function bathroomIntro(game, hooks) {
   ], [[0.4, 'The bathroom. Somebody left the bath running…'], [3.0, 'Leo’s rubber ducks are bobbing about up on the bubbles!'], [6.0, 'Save all five, then sneak through to Mum and Dad’s room.']]);
 }
 
+export function parentsIntro(game, hooks) {
+  return flyover(game, hooks, [
+    { d: 4.6, from: V(10.0, 6.0, 4.0), to: V(4.0, 9.0, 8.0), look0: V(0.0, 4.0, -8.0), look1: V(2.3, 6.0, -9.4), fov: 54 },
+    { d: 4.4, from: V(4.0, 9.0, 8.0), to: V(-4.0, 6.0, 6.0), look0: V(0.0, 8.6, 4.0), look1: V(-12.8, 8.0, 3.0), fov: 56 },
+  ], [[0.4, 'Mum and Dad’s room. Shh… they’re fast asleep.'], [3.0, 'Dad’s snoring is so loud it could lift a shark!'], [6.0, 'Mum’s sewing buttons are everywhere. Find all six.']]);
+}
+
 // ------------------------------------------------------------------ ending --
 export function ending(game, hooks) {
   const leo = game.leo, P = game.p, rig = game.rig;
@@ -636,4 +643,4 @@ export function ending(game, hooks) {
   return c;
 }
 
-export const CINES = { prologue, dog: dogSnatch, downstairs, kitchen: kitchenIntro, laundry: laundryIntro, backyard: backyardIntro, garage: garageIntro, basement: basementIntro, hallway: hallwayIntro, bathroom: bathroomIntro, stairs: stairsIntro, bed: bedIntro, ending };
+export const CINES = { prologue, dog: dogSnatch, downstairs, kitchen: kitchenIntro, laundry: laundryIntro, backyard: backyardIntro, garage: garageIntro, basement: basementIntro, hallway: hallwayIntro, bathroom: bathroomIntro, parents: parentsIntro, stairs: stairsIntro, bed: bedIntro, ending };

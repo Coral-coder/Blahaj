@@ -20,6 +20,9 @@ const BOOKCASE = { type: 'bookcase', x: 7.5, z: -2.2, rot: 3 };
 const WALLSHELF = { type: 'wallShelf', x: 7.7, z: 0.55, rot: 3, w: 1.7, d: 1, y: 5 };
 const WARDROBE = { type: 'wardrobe', x: -6.9, z: 6.6, rot: 1 };
 
+// the ceiling fan in Mum and Dad's room: blades go round this circle
+const FAN = [[3.0, 8.6, 4.0], [2.77, 8.6, 2.85], [2.12, 8.6, 1.88], [1.15, 8.6, 1.23], [0.0, 8.6, 1.0], [-1.15, 8.6, 1.23], [-2.12, 8.6, 1.88], [-2.77, 8.6, 2.85], [-3.0, 8.6, 4.0], [-2.77, 8.6, 5.15], [-2.12, 8.6, 6.12], [-1.15, 8.6, 6.77], [-0.0, 8.6, 7.0], [1.15, 8.6, 6.77], [2.12, 8.6, 6.12], [2.77, 8.6, 5.15]];
+
 export const CHAPTERS = [
   // ---------------------------------------------------------------------------
   {
@@ -415,7 +418,7 @@ export const CHAPTERS = [
       { type: 'duct', x: 2.6, z: -9.0, w: 13.6, y0: 9.8, ceiling: 14 },
       { type: 'waterHeater', x: 11.6, z: -9.6 },
       { type: 'trainTable', x: 5.0, z: 1.4, mountain: 3.0 },
-      { type: 'toyTrain', x: 1.2, y: 3.0, z: -0.6, move: { path3: [[1.2, 3.0, -0.6], [8.8, 3.0, -0.6], [8.8, 3.0, 3.4], [1.2, 3.0, 3.4]], loop: true, speed: 1.6 } },
+      { type: 'toyTrain', x: 1.2, y: 3.0, z: -0.6, move: { path3: [[1.2, 3.0, -0.6], [8.8, 3.0, -0.6], [8.8, 3.0, 3.4], [1.2, 3.0, 3.4]], loop: true, linear: true, speed: 1.6 } },
       { type: 'cardboardBox', x: -1.4, z: 2.0, w: 2.4, d: 2.4, h: 1.8, label: 'TRAINS' },
       { type: 'utilityShelf', x: 13.1, z: -3.2, rot: 3, shelves: [2.6, 5.1, 7.6] },
       { type: 'paintCans', x: 13.2, z: -4.6, rot: 3, y0: 2.6, n: 4, seed: 1 },
@@ -621,6 +624,69 @@ export const CHAPTERS = [
     ],
     bunnies: [[1.0, 0, 7.0]],
     goal: { x: -11.0, y: 0, z: -0.8, r: 2.0, label: 'Mum & Dad’s room' },
+  },
+  // ---------------------------------------------------------------------------
+  {
+    id: 'parents', title: 'Mum and Dad’s Room', music: 1,
+    goalText: 'Find Mum’s six sewing buttons — without waking anyone',
+    intro: 'parents',
+    room: {
+      id: 'parents', x0: -14, x1: 14, z0: -12, z1: 12, h: 12, floor: 'woodDark', wall: 'parentsWall', ambient: 1.6,
+      doors: [{ wall: '+x', at: -1.0, w: 4.0, h: 9.2 }, { wall: '-x', at: -6.0, w: 4.2, h: 9.2 }],
+      windows: [{ wall: '+z', at: -5.0, w: 5, y0: 3.6, y1: 9.0 }],
+    },
+    abilities: { doubleJump: true, flop: true, dash: true, glide: true },
+    spawn: [9.6, 0, -1.0], spawnYaw: -2.5, camYaw: 0.64,
+    drain: 1.0,
+    props: [
+      { type: 'bedRug', x: 0, z: -2.0, w: 16, d: 14, color: 0xb8a58a },
+      { type: 'kingBed', x: 0, z: -6.4 },
+      { type: 'blanketBox', x: 0, z: 0.0, h: 1.7 },
+      { type: 'sleepers', x: 0, y: 4.25, z: -9.85 },
+      { type: 'zzz', x: 2.3, y: 5.2, z: -9.2, top: 11.0 },
+      { type: 'nightstand', x: -6.6, z: -10.6 }, { type: 'nightstand', x: 6.6, z: -10.6 },
+      { type: 'parentsDresser', x: 5.0, z: 10.6, rot: 2 },
+      { type: 'curtains', x: -5.0, z: 11.85, rot: 2, w: 5, h: 5.4, y0: 3.6 },
+      { type: 'bigWardrobe', x: -12.7, z: 3.0, rot: 1 },
+      { type: 'tallboy', x: -12.8, z: 8.0, rot: 1 },
+      { type: 'hamper', x: -9.8, z: 8.0, rot: 1 },
+      { type: 'readingChair', x: 10.6, z: 7.4, rot: 3 },
+      { type: 'slippers', x: -4.2, z: 0.8, rot: 0.3 }, { type: 'slippers', x: 4.0, z: 0.6, color: 0x6f8fb8 },
+      { type: 'fanHub', x: 0, z: 4.0, top: 9.4, ceiling: 12 },
+      { type: 'fanBlade', x: 3.0, y: 8.6, z: 4.0, move: { path3: FAN, loop: true, linear: true, speed: 1.6, phase: 0.0 } },
+      { type: 'fanBlade', x: 3.0, y: 8.6, z: 4.0, move: { path3: FAN, loop: true, linear: true, speed: 1.6, phase: 2.95 } },
+      { type: 'fanBlade', x: 3.0, y: 8.6, z: 4.0, move: { path3: FAN, loop: true, linear: true, speed: 1.6, phase: 5.89 } },
+      { type: 'fanBlade', x: 3.0, y: 8.6, z: 4.0, move: { path3: FAN, loop: true, linear: true, speed: 1.6, phase: 8.84 } },
+    ],
+    wind: [{ x: 2.3, z: -8.8, r: 1.3, y0: 3.6, y1: 11.0, color: 0xdfe9ff }], // Dad's snores (they really are that loud)
+    safe: [
+      { x: 11.4, z: -1.0, r: 2.6 },     // the bathroom light
+    ],
+    lamps: [
+      { x: -6.6, y: 3.0, z: -11.0, kind: 'deskLamp', safe: { x: -6.6, z: -8.2, r: 2.2 } },
+      { x: 6.6, y: 3.0, z: -11.0, kind: 'deskLamp', safe: { x: 6.6, z: -8.2, r: 2.2 } },
+      { x: -13.8, y: 1.2, z: -2.0, kind: 'plugLight', safe: { x: -12.2, z: -2.0, r: 2.0 } },
+    ],
+    collect: { kind: 'button', label: 'sewing buttons', hint: 'Bounce on the bed… and ride the fan!', done: 'All six buttons! Mum will be so pleased', items: [
+      [0, 8.2, -11.65], [-12.8, 10.6, 3.0], [3.0, 9.8, 4.0], [7.1, 6.4, 10.4], [2.3, 10.6, -8.8], [11.8, 6.0, 7.4],
+    ] },
+    fish: F(
+      line([8.0, 0.6, -1.0], [4.0, 0.6, 1.0], 3), line([-3.6, 4.4, -2.0], [-3.6, 4.4, -8.0], 3), line([-2.0, 7.4, -3.0], [-2.0, 7.4, -9.0], 3),
+      line([2.3, 5.0, -8.8], [2.3, 9.0, -8.8], 3), line([1.5, 9.8, 4.0], [-1.5, 9.8, 4.0], 2), line([-9.8, 3.6, 8.0], [-9.8, 6.0, 8.0], 2),
+      line([-12.8, 7.6, 8.0], [-12.8, 10.6, 5.6], 2), line([2.0, 5.4, 10.4], [6.0, 5.4, 10.4], 3), line([10.6, 2.8, 7.4], [10.6, 2.8, 5.0], 2)),
+    starfish: [[0, 10.4, 4.0], [-13.0, 0.9, 11.2], [3.0, 8.4, 11.0]],
+    enemies: [
+      { type: 'moth', path: [[-10.0, 10.2, -1.0], [-8.0, 10.6, 4.0], [-10.0, 10.2, 8.0], [-8.4, 10.6, 3.0]], speed: 1.2 },
+      { type: 'moth', path: [[6.0, 6.4, 6.0], [10.0, 6.8, 4.0], [12.0, 6.4, 0.0], [8.0, 6.8, 2.0]], speed: 1.3, phase: 1.4 },
+      { type: 'spider', at: [5.0, 11.6, 8.6], drop: 3.0, period: 3.8 },
+      { type: 'spider', at: [9.6, 11.6, 5.0], drop: 3.6, period: 4.2, phase: 1.8 },
+      { type: 'shadow', path: [[11.0, 0, -5.0], [11.0, 0, -9.6]], speed: 1.3 },
+      { type: 'shadow', path: [[-8.0, 0, -8.0], [-8.0, 0, 0.0]], speed: 1.4 },
+      { type: 'shadow', path: [[-6.0, 0, 6.0], [2.0, 0, 8.6]], speed: 1.4 },
+      { type: 'shadow', path: [[-2.0, 0, 2.2], [4.0, 0, 2.2]], speed: 1.2 },
+    ],
+    bunnies: [[-4.0, 0, 9.0]],
+    goal: { x: -13.0, y: 0, z: -6.0, r: 2.0, label: 'playroom' },
   },
   // ---------------------------------------------------------------------------
   {
