@@ -14,7 +14,7 @@ const sh = (m) => { m.castShadow = true; m.receiveShadow = true; return m; };
 
 // ----------------------------------------------------------- collectibles --
 export const ITEMS = {
-  letter: { icon: '🔤', name: 'magnet letters' },
+  letter: { icon: '🔤', name: 'fridge magnets' },
   sock: { icon: '🧦', name: 'lost socks' },
   firefly: { icon: '✨', name: 'fireflies' },
   battery: { icon: '🔋', name: 'batteries' },
@@ -25,11 +25,15 @@ export const ITEMS = {
   marble: { icon: '🔮', name: 'marbles' },
   key: { icon: '🗝️', name: 'dream keys' },
 };
-const LETTER_COLORS = { L: 0xe5484d, E: 0x3f8fd8, O: 0xf2b632 };
+const LETTER_COLORS = { L: 0xe5484d, E: 0x3f8fd8, O: 0xf2b632, '♥': 0xf06292 };
 function letterMesh(ch) {
   const g = new THREE.Group(), mat = Mat.plastic(LETTER_COLORS[ch] || 0x4fb06a);
   const bar = (w, h, x, y) => { const m = sh(new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.18), mat)); m.position.set(x, y, 0); g.add(m); };
-  if (ch === 'O') { const m = sh(new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.1, 12, 24), mat)); m.scale.set(0.85, 1.1, 1.6); g.add(m); }
+  if (ch === '♥') {
+    const hs = new THREE.Shape(); hs.moveTo(0, -0.32); hs.bezierCurveTo(-0.5, 0.02, -0.32, 0.4, 0, 0.18); hs.bezierCurveTo(0.32, 0.4, 0.5, 0.02, 0, -0.32);
+    const geo = new THREE.ExtrudeGeometry(hs, { depth: 0.14, bevelEnabled: true, bevelSize: 0.03, bevelThickness: 0.03, bevelSegments: 3 }); geo.center();
+    g.add(sh(new THREE.Mesh(geo, Mat.plastic(0xf06292))));
+  } else if (ch === 'O') { const m = sh(new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.1, 12, 24), mat)); m.scale.set(0.85, 1.1, 1.6); g.add(m); }
   else if (ch === 'L') { bar(0.17, 0.75, -0.15, 0); bar(0.5, 0.17, 0.02, -0.29); }
   else { bar(0.17, 0.75, -0.18, 0); for (const y of [0.29, 0, -0.29]) bar(y === 0 ? 0.36 : 0.48, 0.15, 0.02, y); }
   return g;
@@ -327,9 +331,9 @@ export function visualFeatures(game, dt) {
     gt.open = Math.min(1, gt.open + dt * 1.2);
     const e = gt.open * gt.open;
     for (const p of gt.props) if (p._visual) {
-      if (p._baseY === undefined) { p._baseY = p._visual.position.y; p._visual.traverse((o) => { o.matrixAutoUpdate = true; }); }
-      p._visual.position.y = p._baseY - e * (p.gateDrop || 4);
-      if (gt.open >= 1) p._visual.visible = false;
+      if (!p._base) { p._base = p._visual.position.clone(); p._visual.traverse((o) => { o.matrixAutoUpdate = true; }); }
+      const mv = p.gateMove || [0, -4, 0]; // slide aside into the wall (or drop away)
+      p._visual.position.set(p._base.x + mv[0] * e, p._base.y + mv[1] * e, p._base.z + mv[2] * e);
     }
   }
   // updraft wisps

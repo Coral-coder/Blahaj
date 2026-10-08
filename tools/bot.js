@@ -27,7 +27,7 @@ window.__bot = {
         face(x, z);
         const keys = [];
         const d = hd(x, z);
-        if (d > (o.brake ?? 0.35)) keys.push('KeyW');
+        if (d > (o.brake ?? 0.35) && !(o.up && t < o.up)) keys.push('KeyW'); // up: rise straight first (clear an overhang)
         const press = [];
         holdT -= step;
         if (holdT > 0) keys.push('Space');

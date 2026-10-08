@@ -131,7 +131,7 @@ export const CHAPTERS = [
   // ---------------------------------------------------------------------------
   {
     id: 'kitchen', title: 'Midnight Kitchen', music: 2,
-    goalText: 'Find the L, E and O magnets, then open the pet gate',
+    goalText: 'Gather Leo’s fridge magnets, then open the pet gate',
     intro: 'kitchen', newAbility: 'dash',
     room: {
       id: 'kitchen', x0: -14, x1: 14, z0: -11, z1: 11, h: 11.4, floor: 'checker', wall: 'kitchenWall',
@@ -161,13 +161,13 @@ export const CHAPTERS = [
       { type: 'hangingPots', x: 1.0, z: 0.5, y0: 9.6 },
       { type: 'stool', x: -1.3, z: 3.2 }, { type: 'stool', x: 1.0, z: 3.2 }, { type: 'stool', x: 3.3, z: 3.2 },
       { type: 'diningTable', x: -7.2, z: 6.0 },
-      { type: 'chair', x: -8.8, z: 2.6, rot: 0 }, { type: 'chair', x: -5.6, z: 2.6, rot: 0 },
+      { type: 'chair', x: -8.8, z: 2.6, rot: 0 }, { type: 'chair', x: -5.2, z: 2.0, rot: 1 }, // one pulled out sideways
       { type: 'chair', x: -8.8, z: 9.4, rot: 2 }, { type: 'chair', x: -5.6, z: 9.4, rot: 2 },
       { type: 'pedalBin', x: 12.8, z: -5.6 },
       { type: 'petBowls', x: -12.4, z: -4.8 },
       { type: 'kitchenRug', x: -5.0, z: -6.2, w: 10, d: 2.2 },
       { type: 'wallClock', x: 13.95, z: -1.5, rot: 3, y0: 7.6 },
-      { type: 'petGate', x: 12.6, z: 6.0, rot: 1, gate: 'g1' },
+      { type: 'petGate', x: 12.6, z: 6.0, rot: 1, gate: 'g1', gateMove: [0, 0, 4.4] },
       { type: 'plant', x: 12.6, z: 10.0 },
     ],
     safe: [
@@ -179,15 +179,16 @@ export const CHAPTERS = [
       { x: -13.7, y: 0.4, z: 1.2, kind: 'plugLight', safe: { x: -12.6, z: 1.2, r: 2.4 } },
       { x: 6.9, y: 4.1, z: -10.6, kind: 'plugLight', safe: null },
     ],
-    collect: { kind: 'letter', label: 'magnet letters', hint: 'They fell off the fridge', done: 'L · E · O — Leo!', items: [
+    collect: { kind: 'letter', label: 'fridge magnets', hint: 'They got knocked all over the kitchen', done: 'L · E · O ♥ ♥ — all back!', items: [
       { at: [-7.2, 4.3, 6.0], ch: 'L' }, { at: [-4.0, 6.2, -10.3], ch: 'E' }, { at: [-6.5, 9.4, -10.2], ch: 'O' },
+      { at: [3.3, 4.2, 3.2], ch: '♥' }, { at: [12.8, 3.8, -5.6], ch: '♥' },
     ] },
     switches: [{ at: [11.0, 8.6, -9.6], gate: 'g1', color: 0x3f8fd8, toast: 'Click! The pet gate swings open', hint: 'Now out through the far door' }],
     fish: F(
       line([-11.6, 0.6, 1.6], [-11.6, 0.6, 4.4], 2), line([-7.2, 0.6, -6.2], [-1.6, 0.6, -6.2], 4), [[-4.0, 3.2, -6.6]],
       line([-1.6, 4.9, -9.0], [0.8, 4.9, -9.0], 3), arc([1.4, 5.0, -9.0], [3.6, 5.0, -9.0], 3, 1.0), line([4.2, 7.5, -10.3], [5.4, 7.5, -10.3], 2),
       arc([6.4, 7.6, -10.0], [9.6, 9.4, -9.4], 3, 1.0), line([-11.4, 4.9, -9.0], [-8.0, 4.9, -9.0], 3),
-      line([-1.3, 4.2, 3.2], [3.3, 4.2, 3.2], 3), line([-1.2, 4.9, 0.5], [3.6, 4.9, 0.5], 3), line([-8.8, 2.8, 2.6], [-5.6, 2.8, 2.6], 2),
+      line([-1.3, 4.2, 3.2], [3.3, 4.2, 3.2], 3), line([-1.2, 4.9, 0.5], [3.6, 4.9, 0.5], 3), line([-8.8, 2.8, 2.6], [-5.2, 2.8, 2.0], 2),
       line([2.0, 0.6, 7.0], [9.0, 0.6, 7.0], 4)),
     starfish: [[-12.5, 9.4, -10.2], [4.0, 5.6, -4.4], [-7.2, 0.9, 6.0]],
     enemies: [
