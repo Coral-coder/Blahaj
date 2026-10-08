@@ -97,6 +97,16 @@ window.__bot = {
       else if (w[0] === 'wait') { for (let t = 0; t < w[1]; t += step) tick([]); r = true; }
       else if (w[0] === 'knots') r = knots();
       else if (w[0] === 'updraft') r = updraft(w[1], w[2], w[3], w[4], w[5], w[6] || {});
+      else if (w[0] === 'waitClear') { // ['waitClear', x, y, z, r]: until no nightmare is within r of the point (time a spider)
+        r = 'never clear';
+        let clearT = 0;
+        for (let t = 0; t < 12; t += step) {
+          const near = g.enemies.some((e) => e.alive && e.pos && Math.hypot(e.pos.x - w[1], e.pos.y - w[2], e.pos.z - w[3]) < w[4]);
+          clearT = near ? 0 : clearT + step;
+          if (clearT > (w[5] || 0.15) && !near) { r = true; break; }
+          tick([]);
+        }
+      }
       else if (w[0] === 'waitMover') { // ['waitMover', x, y, z, r]: until a moving platform's top centre is near (x, y, z)
         r = 'mover never came';
         for (let t = 0; t < 20; t += step) {

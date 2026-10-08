@@ -7,5 +7,6 @@ import { BASEMENT } from './basement.vis.js';
 import { HALLWAY } from './hallway.vis.js';
 import { BATHROOM } from './bathroom.vis.js';
 import { PARENTS } from './parents.vis.js';
+import { PLAYROOM } from './playroom.vis.js';
 
-export const VIS = Object.assign({}, KITCHEN, LAUNDRY, BACKYARD, GARAGE, BASEMENT, HALLWAY, BATHROOM, PARENTS);
+export const VIS = Object.assign({}, KITCHEN, LAUNDRY, BACKYARD, GARAGE, BASEMENT, HALLWAY, BATHROOM, PARENTS, PLAYROOM);

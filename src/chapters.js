@@ -690,6 +690,65 @@ export const CHAPTERS = [
   },
   // ---------------------------------------------------------------------------
   {
+    id: 'playroom', title: 'The Playroom', music: 2,
+    goalText: 'Find six puzzle pieces, then climb up to the attic',
+    intro: 'playroom',
+    room: {
+      id: 'playroom', x0: -14, x1: 14, z0: -12, z1: 12, h: 13, floor: 'carpetGreen', wall: 'playWall', ambient: 1.7,
+      doors: [{ wall: '+x', at: -6.0, w: 4.2, h: 9.2 }],
+      windows: [{ wall: '+z', at: -7.0, w: 5, y0: 4.0, y1: 9.0 }],
+    },
+    abilities: { doubleJump: true, flop: true, dash: true, glide: true },
+    spawn: [10.6, 0, -6.0], spawnYaw: -0.64, camYaw: 2.5,
+    drain: 1.0,
+    props: [
+      { type: 'playRug', x: 2.0, z: -4.0, w: 12, d: 9 },
+      { type: 'toyCars', x: 6.0, z: -6.4 },
+      { type: 'blockStack', x: -9.8, z: -10.9, n: 1 }, { type: 'blockStack', x: -8.0, z: -10.9, n: 2 }, { type: 'blockStack', x: -6.2, z: -10.9, n: 3 },
+      { type: 'blockStack', x: -4.4, z: -10.9, n: 4 }, { type: 'blockStack', x: -2.6, z: -10.9, n: 5 },
+      { type: 'blockStack', x: 2.4, z: -8.6, n: 1 }, { type: 'blockStack', x: 3.0, z: -1.4, n: 1, c: 1.4 },
+      { type: 'ballPit', x: 4.0, z: 3.0 },
+      { type: 'dollhouse', x: -12.4, z: 4.0, rot: 1 },
+      { type: 'rockingHorse', x: -8.0, z: 4.0, rot: 3 },
+      { type: 'jackBox', x: 10.4, z: 8.6 },
+      { type: 'jackClown', x: 10.4, y: 2.0, z: 8.6, move: { path3: [[10.4, 2.0, 8.6], [10.4, 7.0, 8.6]], speed: 3.2, wait: 2.0, noTurn: true } },
+      { type: 'toyCubbies', x: 12.9, z: 1.0, rot: 3 },
+      { type: 'atticLadder', x: -12.8, z: -1.0, ceiling: 13 },
+      { type: 'toyPiano', x: 3.6, z: 10.6, rot: 2 },
+      { type: 'teepee', x: -1.0, z: 9.0 },
+      { type: 'starLights', x: 0, z: 11.9, rot: 2, w: 24, y0: 11.6 },
+    ],
+    safe: [
+      { x: 12.2, z: -6.0, r: 2.4 },     // light from Mum and Dad's room
+      { x: -1.0, z: 9.0, r: 2.4 },      // the fairy lights in the teepee
+    ],
+    lamps: [
+      { x: -13.8, y: 1.2, z: 0.4, kind: 'plugLight', safe: { x: -10.0, z: 0.0, r: 1.8 } },
+      { x: 13.8, y: 1.2, z: 6.0, kind: 'plugLight', safe: { x: 12.4, z: 6.0, r: 1.8 } },
+    ],
+    collect: { kind: 'puzzle', label: 'puzzle pieces', hint: 'Climb the blocks, belly-flop the ball pit, wind the jack-in-the-box', done: 'The puzzle’s complete! Up the ladder to the attic', items: [
+      [4.0, 7.8, 3.0], [-2.6, 10.0, -10.9], [-12.6, 6.2, 4.0], [10.4, 8.6, 8.6], [12.9, 7.0, 0.0], [-9.3, 5.4, 4.0],
+    ] },
+    fish: F(
+      line([9.0, 0.6, -6.0], [4.0, 0.6, -4.0], 3), line([-9.8, 2.6, -10.9], [-2.6, 9.8, -10.9], 5), line([2.0, 2.4, 3.0], [6.0, 6.4, 3.0], 3),
+      line([-8.0, 3.4, 5.6], [-8.0, 3.4, 2.4], 2), line([-12.4, 3.2, 2.0], [-12.4, 3.2, 6.0], 2), line([10.4, 3.0, 8.6], [10.4, 6.6, 8.6], 3),
+      line([12.9, 6.6, 3.0], [12.9, 6.6, -1.6], 2), line([-12.8, 2.0, -2.0], [-12.8, 8.0, -7.4], 4), line([0.0, 0.6, 6.0], [-4.0, 0.6, 2.0], 3)),
+    starfish: [[-1.0, 0.9, 9.0], [-12.4, 9.0, 4.0], [10.4, 10.0, 8.6]],
+    enemies: [
+      { type: 'moth', path: [[-8.0, 10.6, -7.0], [-2.0, 10.8, -7.0], [-2.0, 10.6, -4.0], [-8.0, 10.8, -4.0]], speed: 1.3 },
+      { type: 'moth', path: [[8.0, 9.6, 2.0], [12.0, 9.8, 5.0], [8.0, 9.6, 6.0], [6.0, 9.8, 3.0]], speed: 1.2, phase: 2 },
+      { type: 'spider', at: [-10.0, 12.6, 2.0], drop: 4.0, period: 4.0 },
+      { type: 'spider', at: [-5.3, 12.6, -10.9], drop: 4.4, period: 3.6, phase: 1.2 },
+      { type: 'shadow', path: [[6.0, 0, -9.0], [0.0, 0, -6.0]], speed: 1.4 },
+      { type: 'shadow', path: [[-6.0, 0, -6.0], [-6.0, 0, 0.0]], speed: 1.4 },
+      { type: 'shadow', path: [[8.0, 0, 0.0], [8.0, 0, 6.0]], speed: 1.3 },
+      { type: 'shadow', path: [[-4.0, 0, 7.0], [2.0, 0, 7.4]], speed: 1.2 },
+    ],
+    bunnies: [[0.0, 0, -2.0]],
+    goal: { x: -12.8, y: 10.0, z: -9.1, r: 1.6, label: 'attic' },
+  },
+  // ---------------------------------------------------------------------------
+  {
     id: 'bed', title: 'Back to Bed', room: BEDROOM, music: 3,
     goalText: 'Chase the nightmares away from Leo',
     intro: 'bed', newAbility: 'glide', outro: 'ending',

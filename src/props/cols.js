@@ -8,5 +8,6 @@ import { BASEMENT } from './basement.cols.js';
 import { HALLWAY } from './hallway.cols.js';
 import { BATHROOM } from './bathroom.cols.js';
 import { PARENTS } from './parents.cols.js';
+import { PLAYROOM } from './playroom.cols.js';
 
-export const COLS = Object.assign({}, KITCHEN, LAUNDRY, BACKYARD, GARAGE, BASEMENT, HALLWAY, BATHROOM, PARENTS);
+export const COLS = Object.assign({}, KITCHEN, LAUNDRY, BACKYARD, GARAGE, BASEMENT, HALLWAY, BATHROOM, PARENTS, PLAYROOM);
