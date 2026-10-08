@@ -771,7 +771,7 @@ export function createLamp(l) {
     const arm = cyl(g, 0.06, 0.06, 1.6, Mat.plastic(0xf2a7b8), 0, 0.1, 0, 8); arm.rotation.z = 0.25;
     const shade = sh(new THREE.Mesh(new THREE.ConeGeometry(0.55, 0.7, 24, 1, true), shadeMat), true, false);
     shade.position.set(-0.3, 1.75, 0); shade.rotation.z = -0.4; g.add(shade);
-    lightY = 1.6; range = 12; power = 12;
+    lightY = 1.6; range = 12; power = 9;
   } else if (l.kind === 'floorLamp') {
     const shade = sh(new THREE.Mesh(new THREE.CylinderGeometry(0.9, 1.1, 1.3, 28, 1, true), shadeMat), true, false);
     shade.position.y = -0.35; g.add(shade);
