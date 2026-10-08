@@ -65,6 +65,9 @@ CHAPTERS.forEach((ch, i) => {
   const { nodes, seen } = reach(ch, ab);
   const goal = pointOK([ch.goal.x, ch.goal.y + 0.6, ch.goal.z], nodes, seen, ab);
   const ted = ch.starfish.map((t) => pointOK(t, nodes, seen, ab));
+  // things you must reach: every collectible and every gate button
+  const musts = [...(ch.collect ? ch.collect.items.map((it) => (Array.isArray(it) ? it : it.at)) : []), ...(ch.switches || []).map((s) => [s.at[0], s.at[1] + 0.4, s.at[2]])];
+  const mustOK = musts.map((t) => pointOK(t, nodes, seen, ab));
   let need = '';
   if (ch.newAbility) {
     const ab2 = Object.assign({}, ab); delete ab2[ch.newAbility];
@@ -75,8 +78,8 @@ CHAPTERS.forEach((ch, i) => {
   }
   const ov = overlaps(ch);
   if (ov.length) console.log('   overlapping furniture:', ov.join('; '));
-  const ok = goal && ted.every(Boolean) && !ov.length;
+  const ok = goal && ted.every(Boolean) && mustOK.every(Boolean) && !ov.length;
   if (!ok) fails++;
-  console.log(`${ok ? 'OK  ' : 'FAIL'} ${i + 1}. ${ch.title} goal:${goal} starfish:${ted.map((x) => (x ? '⭐' : '✗')).join('')}${need}`);
+  console.log(`${ok ? 'OK  ' : 'FAIL'} ${i + 1}. ${ch.title} goal:${goal} starfish:${ted.map((x) => (x ? '⭐' : '✗')).join('')}${musts.length ? ' items:' + mustOK.map((x) => (x ? '✓' : '✗')).join('') : ''}${need}`);
 });
 process.exit(fails ? 1 : 0);

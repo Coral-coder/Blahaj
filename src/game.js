@@ -10,6 +10,7 @@ import { buildRoom, createDarkFloor, createRisingDark, createLamp } from './room
 import { createLeo, createDreamBubble, createShadow, createKnot, createDog, createCat, updateShadowTime } from './characters.js';
 import { softDotTexture } from './textures.js';
 import { BLAHAJ_SPHERES } from './tumble.js';
+import { buildFeatures, stepFeatures, visualFeatures, applyWind, collectLeft, pathPoint3, ITEMS } from './features.js';
 
 const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 const SOFT_GROUND = { kind: 'soft', active: true, type: 'solid', tag: 'soft' };
@@ -69,7 +70,7 @@ export class Game {
     // collision
     this.solids = [];
     const addBox = (b, mover) => {
-      const s = { min: V(...b.min), max: V(...b.max), active: true, kind: b.tag === 'floor' ? 'floor' : 'solid', tag: b.tag, type: b.type, delta: V(), mover };
+      const s = { min: V(...b.min), max: V(...b.max), active: true, kind: b.tag === 'floor' ? 'floor' : 'solid', tag: b.tag, type: b.type, delta: V(), mover, prefab: b.prefab };
       if (b.type === 'hazard') { (this.hazards = this.hazards || []).push(s); return; }
       this.solids.push(s);
       return s;
@@ -194,6 +195,7 @@ export class Game {
       }
     }
     this.knotsLeft = this.enemies.filter((x) => x.type === 'knot').length;
+    this.features = buildFeatures(this, ch, scene); // collectibles, buttons and gates, updrafts, moths, spiders
 
     // goal marker: a soft shaft of light that fades upward, with rising sparkles
     const gc = document.createElement('canvas'); gc.width = 4; gc.height = 128;
@@ -312,16 +314,18 @@ export class Game {
 
     // moving props (the robo-vacuum)
     for (const m of this.movers) {
-      m.dist += m.p.move.speed * dt;
-      const [x, z, heading] = pathPoint(m.p.move.path, m.dist);
-      const dx = x - m.p.x, dz = z - m.p.z;
+      const mv = m.p.move, y0 = m.p.y || 0;
+      let x, y = y0, z, heading;
+      if (mv.path3) { m.t = (m.t || 0) + dt; [x, y, z, heading] = pathPoint3(mv, m.t); } // lifts, swings, toy trains
+      else { m.dist += mv.speed * dt; [x, z, heading] = pathPoint(mv.path, m.dist); }
+      const dx = x - m.p.x, dy = y - y0, dz = z - m.p.z;
       for (const s of m.solids) {
-        const px = s.min.x, pz = s.min.z;
-        s.min.set(s.base0.x + dx, s.base0.y, s.base0.z + dz); s.max.set(s.base1.x + dx, s.base1.y, s.base1.z + dz);
-        s.delta.set(s.min.x - px, 0, s.min.z - pz);
+        const px = s.min.x, py = s.min.y, pz = s.min.z;
+        s.min.set(s.base0.x + dx, s.base0.y + dy, s.base0.z + dz); s.max.set(s.base1.x + dx, s.base1.y + dy, s.base1.z + dz);
+        s.delta.set(s.min.x - px, s.min.y - py, s.min.z - pz);
       }
       m.heading = heading;
-      if (m.visual) { m.visual.position.set(x, 0, z); m.visual.rotation.y = heading; }
+      if (m.visual) { m.visual.position.set(x, y, z); if (!mv.noTurn) m.visual.rotation.y = heading + (mv.turn || 0); }
     }
     if (P.grounded && P.ground && P.ground.active && P.ground.mover) P.pos.add(P.ground.delta);
 
@@ -397,6 +401,7 @@ export class Game {
         if (P.vel.y < -CFG.glideFall) P.vel.y += (-CFG.glideFall - P.vel.y) * Math.min(1, dt * 14);
         P.glide = true;
       }
+      applyWind(this, dt); // warm air from vents and fans
     }
 
     // --- move & collide
@@ -453,6 +458,7 @@ export class Game {
     const hs = Math.hypot(P.vel.x, P.vel.z);
     if (hs > 0.5 && !P.pound) P.yaw += angDiff(P.yaw, Math.atan2(P.vel.x, P.vel.z)) * Math.min(1, dt * 14);
     this.interact(dt);
+    stepFeatures(this, dt);
     if (P.pos.y < -6) { this.addComfort(-30); if (this.state === 'play') this.nightmare(); }
   }
 
@@ -623,9 +629,18 @@ export class Game {
     // the goal
     const g = ch.goal;
     if (Math.hypot(g.x - P.pos.x, g.z - P.pos.z) < g.r && Math.abs(g.y - P.pos.y) < 2.0) {
-      if (g.needsKnots && this.knotsLeft > 0) { if (!this.knotHintT || this.clock - this.knotHintT > 3) { this.knotHintT = this.clock; this.hooks.toast('Break the nightmares first!', 'Jump on them, or belly flop'); } }
+      const lock = this.goalLock();
+      if (lock) { if (!this.knotHintT || this.clock - this.knotHintT > 3) { this.knotHintT = this.clock; this.hooks.toast(lock[0], lock[1]); } }
       else this.win();
     }
+  }
+
+  // what still stands between you and the goal, as [title, hint] (or null)
+  goalLock() {
+    if (this.ch.goal.needsKnots && this.knotsLeft > 0) return ['Break the nightmares first!', 'Jump on them, or belly flop'];
+    const left = collectLeft(this.features);
+    if (left > 0) { const c = this.ch.collect, info = ITEMS[c.kind] || ITEMS.key; return [`${left} more ${c.label || info.name} to find`, c.hint || 'Look high and low']; }
+    return null;
   }
 
   win() {
@@ -716,7 +731,8 @@ export class Game {
       } else this.bubble.group.visible = true;
     }
     this.goalMarker.visible = !this.cine;
-    const goalReady = !(this.ch.goal.needsKnots && this.knotsLeft > 0);
+    const goalReady = !this.goalLock();
+    visualFeatures(this, dt);
     this.goalMarker.material.opacity = goalReady ? 0.13 + Math.sin(t * 2) * 0.04 : 0.03;
     if (goalReady && !this.cine && Math.random() < 0.3) { const g = this.ch.goal; this.sparks.emit({ p: V(g.x + (Math.random() - 0.5) * g.r, g.y + 0.2, g.z + (Math.random() - 0.5) * g.r), v: V(0, 1.2, 0), life: 1.6, size: 0.16, color: new THREE.Color(0xffe2a8), drag: 0.2, alpha: 0.8 }); }
 
@@ -795,13 +811,13 @@ export class Game {
     // The camera keeps its distance: furniture in the way fades out (fadeOccluders)
     // instead of pulling the camera in. Only the room itself (walls, ceiling) can
     // push it closer, and then it eases in and swings up a little to look down.
-    // Backed up against a wall? Rise up and look down over it rather than zoom in:
-    // the lowest swing up (or, under the ceiling, down) that leaves room to stay back.
+    // Backed up against a wall? Ease in a little (never closer than 5), and only
+    // if that's not enough rise up and look down over it.
     const dirAt = (p) => V(Math.sin(C.yaw) * Math.cos(p), Math.sin(p), Math.cos(C.yaw) * Math.cos(p));
     let liftGoal = 0, bestHit = -1;
     for (const k of [0, 0.12, 0.24, 0.36, 0.5, 0.65, 0.8, -0.12, -0.24]) {
       const p = THREE.MathUtils.clamp(C.pitch + k, -0.1, 1.3), h = this.rayHit(look, dirAt(p), C.dist + 0.4, true);
-      if (h >= C.dist + 0.35) { liftGoal = p - C.pitch; bestHit = h; break; }
+      if (h >= Math.min(C.dist, 5.0) + 0.4) { liftGoal = p - C.pitch; bestHit = h; break; } // room for a comfortable distance
       if (h > bestHit) { bestHit = h; liftGoal = p - C.pitch; }
     }
     C.lift = (C.lift || 0) + (liftGoal - (C.lift || 0)) * Math.min(1, dt * (snap ? 60 : 2.2));

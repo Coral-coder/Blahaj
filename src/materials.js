@@ -121,5 +121,10 @@ Object.assign(Mat, {
   steel() { return memo('steel', () => new THREE.MeshStandardMaterial({ color: 0xc9ccd4, metalness: 1, roughness: 0.35 })); },
   plastic(color) { return memo('plastic' + color, () => new THREE.MeshPhysicalMaterial(Object.assign({ color, roughness: 0.35, clearcoat: 0.6, clearcoatRoughness: 0.2 }, rep(Tex.grainy(), 2)))); },
   book(color) { return memo('book' + color, () => new THREE.MeshStandardMaterial(Object.assign({ color, roughness: 0.75 }, rep(Tex.linen(), 1)))); },
+  tiles(color, n = 4, r = 1) { return memo('tiles' + color + n + r, () => new THREE.MeshPhysicalMaterial(Object.assign({ color, clearcoat: 0.6, clearcoatRoughness: 0.15, normalScale: new THREE.Vector2(0.8, 0.8) }, rep(Tex.tiles(n), r)))); },
+  checker(r = 1) { return memo('checker' + r, () => new THREE.MeshPhysicalMaterial(Object.assign({ clearcoat: 0.5, clearcoatRoughness: 0.2 }, rep(Tex.checker(4), r)))); },
+  concrete(color = 0xbdbab4) { return memo('concrete' + color, () => new THREE.MeshStandardMaterial(Object.assign({ color, normalScale: new THREE.Vector2(0.6, 0.6) }, rep(Tex.concrete(), 1)))); },
+  fence() { return memo('fence', () => new THREE.MeshStandardMaterial(Object.assign({}, rep(Tex.fence(), 1)))); },
+  hedge() { return memo('hedge', () => new THREE.MeshStandardMaterial(Object.assign({ normalScale: new THREE.Vector2(1.6, 1.6) }, rep(Tex.hedge(), 1)))); },
   glass() { return memo('glass', () => new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0.04, transmission: 0.95, thickness: 0.1, ior: 1.5, transparent: true, opacity: 0.25 })); },
 });

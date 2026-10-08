@@ -72,7 +72,7 @@ export const CHAPTERS = [
   // ---------------------------------------------------------------------------
   {
     id: 'downstairs', title: 'Downstairs', music: 1,
-    goalText: 'Find the stairs back up',
+    goalText: 'Sneak out to the kitchen',
     intro: 'downstairs', newAbility: ['doubleJump', 'flop'],
     room: {
       id: 'living', x0: -13, x1: 13, z0: -12, z1: 12, h: 11.4, floor: 'woodDark', wall: 'livingWall',
@@ -126,7 +126,78 @@ export const CHAPTERS = [
     ],
     sleepingDog: { x: -9.3, z: -1.0, rot: 0 },                          // curled up by the fire
     bunnies: [[-2.0, 0, -1.0], [6.0, 0, 8.4], [9.4, 0, -8.6]],
-    goal: { x: 12.2, y: 0, z: 7.5, r: 2.4, label: 'hallway' },
+    goal: { x: 12.2, y: 0, z: 7.5, r: 2.4, label: 'kitchen' },
+  },
+  // ---------------------------------------------------------------------------
+  {
+    id: 'kitchen', title: 'Midnight Kitchen', music: 2,
+    goalText: 'Find the L, E and O magnets, then open the pet gate',
+    intro: 'kitchen', newAbility: 'dash',
+    room: {
+      id: 'kitchen', x0: -14, x1: 14, z0: -11, z1: 11, h: 11.4, floor: 'checker', wall: 'kitchenWall',
+      doors: [{ wall: '-x', at: 6, w: 4.5, h: 9.5 }, { wall: '+x', at: 6, w: 4.5, h: 9.5 }],
+      windows: [{ wall: '-z', at: -4.0, w: 5.6, y0: 5.4, y1: 9.8, sill: 1.2 }],
+    },
+    abilities: { doubleJump: true, flop: true, dash: true },
+    spawn: [-8.6, 0, -6.2], spawnYaw: Math.PI / 2, camYaw: -1.25,
+    drain: 1.0,
+    props: [
+      { type: 'counter', x: -9.5, z: -9.55, w: 8.6, stove: 0 },
+      { type: 'counter', x: -2.0, z: -9.55, w: 6.4, sink: -2.0 },
+      { type: 'counter', x: 6.0, z: -9.55, w: 5.2 },
+      { type: 'fridge', x: 11.0, z: -9.3 },
+      { type: 'upperCabinet', x: -12.5, z: -10.2, w: 2.6, y0: 6.0, h: 2.6 },
+      { type: 'upperCabinet', x: -6.5, z: -10.2, w: 2.6, y0: 6.0, h: 2.6 },
+      { type: 'rangeHood', x: -9.5, z: -10.0, y0: 7.6 },
+      { type: 'wallShelf', x: 4.6, z: -10.35, w: 2.6, d: 1.3, y: 6.7 },
+      { type: 'jar', x: 3.7, y: 6.7, z: -10.5, r: 0.35, h: 0.9, fill: 0xe0b26a },
+      { type: 'cereal', x: -6.5, y: 4.1, z: -8.7 },
+      { type: 'breadBin', x: -12.6, y: 4.1, z: -8.75 },
+      { type: 'toaster', x: 5.0, y: 4.1, z: -8.9 },
+      { type: 'jar', x: 7.6, y: 4.1, z: -10.2, r: 0.45, h: 1.3, fill: 0xf2efe6 },
+      { type: 'stepStool', x: -4.0, z: -7.05 },
+      { type: 'island', x: 1.0, z: 0.5, w: 7, d: 3.4 },
+      { type: 'fruitBowl', x: 0.2, y: 4.1, z: 0.4 },
+      { type: 'hangingPots', x: 1.0, z: 0.5, y0: 9.6 },
+      { type: 'stool', x: -1.3, z: 3.2 }, { type: 'stool', x: 1.0, z: 3.2 }, { type: 'stool', x: 3.3, z: 3.2 },
+      { type: 'diningTable', x: -7.2, z: 6.0 },
+      { type: 'chair', x: -8.8, z: 2.6, rot: 0 }, { type: 'chair', x: -5.6, z: 2.6, rot: 0 },
+      { type: 'chair', x: -8.8, z: 9.4, rot: 2 }, { type: 'chair', x: -5.6, z: 9.4, rot: 2 },
+      { type: 'pedalBin', x: 12.8, z: -5.6 },
+      { type: 'petBowls', x: -12.4, z: -4.8 },
+      { type: 'kitchenRug', x: -5.0, z: -6.2, w: 10, d: 2.2 },
+      { type: 'wallClock', x: 13.95, z: -1.5, rot: 3, y0: 7.6 },
+      { type: 'petGate', x: 12.6, z: 6.0, rot: 1, gate: 'g1' },
+      { type: 'plant', x: 12.6, z: 10.0 },
+    ],
+    safe: [
+      { x0: -10, z0: -7.3, x1: 0, z1: -5.1 },        // the rug runner
+      { x: 9.4, z: -6.2, r: 2.4 },                    // light from the fridge door
+      { x: -4.0, z: -4.4, r: 1.6 },                   // moonlight under the window
+    ],
+    lamps: [
+      { x: -13.7, y: 0.4, z: 1.2, kind: 'plugLight', safe: { x: -12.6, z: 1.2, r: 2.4 } },
+      { x: 6.9, y: 4.1, z: -10.6, kind: 'plugLight', safe: null },
+    ],
+    collect: { kind: 'letter', label: 'magnet letters', hint: 'They fell off the fridge', done: 'L · E · O — Leo!', items: [
+      { at: [-7.2, 4.3, 6.0], ch: 'L' }, { at: [-4.0, 6.2, -10.3], ch: 'E' }, { at: [-6.5, 9.4, -10.2], ch: 'O' },
+    ] },
+    switches: [{ at: [11.0, 8.6, -9.6], gate: 'g1', color: 0x3f8fd8, toast: 'Click! The pet gate swings open', hint: 'Now out through the far door' }],
+    fish: F(
+      line([-11.6, 0.6, 1.6], [-11.6, 0.6, 4.4], 2), line([-7.2, 0.6, -6.2], [-1.6, 0.6, -6.2], 4), [[-4.0, 3.2, -6.6]],
+      line([-1.6, 4.9, -9.0], [0.8, 4.9, -9.0], 3), arc([1.4, 5.0, -9.0], [3.6, 5.0, -9.0], 3, 1.0), line([4.2, 7.5, -10.3], [5.4, 7.5, -10.3], 2),
+      arc([6.4, 7.6, -10.0], [9.6, 9.4, -9.4], 3, 1.0), line([-11.4, 4.9, -9.0], [-8.0, 4.9, -9.0], 3),
+      line([-1.3, 4.2, 3.2], [3.3, 4.2, 3.2], 3), line([-1.2, 4.9, 0.5], [3.6, 4.9, 0.5], 3), line([-8.8, 2.8, 2.6], [-5.6, 2.8, 2.6], 2),
+      line([2.0, 0.6, 7.0], [9.0, 0.6, 7.0], 4)),
+    starfish: [[-12.5, 9.4, -10.2], [4.0, 5.6, -4.4], [-7.2, 0.9, 6.0]],
+    enemies: [
+      { type: 'shadow', path: [[-2.0, 0, 6.6], [7.0, 0, 6.6]], speed: 1.4 },
+      { type: 'shadow', path: [[8.0, 0, -3.6], [8.0, 0, 3.6]], speed: 1.5 },
+      { type: 'shadow', path: [[-11.0, 0, -2.6], [-3.0, 0, -2.6]], speed: 1.3 },
+      { type: 'shadow', path: [[11.4, 0, 1.6], [11.4, 0, 9.6]], speed: 1.2 },
+    ],
+    bunnies: [[0.0, 0, 7.6], [6.6, 0, -5.6]],
+    goal: { x: 13.2, y: 0, z: 6.0, r: 2.0, label: 'laundry room' },
   },
   // ---------------------------------------------------------------------------
   {

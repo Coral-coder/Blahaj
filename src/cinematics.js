@@ -510,6 +510,13 @@ export function bedIntro(game, hooks) {
   ], [[0.4, 'The nightmare has found Leo.'], [4.4, 'Climb up and chase it away!']]);
 }
 
+export function kitchenIntro(game, hooks) {
+  return flyover(game, hooks, [
+    { d: 4.6, from: V(-12.0, 3.0, 9.0), to: V(-3.0, 8.0, 8.4), look0: V(0, 2, 0), look1: V(9.0, 6.0, -8.6), fov: 54 },
+    { d: 4.0, from: V(-3.0, 8.0, 8.4), to: V(5.0, 4.2, 9.4), look0: V(11.0, 8.6, -9.4), look1: V(12.6, 2.0, 6.0), fov: 54 },
+  ], [[0.4, 'The kitchen. Leo’s drawing is still on the fridge…'], [3.0, '…but his magnet letters got knocked everywhere.'], [5.6, 'Find L, E and O — and a way past the pet gate.']]);
+}
+
 // ------------------------------------------------------------------ ending --
 export function ending(game, hooks) {
   const leo = game.leo, P = game.p, rig = game.rig;
@@ -581,4 +588,4 @@ export function ending(game, hooks) {
   return c;
 }
 
-export const CINES = { prologue, dog: dogSnatch, downstairs, stairs: stairsIntro, bed: bedIntro, ending };
+export const CINES = { prologue, dog: dogSnatch, downstairs, kitchen: kitchenIntro, stairs: stairsIntro, bed: bedIntro, ending };

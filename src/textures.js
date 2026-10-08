@@ -412,6 +412,58 @@ Object.assign(Tex, {
       return [s, s, s, n, 0.7];
     });
   },
+  // glazed square tiles with grout lines (greyscale, tinted by the material); n = tiles across
+  tiles(n = 4) {
+    return makeSet('tiles' + n, 512, 3, (u, v) => {
+      const fu = u * n - Math.floor(u * n), fv = v * n - Math.floor(v * n);
+      const ti = Math.floor(u * n), tj = Math.floor(v * n);
+      const edge = Math.min(fu, 1 - fu, fv, 1 - fv);
+      const grout = 1 - sstep(0.02, 0.045, edge);
+      const bevel = sstep(0.045, 0.11, edge);
+      const n2 = fbm(u * 10, v * 10, 10, 3, 251), tint = (hash(ti, tj, 252) - 0.5) * 0.05;
+      const s = grout ? 0.62 + n2 * 0.06 : 0.93 + tint + n2 * 0.03;
+      return [s, s, s, (1 - grout) * (0.6 + bevel * 0.4) + n2 * 0.05, grout ? 0.95 : 0.18 + n2 * 0.1];
+    });
+  },
+  // black and white kitchen floor
+  checker(n = 4) {
+    return makeSet('checker' + n, 512, 2.5, (u, v) => {
+      const ti = Math.floor(u * n), tj = Math.floor(v * n), fu = u * n - ti, fv = v * n - tj;
+      const edge = Math.min(fu, 1 - fu, fv, 1 - fv), grout = 1 - sstep(0.012, 0.03, edge);
+      const dark = (ti + tj) & 1, n2 = fbm(u * 12, v * 12, 12, 3, 261);
+      const base = dark ? 0.16 + n2 * 0.05 : 0.9 + n2 * 0.05, s = grout ? 0.5 : base;
+      return [s, s, s * (dark ? 1.05 : 0.98), (1 - grout) * 0.7 + n2 * 0.1, grout ? 0.9 : 0.22 + n2 * 0.1];
+    });
+  },
+  // poured concrete: cloudy, speckled, a few hairline cracks
+  concrete() {
+    return makeSet('concrete', 512, 2.5, (u, v) => {
+      const n = fbm(u * 6, v * 6, 6, 5, 271), sp = vnoise(u * 260, v * 260, 260, 272);
+      const [f1, f2] = worley(u * 3, v * 3, 3, 273), crack = 1 - sstep(0.0, 0.025, f2 - f1);
+      const s = 0.62 + n * 0.16 + (sp > 0.82 ? -0.08 : 0) - crack * 0.12;
+      return [s, s, s * 1.02, n * 0.6 + sp * 0.2 - crack * 0.4, 0.88];
+    });
+  },
+  // garden fence: vertical boards
+  fence() {
+    return makeSet('fence', 512, 3, (u, v) => {
+      const N = 6, bi = Math.floor(u * N), fu = u * N - bi;
+      const gap = 1 - sstep(0.02, 0.05, Math.min(fu, 1 - fu));
+      const grain = vnoise2(u * 60, v * 4, 60, 4, 281 + bi), n = fbm(u * 8, v * 8, 8, 3, 282);
+      const c = mix3([0.55, 0.42, 0.3], [0.72, 0.58, 0.42], grain * 0.6 + n * 0.4 + (hash(bi, 0, 283) - 0.5) * 0.3);
+      const k = gap ? 0.25 : 1;
+      return [c[0] * k, c[1] * k, c[2] * k, (1 - gap) * 0.7 + grain * 0.2, 0.85];
+    });
+  },
+  // a clipped hedge: clumps of leaves
+  hedge() {
+    return makeSet('hedge', 512, 7, (u, v) => {
+      const [f1, , id] = worley(u * 40, v * 40, 40, 291);
+      const leaf = clamp01(1 - f1 * 1.6), n = fbm(u * 6, v * 6, 6, 4, 292);
+      const c = mix3([0.08, 0.2, 0.09], [0.28, 0.5, 0.22], leaf * 0.6 + n * 0.3 + (id - 0.5) * 0.2);
+      return [c[0], c[1], c[2], leaf * 0.7 + n * 0.3, 0.75];
+    });
+  },
 });
 
 // a moonlit night seen through a window: sky gradient, stars, moon, rooftops
