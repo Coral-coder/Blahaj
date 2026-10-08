@@ -544,6 +544,13 @@ export function garageIntro(game, hooks) {
   ], [[0.4, 'The garage. Dad left the car lights on again…'], [3.0, 'The basement switch is dead — it needs batteries.'], [6.0, 'Watch out for spiders dangling from the rafters!']]);
 }
 
+export function basementIntro(game, hooks) {
+  return flyover(game, hooks, [
+    { d: 4.6, from: V(-11.0, 10.0, 9.0), to: V(-6.0, 6.0, -2.0), look0: V(0.0, 3.0, 0.0), look1: V(5.0, 4.0, 1.4), fov: 56 },
+    { d: 4.6, from: V(-6.0, 6.0, -2.0), to: V(2.0, 7.0, 5.0), look0: V(5.0, 4.0, 1.4), look1: V(10.0, 8.0, 9.8), fov: 56 },
+  ], [[0.4, 'The basement. Every bulb down here has blown…'], [3.0, 'Dad’s train set is still running in the dark.'], [6.0, 'Find four bulbs, and the old dumbwaiter will take you up.']]);
+}
+
 // ------------------------------------------------------------------ ending --
 export function ending(game, hooks) {
   const leo = game.leo, P = game.p, rig = game.rig;
@@ -615,4 +622,4 @@ export function ending(game, hooks) {
   return c;
 }
 
-export const CINES = { prologue, dog: dogSnatch, downstairs, kitchen: kitchenIntro, laundry: laundryIntro, backyard: backyardIntro, garage: garageIntro, stairs: stairsIntro, bed: bedIntro, ending };
+export const CINES = { prologue, dog: dogSnatch, downstairs, kitchen: kitchenIntro, laundry: laundryIntro, backyard: backyardIntro, garage: garageIntro, basement: basementIntro, stairs: stairsIntro, bed: bedIntro, ending };

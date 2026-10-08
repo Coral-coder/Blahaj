@@ -398,6 +398,73 @@ export const CHAPTERS = [
   },
   // ---------------------------------------------------------------------------
   {
+    id: 'basement', title: 'Down in the Basement', music: 1,
+    goalText: 'Find four light bulbs, then ride the dumbwaiter up',
+    intro: 'basement',
+    room: {
+      id: 'basement', x0: -14, x1: 14, z0: -12, z1: 12, h: 14, floor: 'concrete', wall: 'concreteWall', ambient: 1.85, landing: 'wood',
+      upper: [{ x0: -14, x1: -9.5, z0: 6, z1: 12, y: 8.0 }, { x0: 10.6, x1: 14, z0: 7.6, z1: 12, y: 9.0 }],
+      doors: [{ wall: '-x', at: 9.0, w: 4.0, h: 4.6, y0: 8.0 }],
+    },
+    abilities: { doubleJump: true, flop: true, dash: true, glide: true },
+    spawn: [-5.0, 0, -5.4], spawnYaw: 0.78, camYaw: -2.36,
+    drain: 1.05,
+    props: [
+      { type: 'basementStairs', x: -11.75, z: -7.0, rot: 2, n: 10, rise: 0.8, run: 1.3, w: 4.5, rail: -1 },
+      { type: 'furnace', x: -2.0, z: -9.8, riser: 3.3 },
+      { type: 'duct', x: 2.6, z: -9.0, w: 13.6, y0: 9.8, ceiling: 14 },
+      { type: 'waterHeater', x: 11.6, z: -9.6 },
+      { type: 'trainTable', x: 5.0, z: 1.4, mountain: 3.0 },
+      { type: 'toyTrain', x: 1.2, y: 3.0, z: -0.6, move: { path3: [[1.2, 3.0, -0.6], [8.8, 3.0, -0.6], [8.8, 3.0, 3.4], [1.2, 3.0, 3.4]], loop: true, speed: 1.6 } },
+      { type: 'cardboardBox', x: -1.4, z: 2.0, w: 2.4, d: 2.4, h: 1.8, label: 'TRAINS' },
+      { type: 'utilityShelf', x: 13.1, z: -3.2, rot: 3, shelves: [2.6, 5.1, 7.6] },
+      { type: 'paintCans', x: 13.2, z: -4.6, rot: 3, y0: 2.6, n: 4, seed: 1 },
+      { type: 'pipes', x: 2.0, z: -3.2, w: 21, top: 9.4, ceiling: 14 },
+      { type: 'pingPong', x: -3.4, z: 6.8 },
+      { type: 'sheetCouch', x: 4.2, z: 10.4, rot: 2, w: 6.4 },
+      { type: 'liftShaft', x: 9.0, z: 9.8, h: 9.6 },
+      { type: 'post', x: -9.75, z: 6.25, h: 7.4 }, { type: 'post', x: 10.85, z: 7.85, h: 8.4 },
+      { type: 'dumbwaiter', x: 9.0, y: 0, z: 9.8, move: { path3: [[9.0, 0, 9.8], [9.0, 8.7, 9.8]], speed: 1.8, wait: 1.8, noTurn: true } },
+      { type: 'hatch', x: 13.95, z: 9.8, rot: 3, y0: 9.0, w: 3.4, h: 3.8 },
+      { type: 'cardboardBox', x: 7.0, z: -10.4, w: 2.6, d: 2.2, h: 2.0, label: 'XMAS' },
+      { type: 'cardboardBox', x: -6.6, z: -10.6, w: 2.4, d: 2.2, h: 1.8, label: 'OLD TOYS' },
+      { type: 'bareBulb', x: -4.0, z: 0.0, y0: 12.2, ceiling: 14 }, { type: 'bareBulb', x: 6.0, z: 6.0, y0: 12.2, ceiling: 14 },
+      { type: 'cobweb', x: 13.9, z: 11.9, y0: 13.9 }, { type: 'cobweb', x: -13.9, z: -11.9, y0: 13.9, rot: 2 },
+      { type: 'sumpGrate', x: -8.0, z: 0.0 },
+    ],
+    wind: [{ x: -2.0, z: -6.6, r: 1.4, y0: 0, y1: 12.0, color: 0xffd2a0 }], // hot air from the furnace grate
+    safe: [
+      { x: -3.4, z: -6.0, r: 2.8 },     // the furnace's warm glow
+      { x: 12.3, z: 9.8, r: 1.6 },      // the hatch at the top (on the landing)
+      { x: 9.0, z: 8.6, r: 2.0 },       // the dumbwaiter's little lamp
+    ],
+    lamps: [
+      { x: 9.4, y: 3.0, z: 4.0, kind: 'deskLamp', safe: { x: 9.4, z: 6.4, r: 2.2 } },
+      { x: -13.8, y: 1.2, z: -2.0, kind: 'plugLight', safe: { x: -12.2, z: -2.0, r: 2.0 } },
+    ],
+    collect: { kind: 'bulb', label: 'light bulbs', hint: 'Try the warm air, the train set and the pipes', done: 'Four bulbs! The dumbwaiter hatch lights up', items: [
+      [11.6, 9.6, -9.6], [-2.0, 10.0, -6.6], [5.0, 7.0, 1.4], [-4.0, 10.4, -3.2],
+    ] },
+    fish: F(
+      line([-5.0, 0.6, -3.0], [-5.0, 0.6, 3.0], 3), line([-2.0, 2.0, -6.6], [-2.0, 8.0, -6.6], 3), line([-2.0, 11.4, -9.0], [8.6, 11.4, -9.0], 4),
+      line([1.2, 3.6, -0.6], [8.8, 3.6, -0.6], 4), line([8.8, 3.6, 3.4], [1.2, 3.6, 3.4], 3), line([12.6, 8.4, -3.2], [6.0, 9.9, -3.2], 3), line([2.0, 9.9, -3.2], [-6.0, 9.9, -3.2], 3),
+      line([-6.4, 3.6, 6.8], [-0.4, 3.6, 6.8], 3), line([9.0, 1.4, 7.6], [9.0, 7.0, 7.6], 3)),
+    starfish: [[-3.4, 0.9, 6.8], [4.2, 7.6, 10.0], [9.0, 12.4, -9.0]],
+    enemies: [
+      { type: 'spider', at: [8.0, 13.6, 3.4], drop: 7.4, period: 4.2 },
+      { type: 'spider', at: [4.0, 13.8, -7.4], drop: 2.6, period: 3.2, phase: 1.0 },
+      { type: 'spider', at: [11.2, 13.6, -1.2], drop: 5.4, period: 3.8, phase: 2.2 },
+      { type: 'moth', path: [[5.0, 6.0, 7.6], [11.0, 6.4, 7.0], [11.0, 6.0, 5.0], [5.0, 6.4, 5.6]], speed: 1.3 },
+      { type: 'shadow', path: [[-8.0, 0, -3.0], [-8.0, 0, 4.0]], speed: 1.4 },
+      { type: 'shadow', path: [[0.0, 0, -6.0], [10.0, 0, -6.0]], speed: 1.5 },
+      { type: 'shadow', path: [[1.6, 0, 6.2], [6.4, 0, 6.2]], speed: 1.3 },
+      { type: 'shadow', path: [[12.0, 0, 0.0], [12.0, 0, 6.0]], speed: 1.2 },
+    ],
+    bunnies: [[-6.0, 0, 2.0]],
+    goal: { x: 12.6, y: 9.0, z: 9.8, r: 1.8, label: 'dumbwaiter' },
+  },
+  // ---------------------------------------------------------------------------
+  {
     id: 'stairs', title: 'The Big Stairs', music: 2,
     goalText: 'Climb before the dark catches you',
     intro: 'stairs', newAbility: 'dash',

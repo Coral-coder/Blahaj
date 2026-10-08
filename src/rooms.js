@@ -556,7 +556,7 @@ function buildShell(room, scene) {
     if (b.tag === 'floor') { mat = floorMat; uv = floorUV; }
     else if (b.tag === 'ceiling') { mat = room.wall === 'atticWall' ? Mat.woodBoard() : Mat.paint(0xf4f1ea, 0.95); uv = 0.15; }
     else if (b.tag === 'sill') { mat = Mat.whiteWood(); uv = 0.6; }
-    else if (b.tag === 'landing') { mat = Mat.carpet(0x8f3b3f); uv = 0.6; }
+    else if (b.tag === 'landing') { mat = room.landing === 'wood' ? Mat.woodBoard() : Mat.carpet(0x8f3b3f); uv = 0.6; }
     const m = new THREE.Mesh(worldUV(new THREE.BoxGeometry(w, h, d), uv), mat);
     m.position.set((b.min[0] + b.max[0]) / 2, cy, (b.min[2] + b.max[2]) / 2);
     m.receiveShadow = true;

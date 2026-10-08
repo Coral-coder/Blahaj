@@ -399,7 +399,8 @@ export class Game {
       P.vel.y -= CFG.gravity * dt;
       if (P.vel.y < -CFG.maxFall) P.vel.y = -CFG.maxFall;
       P.glide = false;
-      if (this.ab.glide && !P.grounded && P.vel.y < 0 && inp.jumpHeld() && !P.jumpHeld) {
+      // glide while falling, or ride warm air upward while holding jump inside an updraft
+      if (this.ab.glide && !P.grounded && inp.jumpHeld() && (P.inWind || (P.vel.y < 0 && !P.jumpHeld))) {
         if (P.vel.y < -CFG.glideFall) P.vel.y += (-CFG.glideFall - P.vel.y) * Math.min(1, dt * 14);
         P.glide = true;
       }

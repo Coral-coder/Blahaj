@@ -50,6 +50,23 @@ window.__bot = {
       }
       return 'timeout ' + where();
     };
+    // ride an updraft: walk into it, jump, hold jump to float up to `rise`, then glide over to the target
+    const updraft = (wx, wz, x, y, z, o) => {
+      const w0 = walk(wx, wz, 0.25); if (w0 !== true) return 'walk ' + w0;
+      tick(['Space'], ['Space']);
+      let up = true;
+      for (let t = 0; t < (o.max || 8); t += step) {
+        if (g.state !== 'play') return 'state:' + g.state;
+        if (up && P.pos.y >= (o.rise ?? y + 1.5)) up = false; // high enough: head for the target
+        const [tx, tz] = up ? [wx, wz] : [x, z];
+        face(tx, tz);
+        const keys = ['Space'];
+        if (hd(tx, tz) > (up ? 0.15 : 0.35)) keys.push('KeyW');
+        tick(keys);
+        if (P.grounded && t > 0.3 && !up) { stop(6); const ok = P.pos.y > y - 0.4 && P.pos.y < y + 1.3 && hd(x, z) < 2.6; return ok ? true : `landed ${where()} wanted (${x},${y},${z})`; }
+      }
+      return 'timeout ' + where();
+    };
     const knots = () => {
       for (let attempt = 0; attempt < 14 && g.knotsLeft > 0; attempt++) {
         const k = g.enemies.find((e) => e.type === 'knot' && e.alive);
@@ -79,6 +96,7 @@ window.__bot = {
       else if (w[0] === 'jump') r = jump(w[1], w[2], w[3], w[4]);
       else if (w[0] === 'wait') { for (let t = 0; t < w[1]; t += step) tick([]); r = true; }
       else if (w[0] === 'knots') r = knots();
+      else if (w[0] === 'updraft') r = updraft(w[1], w[2], w[3], w[4], w[5], w[6] || {});
       else if (w[0] === 'waitMover') { // ['waitMover', x, y, z, r]: until a moving platform's top centre is near (x, y, z)
         r = 'mover never came';
         for (let t = 0; t < 20; t += step) {
