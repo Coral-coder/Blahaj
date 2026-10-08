@@ -41,13 +41,15 @@ const HELD_Q = yawQ(Math.PI).multiply(new THREE.Quaternion().setFromEuler(new TH
 export const SNUG_BEND = -1.0;
 export function snuggle(leo, bx, bz, pose) {
   const L = leo.worldToLocal(V(bx, 0, bz));
-  const ik = new THREE.Vector3(L.x + 0.3, 0.5, L.z + 0.15);
-  const ikL = pose ? leo.worldToLocal(pose.com.clone().add(V(0.42, 0.2, 0.25))) : new THREE.Vector3(L.x + 0.42, 1.25, L.z + 0.35);
-  // top arm: the elbow lies forward along Blåhaj's back (toward his head), not up in the air
-  return { roll: -0.85, curl: 0.7, ik, ikW: 1, pole: V(0.2, -1, -0.1).normalize(), armOver: true, ikL, ikWL: 1, poleL: V(0.55, 0.55, -0.65).normalize(), armOverL: true };
+  // lower arm flat on the mattress under Blåhaj; knees only a little drawn up, so
+  // they stay clear of him and he lies low against Leo's chest
+  const ik = new THREE.Vector3(L.x + 0.3, 0.28, L.z + 0.15);
+  const ikL = pose ? leo.worldToLocal(pose.com.clone().add(V(0.45, 0.02, 0.3))) : new THREE.Vector3(L.x + 0.45, 0.62, L.z + 0.3);
+  // top arm: wraps low over his back, the elbow toward his tail (never up in the air)
+  return { roll: -0.85, curl: 0.3, ik, ikW: 1, pole: V(0.2, -1, -0.1).normalize(), armOver: true, ikL, ikWL: 1, poleL: V(0.35, 0.4, 0.85).normalize(), armOverL: true };
 }
-const snugX = (leo) => leo.hugPoint.x + 0.12; // right up against his chest
-const snugZ = (leo) => leo.hugPoint.z + 0.15;
+const snugX = (leo) => leo.hugPoint.x + 0.2; // right up against his chest
+const snugZ = (leo) => leo.hugPoint.z - 0.35; // (up by his chest, clear of his knees)
 export function restingHug(game, dt, extra = {}) {
   const leo = game.leo, t = (game._hugT = (game._hugT || 0) + dt), bx = snugX(leo), bz = snugZ(leo);
   leo.update(dt, Object.assign({ cover: 0.3, shiver: 0, grabR: false, grabL: false, blahaj: game._hugPose ? onTopOf(leo, game._hugPose) : [] }, snuggle(leo, bx, bz, game._hugPose), extra));
@@ -167,10 +169,10 @@ export function prologue(game, hooks) {
     const grabbing = t >= 14.95 && t < 17.4;
     const blahaj = lastPose && lastPose.com.y > leo.group.position.y - 0.6 ? onTopOf(leo, lastPose) : [];
     if (!c.settled) { // from the title's pose to this one: lay the blanket fresh
-      const p0 = { cover, roll: -0.85, curl: 0.7, shiver, ik, ikW, pole, ikL: sn.ikL, ikWL: 1, poleL: sn.poleL, armOver: true, armOverL: true, grabR: false, grabL: false };
+      const p0 = { cover, roll: -0.85, curl: 0.3, shiver, ik, ikW, pole, ikL: sn.ikL, ikWL: 1, poleL: sn.poleL, armOver: true, armOverL: true, grabR: false, grabL: false };
       leo.update(0, p0); leo.update(0, Object.assign(p0, { blahaj: onTopOf(leo, { com: restingCom(), q: heldQ }) })); leo.settle(3); c.settled = true;
     }
-    leo.update(dt, { cover: grabbing ? null : t < 15 ? cover : 0.82, roll: -0.85 + 1.85 * rollT, curl: 0.7 * (1 - rollT), shiver, ik, ikW, pole, ikL: sn.ikL, ikWL: 1 - letGo, poleL: sn.poleL, grabR: grabbing, grabL: false, blahaj });
+    leo.update(dt, { cover: grabbing ? null : t < 15 ? cover : 0.82, roll: -0.85 + 1.85 * rollT, curl: 0.3 * (1 - rollT), shiver, ik, ikW, pole, ikL: sn.ikL, ikWL: 1 - letGo, poleL: sn.poleL, grabR: grabbing, grabL: false, blahaj });
     // Blåhaj: snug in his arm, then (real physics) rolling off the bed
     rig.root.visible = true;
     let com, q, vel = V(), grounded = true;

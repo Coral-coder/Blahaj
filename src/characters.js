@@ -209,7 +209,7 @@ export function createLeo(bed) {
       list.push(capC(Km, Am, 0.18 + 0.5 * K1.distanceTo(K2) / 2 + 0.5 * A1.distanceTo(A2) / 2));
     }
     if (withArms) for (const sg of segs) if (!armsFilter || armsFilter(sg.tag)) list.push(capC(sg.a, sg.b, sg.r + 0.02));
-    if (withBlahaj) for (const b of state.blahaj || []) list.push({ t: 's', v: [b.x, b.y, b.z, b.r], mu: 0.5 });
+    if (withBlahaj) for (const b of state.blahaj || []) list.push({ t: 's', v: [b.x, b.y, b.z, b.r], mu: b.mu !== undefined ? b.mu : 0.5 });
     return list;
   }
   const bbOf = (c) => {
@@ -269,7 +269,20 @@ export function createLeo(bed) {
 
   // keep the top edge where the covers are meant to be (unless a hand has it)
   let coverZ = zTopOf(state.cover);
+  // anchors (in play): every point is gently held where the blanket last settled,
+  // firmer where it hangs over the sides and foot (tucked in), so walking around on
+  // the bed dents it but never drags it off
+  const anchor = new Float32Array(cloth.N * 3), anchorK = new Float32Array(cloth.N);
+  function setAnchors() {
+    anchor.set(cloth.P);
+    for (let p = 0; p < cloth.N; p++) anchorK[p] = anchor[p * 3 + 1] < -0.05 ? 0.08 : 0.012;
+  }
   cloth.guide = (P, W) => {
+    if (state.anchor > 0) for (let p = 0; p < cloth.N; p++) {
+      if (W[p] === 0) continue;
+      const k = anchorK[p] * state.anchor;
+      P[p * 3] += (anchor[p * 3] - P[p * 3]) * k; P[p * 3 + 1] += (anchor[p * 3 + 1] - P[p * 3 + 1]) * k; P[p * 3 + 2] += (anchor[p * 3 + 2] - P[p * 3 + 2]) * k;
+    }
     if (state.cover === null || state.cover === undefined) return;
     for (let i = 0; i < CNX; i++) {
       const p = cloth.idx(i, 0);
@@ -443,6 +456,7 @@ export function createLeo(bed) {
     handAt(tag) { return hands[tag].clone().add(root.position); },
     update(dt, s = {}) {
       Object.assign(state, s);
+      state.anchor = s.anchor || 0; // only while you play (cutscenes move it freely)
       pose(dt);
       for (const tag of ['R', 'L']) {
         const want = tag === 'R' ? state.grabR : state.grabL;
@@ -458,7 +472,7 @@ export function createLeo(bed) {
       cloth.setColliders(allColliders()); cloth.setColliders(allColliders());
       cloth.opts.self = true;
       for (let i = 0, n = Math.round(seconds / H); i < n; i++) cloth.step(H, 1, 1);
-      awake = 30; writeMesh();
+      awake = 30; writeMesh(); setAnchors();
     },
   };
   void probeOut;

@@ -701,9 +701,9 @@ export class Game {
       if (near) { // his real body, as drawn: the rig's body space is the collision spheres' space
         const body = this.rig.body; body.updateWorldMatrix(true, false);
         const k = body.getWorldScale(V()).x;
-        spheres = BLAHAJ_SPHERES.map(([x, y, z, r]) => { const p = V(x, y, z).applyMatrix4(body.matrixWorld); return { x: p.x - lp.x, y: p.y - lp.y, z: p.z - lp.z, r: r * k + 0.04 }; });
+        spheres = BLAHAJ_SPHERES.map(([x, y, z, r]) => { const p = V(x, y, z).applyMatrix4(body.matrixWorld); return { x: p.x - lp.x, y: p.y - lp.y, z: p.z - lp.z, r: r * k + 0.04, mu: 0.03 }; }); // slides over the fabric, doesn't drag it
       }
-      this.leo.update(dt, { blahaj: spheres });
+      this.leo.update(dt, { blahaj: spheres, anchor: 1 });
     }
     if (this.bubble) {
       this.bubble.update(dt, t, this.cine && this.cine.dream !== undefined ? this.cine.dream : c01);
