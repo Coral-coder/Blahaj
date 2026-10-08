@@ -19,9 +19,10 @@ function nodesFor(ch) {
     const bs = expand(p);
     if (!p.move) return bs;
     // a moving prop counts at every corner of its path
-    return p.move.path.flatMap(([x, z]) => bs.map((b) => {
-      const dx = x - p.x, dz = z - p.z;
-      return Object.assign({}, b, { min: [b.min[0] + dx, b.min[1], b.min[2] + dz], max: [b.max[0] + dx, b.max[1], b.max[2] + dz] });
+    const pts = p.move.path3 ? p.move.path3 : p.move.path.map(([x, z]) => [x, p.y || 0, z]);
+    return pts.flatMap(([x, y, z]) => bs.map((b) => {
+      const dx = x - p.x, dy = y - (p.y || 0), dz = z - p.z;
+      return Object.assign({}, b, { min: [b.min[0] + dx, b.min[1] + dy, b.min[2] + dz], max: [b.max[0] + dx, b.max[1] + dy, b.max[2] + dz] });
     }));
   })];
   return boxes.filter((b) => !SKIP.test(b.tag) && b.type !== 'hazard').map((b, i) => Object.assign({ id: i, top: b.max[1] }, b));

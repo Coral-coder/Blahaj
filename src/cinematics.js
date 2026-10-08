@@ -523,6 +523,13 @@ export function kitchenIntro(game, hooks) {
   ], [[0.4, 'The kitchen. Leo’s drawing is still on the fridge…'], [3.0, '…but his magnet letters got knocked everywhere.'], [5.6, 'Find L, E and O — and a way past the pet gate.']]);
 }
 
+export function laundryIntro(game, hooks) {
+  return flyover(game, hooks, [
+    { d: 4.4, from: V(-10.0, 3.0, -5.0), to: V(-5.0, 7.5, 7.5), look0: V(-1.0, 3.0, -8.5), look1: V(-11.0, 8.0, 4.0), fov: 54 },
+    { d: 4.4, from: V(-5.0, 7.5, 7.5), to: V(5.0, 5.0, 8.4), look0: V(0.0, 7.0, 0.0), look1: V(11.4, 5.0, 3.0), fov: 54 },
+  ], [[0.4, 'The laundry room. The dryer’s still warm…'], [3.0, 'Leo’s socks are everywhere — five of them, at least.'], [5.8, 'And the back door is shut. There must be a way to open it.']]);
+}
+
 // ------------------------------------------------------------------ ending --
 export function ending(game, hooks) {
   const leo = game.leo, P = game.p, rig = game.rig;
@@ -594,4 +601,4 @@ export function ending(game, hooks) {
   return c;
 }
 
-export const CINES = { prologue, dog: dogSnatch, downstairs, kitchen: kitchenIntro, stairs: stairsIntro, bed: bedIntro, ending };
+export const CINES = { prologue, dog: dogSnatch, downstairs, kitchen: kitchenIntro, laundry: laundryIntro, stairs: stairsIntro, bed: bedIntro, ending };

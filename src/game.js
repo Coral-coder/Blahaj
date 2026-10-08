@@ -56,7 +56,7 @@ export class Game {
     scene.fog = new THREE.Fog(0x0a0c18, 30, 70);
     this.camera = new THREE.PerspectiveCamera(58, innerWidth / innerHeight, 0.05, 300);
     this.roomFx = buildRoom(scene, ch, q);
-    const movingVis = new Set(ch.props.filter((p) => p.move).map((p) => p._visual));
+    const movingVis = new Set(ch.props.filter((p) => p.move || (p._visual && p._visual.userData.tick)).map((p) => p._visual)); // movers and animated props keep updating
     for (const grp of [this.roomFx.shell, this.roomFx.props]) grp.traverse((o) => { let n = o, moving = false; while (n) { if (movingVis.has(n)) { moving = true; break; } n = n.parent; } if (!moving) { o.updateMatrix(); o.matrixAutoUpdate = false; } });
     scene.environmentIntensity = 0.25;
     // furniture that fades out when it comes between the camera and Blåhaj

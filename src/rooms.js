@@ -814,9 +814,10 @@ export function buildRoom(scene, ch, quality) {
   }
   scene.add(propGroup);
   const upd = [];
+  for (const p of ch.props) if (p._visual.userData.tick) upd.push((t) => p._visual.userData.tick(t)); // spinning drums and the like
 
   // night fill: cool and dim, so silhouettes still read
-  const hemi = new THREE.HemisphereLight(0x3a4a80, 0x1a1420, 1.6);
+  const hemi = new THREE.HemisphereLight(0x3a4a80, 0x1a1420, 1.6 * (room.ambient || 1));
   scene.add(hemi);
   // moonlight through the first window
   const win = (room.windows || [])[0];

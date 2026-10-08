@@ -202,6 +202,66 @@ export const CHAPTERS = [
   },
   // ---------------------------------------------------------------------------
   {
+    id: 'laundry', title: 'The Laundry Room', music: 0,
+    goalText: 'Find the five lost socks, then open the back door',
+    intro: 'laundry',
+    room: {
+      id: 'laundry', x0: -12, x1: 12, z0: -10, z1: 10, h: 11.4, floor: 'tile', wall: 'laundryWall', ambient: 1.6,
+      doors: [{ wall: '-x', at: -5, w: 4.5, h: 9.5 }, { wall: '+x', at: 5, w: 4.5, h: 9.5 }],
+      windows: [{ wall: '-z', at: 4.6, w: 4.4, y0: 5.6, y1: 9.4, sill: 0.8 }],
+    },
+    abilities: { doubleJump: true, flop: true, dash: true },
+    spawn: [-8.6, 0, -4.4], spawnYaw: Math.PI / 2, camYaw: -0.25,
+    drain: 1.05,
+    props: [
+      { type: 'washer', x: -3.0, z: -8.5 }, { type: 'dryer', x: 0.4, z: -8.5 },
+      { type: 'wallShelf', x: -1.3, z: -9.4, w: 6.6, d: 1.2, y: 7.2 },
+      { type: 'detergent', x: -4.2, y: 7.2, z: -9.5 },
+      { type: 'utilitySink', x: 4.6, z: -8.8 },
+      { type: 'stepLadder', x: 8.2, z: -7.4, rot: 2 },
+      { type: 'dogFood', x: -6.6, z: -8.8 }, // a step up onto the washer
+      { type: 'utilityShelf', x: -11.0, z: 4.0, rot: 1 },
+      { type: 'laundry', x: -6.6, z: 7.6 }, { type: 'laundry', x: 4.2, z: 0.8 }, { type: 'clothesPile', x: -7.0, z: -3.4 }, // flop it to reach the basket
+      { type: 'ironingBoard', x: -3.0, z: 4.5, h: 3.2 },
+      { type: 'dryingRack', x: 3.6, z: 6.2, h: 3.3 },
+      { type: 'clothesline', x: 0, z: 0, y0: 9.6, len: 23.6 },
+      { type: 'lineBasket', x: -6.0, y: 6.6, z: 0, move: { path3: [[-6.0, 6.6, 0], [6.6, 6.6, 0]], speed: 1.5, wait: 1.4, noTurn: true } },
+      { type: 'wallShelf', x: 11.4, z: -2.0, w: 3.2, d: 1.2, y: 7.4, rot: 3 },
+      { type: 'mopBucket', x: 9.2, z: 8.6 },
+      { type: 'laundryRug', x: -8.6, z: -4.6, w: 5, d: 3.4 },
+      { type: 'backDoor', x: 11.85, z: 5.0, rot: 1, gate: 'door', gateMove: [0, 0, -4.4] },
+    ],
+    safe: [
+      { x0: -11.1, z0: -6.3, x1: -6.1, z1: -2.9 },     // the bath mat by the door
+      { x: 0.4, z: -5.8, r: 1.8 },                      // the dryer's warm glow
+      { x: 4.6, z: -5.6, r: 1.6 },                      // moonlight over the sink
+    ],
+    lamps: [
+      { x: -11.7, y: 0.4, z: -8.4, kind: 'plugLight', safe: null },
+      { x: -2.2, y: 4.0, z: -8.6, kind: 'deskLamp', safe: { x: -2.8, z: -5.6, r: 2.0 } },
+    ],
+    collect: { kind: 'sock', label: 'lost socks', hint: 'Socks always go missing in the wash', done: 'Five socks! (Still no pairs.)', items: [
+      [-3.0, 4.0, 4.5], [-11.0, 10.4, 4.0], [-3.6, 8.0, -9.4], [3.6, 4.1, 6.2], [0.4, 8.6, 0.0],
+    ] },
+    switches: [{ at: [11.4, 7.4, -2.6], gate: 'door', color: 0x4fb06a, toast: 'Click! The back door swings open', hint: 'Out into the garden' }],
+    fish: F(
+      line([-7.2, 0.6, -4.4], [-4.8, 0.6, -6.0], 3), [[-3.0, 4.8, -7.6], [0.4, 4.8, -7.6]], arc([0.6, 5.0, -7.6], [-0.4, 8.0, -9.2], 2, 0.5),
+      line([-2.6, 8.0, -9.4], [0.8, 8.0, -9.4], 3), line([-8.6, 4.8, 4.0], [-9.4, 7.4, 4.0], 2), arc([-9.0, 10.4, 3.0], [-6.0, 7.6, 0.0], 3, 0.8),
+      line([-3.4, 7.6, 0.0], [3.4, 7.6, 0.0], 4), arc([7.0, 7.8, 0.0], [10.6, 8.2, -1.6], 3, 1.0),
+      line([-5.0, 4.0, 4.5], [-1.0, 4.0, 4.5], 3), line([2.4, 4.1, 6.2], [4.8, 4.1, 6.2], 2), line([6.0, 0.6, 3.0], [9.6, 0.6, 3.0], 3)),
+    starfish: [[1.4, 8.0, -9.4], [-11.0, 5.6, 4.0], [9.2, 3.4, 8.6]],
+    enemies: [
+      { type: 'shadow', path: [[-5.0, 0, -3.0], [6.0, 0, -3.0]], speed: 1.5 },
+      { type: 'shadow', path: [[6.4, 0, 3.0], [6.4, 0, 8.8]], speed: 1.4 },
+      { type: 'shadow', path: [[-8.4, 0, 1.6], [-8.4, 0, 8.4]], speed: 1.3 },
+      { type: 'shadow', path: [[9.8, 0, -5.0], [9.8, 0, 2.4]], speed: 1.6 },
+      { type: 'shadow', path: [[-1.0, 0, 8.6], [-5.0, 0, 2.0]], speed: 1.2 },
+    ],
+    bunnies: [[0.6, 0, 4.0], [-1.6, 0, 8.4]],
+    goal: { x: 11.4, y: 0, z: 5.0, r: 2.0, label: 'garden' },
+  },
+  // ---------------------------------------------------------------------------
+  {
     id: 'stairs', title: 'The Big Stairs', music: 2,
     goalText: 'Climb before the dark catches you',
     intro: 'stairs', newAbility: 'dash',

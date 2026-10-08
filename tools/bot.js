@@ -22,21 +22,26 @@ window.__bot = {
       face(x, z);
       let usedD = false, usedDash = false, holdT = o.hold ?? 0.3, flopped = false;
       tick(['KeyW', 'Space'], ['Space']);
+      let bounced = !o.via; // via: [x, z] of something bouncy to spring off first
       for (let t = 0; t < (o.max || 5); t += step) {
         if (g.state !== 'play') return 'state:' + g.state;
-        face(x, z);
+        if (!bounced && P.vel.y > 12 && t > 0.1) { bounced = true; usedD = false; } // the bounce gives the double jump back
+        const [tx, tz] = bounced ? [x, z] : o.via;
+        face(tx, tz);
         const keys = [];
-        const d = hd(x, z);
+        const d = hd(tx, tz);
         if (d > (o.brake ?? 0.35) && !(o.up && t < o.up)) keys.push('KeyW'); // up: rise straight first (clear an overhang)
         const press = [];
         holdT -= step;
         if (holdT > 0) keys.push('Space');
         if (o.double && !usedD && P.vel.y < (o.djAt ?? 1.5) && !P.grounded) { press.push('Space'); keys.push('Space'); usedD = true; holdT = 0.25; }
+        if (o.via && !bounced) keys.push('Space'); // hold jump for the big bounce
         if (o.dash && usedD && !usedDash && P.vel.y < 0.5 && d > 2.5) { press.push('ShiftLeft'); usedDash = true; }
+        if (o.dashNow && !usedDash && t > (o.dashAt ?? 0.1)) { press.push('ShiftLeft'); usedDash = true; } // dash straight off the jump
         if (o.glide && usedD && P.vel.y < 0 && holdT <= 0) keys.push('Space');
-        if (o.flop && !flopped && P.vel.y < 0 && d < 0.6) { press.push('KeyC'); flopped = true; }
+        if (o.flop && !flopped && !bounced && P.vel.y < 0 && d < 0.6) { press.push('KeyC'); flopped = true; }
         tick(keys, press);
-        if (P.grounded && t > 0.15) {
+        if (P.grounded && t > 0.15 && bounced) {
           stop(6);
           const ok = P.pos.y > y - 0.4 && P.pos.y < y + 1.3 && hd(x, z) < 2.6;
           return ok ? true : `landed ${where()} wanted (${x},${y},${z})`;
@@ -73,6 +78,14 @@ window.__bot = {
       else if (w[0] === 'jump') r = jump(w[1], w[2], w[3], w[4]);
       else if (w[0] === 'wait') { for (let t = 0; t < w[1]; t += step) tick([]); r = true; }
       else if (w[0] === 'knots') r = knots();
+      else if (w[0] === 'waitMover') { // ['waitMover', x, y, z, r]: until a moving platform's top centre is near (x, y, z)
+        r = 'mover never came';
+        for (let t = 0; t < 20; t += step) {
+          const near = g.movers.some((m) => m.solids.some((s) => Math.hypot((s.min.x + s.max.x) / 2 - w[1], s.max.y - w[2], (s.min.z + s.max.z) / 2 - w[3]) < (w[4] || 0.6)));
+          if (near) { r = true; break; }
+          tick([]);
+        }
+      }
       log.push(`${r === true ? 'ok  ' : 'FAIL'} ${JSON.stringify(w)} -> ${r === true ? where() : r} comfort=${Math.round(g.comfort)}`);
       if (r === 'state:won') return { ok: true, log, minComfort, state: g.state, mode: B.mode, time: f2(g.stats.time) };
       if (r !== true) return { ok: false, log, minComfort, state: g.state };
