@@ -262,6 +262,76 @@ export const CHAPTERS = [
   },
   // ---------------------------------------------------------------------------
   {
+    id: 'backyard', title: 'The Back Garden', music: 1,
+    goalText: 'Catch six fireflies to light the way to the garage',
+    intro: 'backyard', newAbility: 'glide',
+    room: {
+      id: 'garden', x0: -16, x1: 16, z0: -14, z1: 14, h: 30, floor: 'grass', wall: 'fence', outdoor: true, fenceH: 5.5, ambient: 1.25,
+      skins: { '-z': 'brick', '+x': 'brick' },
+      doors: [{ wall: '-z', at: -11, w: 4.5, h: 9.5 }, { wall: '+x', at: -9, w: 4.5, h: 9.5 }],
+    },
+    abilities: { doubleJump: true, flop: true, dash: true, glide: true },
+    spawn: [-10.6, 0, -9.4], spawnYaw: 0.9, camYaw: -2.2,
+    drain: 1.0,
+    props: [
+      { type: 'patio', x: -11, z: -11, w: 10, d: 6 },
+      { type: 'bbq', x: -6.6, z: -12.4 },
+      { type: 'flowerPot', x: -9.2, z: -12.7, r: 0.8, h: 1.8 },  // a step up to the grill
+      { type: 'dryerVent', x: -2.0, z: -13.75, y0: 1.8 },
+      { type: 'litWindow', x: 4.0, z: -13.95, w: 3.4, h: 3.6, y0: 4.2 },
+      { type: 'litWindow', x: 15.95, z: 2.0, rot: 3, w: 3.0, h: 2.4, y0: 5.0, color: 0xbfd6ff },
+      { type: 'trampoline', x: -1.0, z: 1.0 },
+      { type: 'tree', x: 6.0, z: -4.0, branches: [[-3.2, 3.0, 1.2, 2.6, 2.2], [0.4, 5.8, 3.4, 2.6, 2.4], [3.2, 8.4, 0.4, 2.4, 2.4]] },
+      { type: 'treehouse', x: 6.0, z: -8.2, w: 7, d: 4.4, y0: 11.2 },
+      { type: 'swingFrame', x: -10.0, z: 6.0 },
+      { type: 'swingSeat', x: -11.6, y: 2.0, z: 4.0, top: 8, pivotZ: 6.0, move: { path3: [[-11.6, 2.0, 4.0], [-11.6, 2.0, 8.0]], speed: 2.6, noTurn: true } },
+      { type: 'swingSeat', x: -8.4, y: 2.0, z: 8.0, top: 8, pivotZ: 6.0, move: { path3: [[-8.4, 2.0, 8.0], [-8.4, 2.0, 4.0]], speed: 2.6, noTurn: true } },
+      { type: 'playhouse', x: -12.0, z: 11.2, rot: 2 },
+      { type: 'picnicTable', x: -5.0, z: 10.6 },
+      { type: 'sandbox', x: 1.0, z: 10.4 },
+      { type: 'kiddiePool', x: 6.6, z: 9.6 },
+      { type: 'shed', x: 12.2, z: 10.6 },
+      { type: 'bush', x: -14.4, z: 0.0 }, { type: 'bush', x: 14.2, z: -1.6, r: 1.4 }, { type: 'bush', x: 14.0, z: 5.2, r: 1.5 },
+      { type: 'flowerPot', x: -14.6, z: -5.0 }, { type: 'flowerPot', x: -14.6, z: -3.0, r: 0.7, h: 1.2 }, { type: 'flowerPot', x: 7.8, z: 13.0, r: 0.7, h: 1.3 },
+      { type: 'gnome', x: 3.6, z: 13.0, rot: 2 },
+      { type: 'solarLight', x: -4.4, z: -5.4 }, { type: 'solarLight', x: 2.6, z: -8.4 }, { type: 'solarLight', x: 10.6, z: -11.4 }, { type: 'solarLight', x: -7.4, z: 4.0 }, { type: 'solarLight', x: 4.4, z: 5.4 },
+      { type: 'gardenHose', x: 13.6, z: -12.4 },
+    ],
+    wind: [{ x: -2.0, z: -12.6, r: 1.6, y0: 0, y1: 13.5, color: 0xffe6c8 }], // warm air from the dryer vent
+    safe: [
+      { x0: -16, z0: -14, x1: -6, z1: -8 },              // the patio under the porch light
+      { x: 4.0, z: -12.0, r: 2.2 },                       // light from the kitchen window
+      { x: 14.0, z: 2.0, r: 1.8 },                        // the neighbour's window
+      { x: -4.4, z: -5.4, r: 1.5 }, { x: 2.6, z: -8.4, r: 1.5 }, { x: 10.6, z: -11.4, r: 1.5 }, { x: -7.4, z: 4.0, r: 1.5 }, { x: 4.4, z: 5.4, r: 1.5 }, // solar path lights
+    ],
+    lamps: [
+      { x: -13.6, y: 5.6, z: -13.6, kind: 'porch', on: true, safe: null },
+      { x: -5.0, y: 3.3, z: 10.6, kind: 'plugLight', safe: { x: -5.0, z: 8.4, r: 2.4 } },
+      { x: 9.0, y: 11.2, z: -9.6, kind: 'plugLight', safe: null },
+    ],
+    collect: { kind: 'firefly', label: 'fireflies', hint: 'Look up — they love high places', done: 'Six fireflies! They light the way to the garage', items: [
+      [-1.0, 7.0, 1.0], [6.4, 6.9, -0.6], [8.4, 12.2, -7.0], [12.2, 9.0, 10.6], [-10.0, 9.0, 6.0], [-6.6, 5.2, -12.4],
+    ] },
+    fish: F(
+      line([-11.0, 0.6, -9.6], [-11.0, 0.6, -7.6], 2), line([-6.0, 0.6, -6.0], [-2.6, 0.6, -2.0], 3), arc([-1.0, 2.6, -1.0], [-1.0, 5.6, 1.0], 2, 0.6),
+      [[2.8, 3.8, -2.8]], arc([3.4, 4.0, -2.0], [6.4, 6.6, -0.6], 3, 1.0), arc([7.0, 6.8, -1.2], [9.2, 9.2, -3.6], 3, 1.0), line([4.0, 12.0, -7.0], [8.0, 12.0, -7.0], 3),
+      line([10.0, 11.0, -4.0], [12.0, 9.6, 6.0], 4), line([-5.0, 4.2, 10.6], [-5.0, 4.2, 9.0], 2), line([-12.0, 6.8, 10.0], [-11.0, 8.6, 6.4], 2),
+      line([-2.0, 2.0, -12.6], [-2.0, 10.0, -12.6], 4), line([1.0, 1.4, 10.4], [5.0, 1.0, 9.6], 3)),
+    starfish: [[10.2, 9.2, -3.6], [15.0, 0.9, 13.2], [-2.0, 12.6, -11.8]],
+    enemies: [
+      { type: 'moth', path: [[-12.0, 4.2, -5.6], [-8.0, 5.2, -6.0], [-7.4, 5.6, -2.4], [-12.0, 4.6, -1.6]], speed: 1.6 },
+      { type: 'moth', path: [[6.4, 12.8, -9.8], [9.6, 13.2, -9.8], [9.6, 12.8, -6.4], [6.4, 13.2, -6.4]], speed: 1.2, phase: 2 },
+      { type: 'moth', path: [[1.0, 6.0, 7.0], [6.0, 7.0, 8.6], [9.4, 5.6, 4.4], [4.0, 6.0, 5.0]], speed: 1.8 },
+      { type: 'shadow', path: [[-6.0, 0, -4.0], [2.0, 0, -6.0]], speed: 1.5 },
+      { type: 'shadow', path: [[8.0, 0, 2.0], [8.0, 0, 7.0]], speed: 1.5 },
+      { type: 'shadow', path: [[-13.0, 0, -3.0], [-8.0, 0, 2.0]], speed: 1.4 },
+      { type: 'shadow', path: [[12.0, 0, -6.0], [12.0, 0, -12.0]], speed: 1.3 },
+    ],
+    bunnies: [[3.0, 0, 6.0], [-8.0, 0, -2.0]],
+    goal: { x: 14.8, y: 0, z: -9.0, r: 2.2, label: 'garage' },
+  },
+  // ---------------------------------------------------------------------------
+  {
     id: 'stairs', title: 'The Big Stairs', music: 2,
     goalText: 'Climb before the dark catches you',
     intro: 'stairs', newAbility: 'dash',

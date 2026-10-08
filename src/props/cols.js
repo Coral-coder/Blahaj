@@ -2,5 +2,6 @@
 // (no THREE): the level checker in tools/ reads exactly what the game uses.
 import { KITCHEN } from './kitchen.cols.js';
 import { LAUNDRY } from './laundry.cols.js';
+import { BACKYARD } from './backyard.cols.js';
 
-export const COLS = Object.assign({}, KITCHEN, LAUNDRY);
+export const COLS = Object.assign({}, KITCHEN, LAUNDRY, BACKYARD);

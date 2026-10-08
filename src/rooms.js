@@ -776,6 +776,11 @@ export function createLamp(l) {
     const shade = sh(new THREE.Mesh(new THREE.CylinderGeometry(0.9, 1.1, 1.3, 28, 1, true), shadeMat), true, false);
     shade.position.y = -0.35; g.add(shade);
     lightY = -0.5; range = 16; power = 26;
+  } else if (l.kind === 'porch') { // a lantern on the outside wall
+    box(g, 0.5, 0.15, 0.5, Mat.paint(0x1c1d20, 0.4), 0, 0, 0, 0.03, 1);
+    const glassL = sh(new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.9, 0.6), shadeMat), false, false); glassL.position.y = 0.6; g.add(glassL);
+    box(g, 0.8, 0.15, 0.8, Mat.paint(0x1c1d20, 0.4), 0, 1.05, 0, 0.03, 1);
+    lightY = 0.6; range = 18; power = 26;
   } else if (l.kind === 'plugLight') {
     box(g, 0.5, 0.5, 0.2, Mat.whiteWood(), 0, 0.6, 0, 0.08, 1);
     const moon = sh(new THREE.Mesh(new THREE.SphereGeometry(0.22, 14, 10), shadeMat), false, false);

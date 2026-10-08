@@ -530,6 +530,13 @@ export function laundryIntro(game, hooks) {
   ], [[0.4, 'The laundry room. The dryer’s still warm…'], [3.0, 'Leo’s socks are everywhere — five of them, at least.'], [5.8, 'And the back door is shut. There must be a way to open it.']]);
 }
 
+export function backyardIntro(game, hooks) {
+  return flyover(game, hooks, [
+    { d: 4.6, from: V(-12.0, 3.0, -8.0), to: V(-4.0, 9.0, 4.0), look0: V(-1.0, 2.0, 1.0), look1: V(6.0, 11.0, -6.0), fov: 56 },
+    { d: 4.6, from: V(-4.0, 9.0, 4.0), to: V(4.0, 6.0, 12.0), look0: V(6.0, 12.0, -8.0), look1: V(14.0, 3.0, -9.0), fov: 56 },
+  ], [[0.4, 'Outside! The garden at night…'], [3.0, 'Fireflies are drifting up in the trees.'], [6.0, 'Catch them all and they’ll light the way to the garage.']]);
+}
+
 // ------------------------------------------------------------------ ending --
 export function ending(game, hooks) {
   const leo = game.leo, P = game.p, rig = game.rig;
@@ -601,4 +608,4 @@ export function ending(game, hooks) {
   return c;
 }
 
-export const CINES = { prologue, dog: dogSnatch, downstairs, kitchen: kitchenIntro, laundry: laundryIntro, stairs: stairsIntro, bed: bedIntro, ending };
+export const CINES = { prologue, dog: dogSnatch, downstairs, kitchen: kitchenIntro, laundry: laundryIntro, backyard: backyardIntro, stairs: stairsIntro, bed: bedIntro, ending };

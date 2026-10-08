@@ -22,15 +22,15 @@ window.__bot = {
       face(x, z);
       let usedD = false, usedDash = false, holdT = o.hold ?? 0.3, flopped = false;
       tick(['KeyW', 'Space'], ['Space']);
-      let bounced = !o.via; // via: [x, z] of something bouncy to spring off first
+      let tb = 0, bounced = !o.via; // via: [x, z] of something bouncy to spring off first
       for (let t = 0; t < (o.max || 5); t += step) {
         if (g.state !== 'play') return 'state:' + g.state;
-        if (!bounced && P.vel.y > 12 && t > 0.1) { bounced = true; usedD = false; } // the bounce gives the double jump back
+        if (!bounced && P.vel.y > 12 && t > 0.1) { bounced = true; usedD = false; tb = t; } // the bounce gives the double jump back
         const [tx, tz] = bounced ? [x, z] : o.via;
         face(tx, tz);
         const keys = [];
         const d = hd(tx, tz);
-        if (d > (o.brake ?? 0.35) && !(o.up && t < o.up)) keys.push('KeyW'); // up: rise straight first (clear an overhang)
+        if (d > (o.brake ?? 0.35) && !(o.up && (o.via ? bounced && t - tb < o.up : t < o.up))) keys.push('KeyW'); // up: rise straight first (clear an overhang)
         const press = [];
         holdT -= step;
         if (holdT > 0) keys.push('Space');
@@ -41,6 +41,7 @@ window.__bot = {
         if (o.glide && usedD && P.vel.y < 0 && holdT <= 0) keys.push('Space');
         if (o.flop && !flopped && !bounced && P.vel.y < 0 && d < 0.6) { press.push('KeyC'); flopped = true; }
         tick(keys, press);
+        if (o.trace && Math.round(t / step) % 5 === 0) log.push('  t' + t.toFixed(2) + ' ' + where() + ' vy' + P.vel.y.toFixed(1) + (bounced ? ' B' : ''));
         if (P.grounded && t > 0.15 && bounced) {
           stop(6);
           const ok = P.pos.y > y - 0.4 && P.pos.y < y + 1.3 && hd(x, z) < 2.6;
