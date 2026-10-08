@@ -332,6 +332,72 @@ export const CHAPTERS = [
   },
   // ---------------------------------------------------------------------------
   {
+    id: 'garage', title: 'The Garage', music: 2,
+    goalText: 'Find five batteries, then hit the switch to open the basement door',
+    intro: 'garage',
+    room: {
+      id: 'garage', x0: -15, x1: 15, z0: -11, z1: 11, h: 16, floor: 'concrete', wall: 'garageWall', ambient: 1.7,
+      doors: [{ wall: '-x', at: 7, w: 4.5, h: 9.5 }, { wall: '+x', at: 6.5, w: 4.5, h: 9.5 }],
+    },
+    abilities: { doubleJump: true, flop: true, dash: true, glide: true },
+    spawn: [-10.4, 0, 5.6], spawnYaw: 2.3, camYaw: -0.86,
+    drain: 1.0,
+    props: [
+      { type: 'garageDoor', x: -3.0, z: -10.85, w: 14, h: 9 },
+      { type: 'car', x: -4.0, z: -3.6 },
+      { type: 'tireStack', x: -8.6, z: 0.6, n: 2 },
+      { type: 'oilStain', x: 3.4, z: -1.0, r: 1.2 },
+      { type: 'workbench', x: 5.0, z: 9.7, rot: 2 },
+      { type: 'locker', x: 13.9, z: 1.6, rot: 3 },
+      { type: 'backDoor', x: 14.85, z: 6.5, rot: 1, gate: 'door', gateMove: [0, 0, 4.4] },
+      { type: 'utilityShelf', x: -14.0, z: -4.0, rot: 1, shelves: [2.6, 5.1, 7.6] },
+      { type: 'paintCans', x: -14.2, z: -5.6, rot: 1, y0: 2.4, n: 4 }, { type: 'paintCans', x: -14.2, z: -5.6, rot: 1, y0: 5.1, n: 3, seed: 2 },
+      { type: 'wallBike', x: -7.0, z: 10.8, rot: 2, y0: 6.2 }, { type: 'wallBike', x: -1.6, z: 10.8, rot: 2, y0: 6.6, color: 0xe5484d },
+      { type: 'lawnmower', x: -11.0, z: -9.0 },
+      { type: 'cardboardBox', x: -1.0, z: 9.6, w: 2.2, d: 2.2, label: 'GARDEN' },
+      { type: 'cardboardBox', x: 12.8, z: -9.4, label: 'TOYS' },
+      { type: 'cardboardBox', x: 12.8, z: -9.4, y0: 1.8, w: 2.2, d: 2.2, label: 'XMAS' },
+      { type: 'cardboardBox', x: 12.8, z: -9.4, y0: 3.6, w: 2.0, d: 2.0 },
+      { type: 'cardboardBox', x: 10.3, z: -9.6, w: 2.2, d: 2.2, h: 1.8, label: 'LEO BABY' },
+      { type: 'ceilingRack', x: 8.0, z: -7.5, w: 8, d: 4.2, top: 10.6, ceiling: 16 },
+      { type: 'leafBlower', x: 2.4, z: -7.5 },
+      { type: 'shopLight', x: -4.0, z: -3.0, y0: 13.6, ceiling: 16 }, { type: 'shopLight', x: 6.0, z: 2.0, y0: 13.6, ceiling: 16, on: true },
+      { type: 'toolCart', x: 0.0, z: 4.6, move: { path3: [[0.0, 0, 4.6], [9.0, 0, 4.6]], speed: 1.1, wait: 2.0, noTurn: true } },
+    ],
+    wind: [{ x: 2.4, z: -7.5, r: 1.3, y0: 0, y1: 13.0, color: 0xd6ecff }], // the leaf blower, pointing straight up
+    safe: [
+      { x: -11.8, z: 6.4, r: 2.8 },     // the garden light through the side door
+      { x: -4.0, z: 4.4, r: 2.6 },      // the car's headlights
+    ],
+    lamps: [
+      { x: 8.4, y: 4.0, z: 9.4, kind: 'deskLamp', safe: { x: 8.0, z: 7.2, r: 2.2 } },
+      { x: 14.7, y: 1.2, z: 9.6, kind: 'plugLight', safe: { x: 12.8, z: 9.4, r: 2.0 } },
+    ],
+    collect: { kind: 'battery', label: 'batteries', hint: 'The switch needs power — look up high', done: 'All five batteries! Now find the switch', items: [
+      [-4.0, 6.2, -4.2], [2.0, 8.2, 10.3], [-14.0, 8.6, -4.0], [10.4, 11.6, -7.5], [12.8, 6.4, -9.4],
+    ] },
+    switches: [{ at: [13.9, 9.0, 1.6], gate: 'door', color: 0xf2b632, toast: 'Click! The basement door creaks open', hint: 'Down to the basement' }],
+    fish: F(
+      line([-11.0, 0.6, 7.0], [-6.0, 0.6, 6.0], 3), line([-8.6, 2.2, 0.6], [-5.0, 3.6, -0.6], 2), line([-4.0, 5.8, -2.4], [-4.0, 5.8, -6.0], 3),
+      line([-1.0, 0.6, 4.6], [8.0, 0.6, 4.6], 4), line([1.0, 4.6, 8.8], [9.0, 4.6, 8.8], 4), line([1.0, 7.8, 10.3], [8.0, 7.8, 10.3], 3),
+      line([-12.6, 3.4, -5.6], [-12.6, 6.4, -2.4], 3), line([2.4, 2.0, -7.5], [2.4, 9.6, -7.5], 4), line([5.0, 11.2, -7.5], [9.0, 11.2, -7.5], 3),
+      line([12.0, 10.4, -3.0], [13.4, 9.6, 0.0], 2), line([10.3, 2.4, -9.6], [12.8, 4.6, -9.4], 2)),
+    starfish: [[-4.0, 0.9, -10.0], [13.9, 12.0, 1.6], [2.4, 13.2, -7.5]],
+    enemies: [
+      { type: 'spider', at: [-4.0, 13.6, -2.4], drop: 6.0, period: 4.5 },
+      { type: 'spider', at: [4.0, 13.0, 8.8], drop: 7.6, period: 4.0, phase: 1.5 },
+      { type: 'spider', at: [-11.6, 14.0, -4.0], drop: 5.0, period: 5.0, phase: 3.0 },
+      { type: 'spider', at: [14.0, 14.6, -3.2], drop: 3.4, period: 3.6, phase: 0.8 },
+      { type: 'moth', path: [[0.2, 9.6, -9.8], [4.0, 10.4, -10.0], [4.0, 11.0, -4.4], [0.2, 10.2, -4.8]], speed: 1.3 },
+      { type: 'shadow', path: [[-0.6, 0, -7.0], [-0.6, 0, 2.0]], speed: 1.4 },
+      { type: 'shadow', path: [[3.0, 0, 0.0], [10.0, 0, -2.4]], speed: 1.5 },
+      { type: 'shadow', path: [[-12.0, 0, -8.0], [-9.4, 0, 3.0]], speed: 1.3 },
+    ],
+    bunnies: [[0.0, 0, 7.6]],
+    goal: { x: 14.4, y: 0, z: 6.5, r: 2.0, label: 'basement' },
+  },
+  // ---------------------------------------------------------------------------
+  {
     id: 'stairs', title: 'The Big Stairs', music: 2,
     goalText: 'Climb before the dark catches you',
     intro: 'stairs', newAbility: 'dash',

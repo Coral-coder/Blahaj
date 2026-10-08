@@ -2,5 +2,6 @@
 import { KITCHEN } from './kitchen.vis.js';
 import { LAUNDRY } from './laundry.vis.js';
 import { BACKYARD } from './backyard.vis.js';
+import { GARAGE } from './garage.vis.js';
 
-export const VIS = Object.assign({}, KITCHEN, LAUNDRY, BACKYARD);
+export const VIS = Object.assign({}, KITCHEN, LAUNDRY, BACKYARD, GARAGE);

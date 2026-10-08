@@ -537,6 +537,13 @@ export function backyardIntro(game, hooks) {
   ], [[0.4, 'Outside! The garden at night…'], [3.0, 'Fireflies are drifting up in the trees.'], [6.0, 'Catch them all and they’ll light the way to the garage.']]);
 }
 
+export function garageIntro(game, hooks) {
+  return flyover(game, hooks, [
+    { d: 4.6, from: V(-12.0, 4.0, 8.0), to: V(-2.0, 9.0, 6.0), look0: V(-4.0, 3.0, -3.0), look1: V(8.0, 10.0, -7.5), fov: 56 },
+    { d: 4.4, from: V(-2.0, 9.0, 6.0), to: V(6.0, 5.0, 4.0), look0: V(8.0, 10.0, -7.5), look1: V(14.0, 6.0, 4.0), fov: 56 },
+  ], [[0.4, 'The garage. Dad left the car lights on again…'], [3.0, 'The basement switch is dead — it needs batteries.'], [6.0, 'Watch out for spiders dangling from the rafters!']]);
+}
+
 // ------------------------------------------------------------------ ending --
 export function ending(game, hooks) {
   const leo = game.leo, P = game.p, rig = game.rig;
@@ -608,4 +615,4 @@ export function ending(game, hooks) {
   return c;
 }
 
-export const CINES = { prologue, dog: dogSnatch, downstairs, kitchen: kitchenIntro, laundry: laundryIntro, backyard: backyardIntro, stairs: stairsIntro, bed: bedIntro, ending };
+export const CINES = { prologue, dog: dogSnatch, downstairs, kitchen: kitchenIntro, laundry: laundryIntro, backyard: backyardIntro, garage: garageIntro, stairs: stairsIntro, bed: bedIntro, ending };

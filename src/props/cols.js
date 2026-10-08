@@ -3,5 +3,6 @@
 import { KITCHEN } from './kitchen.cols.js';
 import { LAUNDRY } from './laundry.cols.js';
 import { BACKYARD } from './backyard.cols.js';
+import { GARAGE } from './garage.cols.js';
 
-export const COLS = Object.assign({}, KITCHEN, LAUNDRY, BACKYARD);
+export const COLS = Object.assign({}, KITCHEN, LAUNDRY, BACKYARD, GARAGE);
