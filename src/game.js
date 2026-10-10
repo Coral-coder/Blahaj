@@ -874,14 +874,17 @@ export class Game {
     // can always see Blåhaj and what's around her instead of the camera crowding in.
     const pitch = THREE.MathUtils.clamp(C.pitch, -0.1, 1.3);
     const dir = V(Math.sin(C.yaw) * Math.cos(pitch), Math.sin(pitch), Math.cos(C.yaw) * Math.cos(pitch));
-    C.cur = C.dist;
+    // in a small room don't back off so far that the view is mostly empty night:
+    // come in along the same line to just outside the walls (like looking into a
+    // dollhouse), but never closer than 7 so you can always see around her
+    const r = this.ch.room, O = 1.6;
+    let t = C.dist;
+    if (dir.x > 1e-3) t = Math.min(t, (r.x1 + O - look.x) / dir.x); else if (dir.x < -1e-3) t = Math.min(t, (r.x0 - O - look.x) / dir.x);
+    if (dir.z > 1e-3) t = Math.min(t, (r.z1 + O - look.z) / dir.z); else if (dir.z < -1e-3) t = Math.min(t, (r.z0 - O - look.z) / dir.z);
+    const want = Math.max(Math.min(C.dist, 7), t);
+    C.cur = snap || C.cur === undefined ? want : C.cur + (want - C.cur) * Math.min(1, dt * 3);
     this.camera.position.copy(look).addScaledVector(dir, C.cur);
     this.camera.position.y = Math.max(0.4, this.camera.position.y);
-    // in a small room don't back off so far that the view is mostly empty night:
-    // stop just outside the walls, like looking into a dollhouse
-    const r = this.ch.room, O = 1.6;
-    this.camera.position.x = THREE.MathUtils.clamp(this.camera.position.x, r.x0 - O, r.x1 + O);
-    this.camera.position.z = THREE.MathUtils.clamp(this.camera.position.z, r.z0 - O, r.z1 + O);
     if (C.shake) { C.shake = Math.max(0, C.shake - dt); this.camera.position.add(V(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(C.shake * 0.5)); }
     this.camera.lookAt(look);
     this.fadeOccluders(look, snap ? 1 : dt);
@@ -905,8 +908,8 @@ export class Game {
     for (let i = 0; i <= 8; i++) sight.push(cam.clone().lerp(look, i / 8));
     for (const m of this.fadeables) {
       const box = m.matrixAutoUpdate ? (m.userData.box.copy(m.geometry.boundingBox).applyMatrix4(m.matrixWorld)) : m.userData.box;
-      if (box.distanceToPoint(cam) < 1.1) { hits.add(m); continue; }
-      for (let i = 1; i < 8; i++) if (box.distanceToPoint(sight[i]) < 0.55) { hits.add(m); break; }
+      if (box.distanceToPoint(cam) < 1.6) { hits.add(m); continue; }
+      for (let i = 1; i < 8; i++) if (box.distanceToPoint(sight[i]) < (i <= 3 ? 1.9 : 0.55)) { hits.add(m); break; } // near the lens, anything framing the view goes too
     }
     // walls and the ceiling the camera is behind
     const r = this.ch.room, M = 1.6, behind = { '+x': cam.x > r.x1 - M, '-x': cam.x < r.x0 + M, '+z': cam.z > r.z1 - M, '-z': cam.z < r.z0 + M, ceil: cam.y > r.h - 0.6 }; // behind it, or so close it would fill the screen edge-on
