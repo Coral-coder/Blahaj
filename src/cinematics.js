@@ -166,10 +166,12 @@ export function prologue(game, hooks) {
       pole = t < 15.8 ? sn.pole.clone().lerp(PULL, letGo) : PULL;
       if (t > 17.4) { // let go: the hand settles on the covers over his side as he rolls
         // (down in front of his chest, over the covers, as he rolls to face the wall)
-        const rx = -0.5 * (-0.85 + 1.85 * rollT) - 0.85, rz = -1.35;
-        const rest = V(rx, leo.underAt(leo.group.position.x + rx, leo.group.position.z + rz) - leo.group.position.y + 0.32, rz);
+        // the hand comes to rest close in front of his chest, low on the mattress, elbow tucked down
+        // toward his hip, the way a sleeping kid curls an arm, so the covers lie over it
+        const sh_ = leo.shoulder.position, rx = sh_.x - 0.7, rz = sh_.z + 0.35;
+        const rest = V(rx, Math.max(0.3, leo.underAt(leo.group.position.x + rx, leo.group.position.z + rz) - leo.group.position.y + 0.3), rz);
         ik = SHOULDER.clone().lerp(rest, seg(t, 17.4, 19.6));
-        pole = PULL.clone().lerp(V(-0.3, 0.6, 0.75).normalize(), seg(t, 17.4, 19.6));
+        pole = PULL.clone().lerp(V(0.15, -0.35, 1).normalize(), seg(t, 17.4, 19.6));
       }
     }
     const grabbing = t >= 14.95 && t < 17.4;
@@ -617,8 +619,10 @@ export function ending(game, hooks) {
     sn.ik.y = 0.28; // his lower arm lies flat on the mattress, under Blåhaj
     const L = (x, y, z) => V(x, y, z); // bed-local
     if (!c.under) c.under = L(1.05, 0.62, leo.worldToLocal(leo.edgePoint(1.05)).z + 0.3); // just inside the edge
-    const UP = L(1.5, 1.8, -1.5), DOWN = L(1.4, 0.95, -2.05);
-    let ikL, ikWL, poleL = V(0.2, 1, -0.5).normalize();
+    // he lifts the covers like a tent flap: hand up to about shoulder height and out in front, elbow bent
+    // and out to the side (not a straight arm to the ceiling), then lays it back down over Blåhaj
+    const UP = L(1.75, 1.3, -1.35), DOWN = L(1.4, 0.95, -2.05);
+    let ikL, ikWL, poleL = V(0.45, 0.55, 0.7).normalize();
     if (t < 6.4) { ikL = c.under.clone().lerp(UP, sm(t, 5.0, 6.4)); ikWL = sm(t, 3.9, 5.0); }
     else if (t < 8.8) { const k = sm(t, 7.4, 8.8); ikL = UP.clone().lerp(DOWN, k); ikL.y += Math.sin(k * Math.PI) * 0.25; ikWL = 1; }
     else { // then wraps round him, low over his back, elbow toward his tail (under the covers with him)

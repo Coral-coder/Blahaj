@@ -380,7 +380,36 @@ export function createLeo(bed) {
     const fore = z1.clone().multiplyScalar(dist).sub(E).normalize();
     const qU = new THREE.Quaternion().setFromRotationMatrix(m4.makeBasis(x1, new THREE.Vector3().crossVectors(up, x1), up));
     const qF = new THREE.Quaternion().setFromRotationMatrix(m4.makeBasis(x1, new THREE.Vector3().crossVectors(fore, x1), fore));
-    return [qU, qU.clone().invert().multiply(qF)];
+    return [qU, qU.clone().invert().multiply(qF), S.clone().add(E), S.clone().addScaledVector(z1, dist)];
+  }
+  // keep an arm out of his own head: push the hand off it, and swing the elbow away if the arm would pass through
+  const segDist = (p, a, b) => { const ab = b.clone().sub(a), t = THREE.MathUtils.clamp(p.clone().sub(a).dot(ab) / Math.max(1e-6, ab.lengthSq()), 0, 1); return a.clone().addScaledVector(ab, t).distanceTo(p); };
+  function solveClear(S, goal, pole) {
+    const HC = headPivot.position, HR = 0.78;
+    const dh = goal.clone().sub(HC); if (dh.length() < HR) goal = HC.clone().addScaledVector(dh.normalize(), HR);
+    let r = solveIK(S, goal, pole);
+    for (let i = 0; i < 3; i++) {
+      const [, , E, Hn] = r, d = Math.min(segDist(HC, S, E), segDist(HC, E, Hn));
+      if (d > HR - 0.1) break;
+      const axis = Hn.clone().sub(S).normalize(), away = E.clone().sub(HC); away.addScaledVector(axis, -away.dot(axis));
+      if (away.lengthSq() < 1e-6) away.set(0, 1, 0);
+      pole = pole.clone().addScaledVector(away.normalize(), 1.4).normalize();
+      r = solveIK(S, goal, pole);
+    }
+    return r;
+  }
+  // hands move like a person's: each target is chased by a critically damped spring (no snaps,
+  // ease in and out), and a hand moving across lifts a little, arcing up and over instead of sliding through
+  function chase(sm, goal, pole, dt) {
+    if (!sm.g || dt <= 0 || dt > 0.25) { sm.g = goal.clone(); sm.v = new THREE.Vector3(); sm.p = pole.clone(); return; }
+    const w = 10, n = Math.ceil(dt / (1 / 120)), h = dt / n;
+    for (let i = 0; i < n; i++) {
+      const lift = Math.min(0.35, Math.hypot(sm.v.x, sm.v.z) * 0.12);
+      const ax = (goal.x - sm.g.x) * w * w - 2 * w * sm.v.x, ay = (goal.y + lift - sm.g.y) * w * w - 2 * w * sm.v.y, az = (goal.z - sm.g.z) * w * w - 2 * w * sm.v.z;
+      sm.v.x += ax * h; sm.v.y += ay * h; sm.v.z += az * h;
+      sm.g.addScaledVector(sm.v, h);
+    }
+    sm.p.lerp(pole, 1 - Math.exp(-dt * 7)).normalize();
   }
   const POLE = new THREE.Vector3(0.75, 1, 0.35).normalize(); // elbow out and up, over whatever he hugs
   const TUCK_POLE = new THREE.Vector3(1, 0.2, 0.5).normalize(); // elbow down by his side
@@ -398,13 +427,17 @@ export function createLeo(bed) {
     // his chest under the covers; state.ik / state.ikL (bed-local) pull it elsewhere
     const arms = [
       [armR, V(0.35 - 0.55 * rp + 0.45 * rn, 0.62, -l / 2 + 3.35), TUCK_POLE, state.ik, state.ikW, state.pole || POLE],
-      [armL, V(-0.35 - 0.2 * rp, 0.62, -l / 2 + 3.35).lerp(V(0.45, 0.95, -l / 2 + 4.3), rn), V(-1 + 1.6 * rn, -0.3, 0.5 - 0.8 * rn).normalize(), state.ikL, state.ikWL, state.poleL || POLE_L],
+      // the free (top) arm: on his back it rests on his chest; rolled toward the room it lies along his side
+      // with the hand on the mattress in front of his tummy, elbow up over his hip
+      [armL, V(-0.35 - 0.2 * rp, 0.62, -l / 2 + 3.35).lerp(V(0.75, 0.32, -l / 2 + 4.0), rn), V(-1 + 0.8 * rn, -0.3 + 1.2 * rn, 0.5).normalize(), state.ikL, state.ikWL, state.poleL || POLE_L],
     ];
     for (const [arm, tuck, tpole, ik, ikW, ipole] of arms) {
       const w_ = ik ? ikW : 0;
       const goal = w_ > 0 ? tuck.clone().lerp(ik, w_) : tuck;
       const pole = tpole.clone().lerp(ipole, w_).normalize();
-      const [qU, qE] = solveIK(arm.shoulder.position, goal, pole);
+      arm.sm ||= {};
+      chase(arm.sm, goal, pole, dt);
+      const [qU, qE] = solveClear(arm.shoulder.position, arm.sm.g, arm.sm.p);
       arm.shoulder.quaternion.copy(qU); arm.elbow.quaternion.copy(qE);
     }
     headPivot.rotation.z = -0.15 + state.roll + Math.sin(state.t * 0.7) * 0.02;
