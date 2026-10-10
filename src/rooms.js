@@ -644,6 +644,7 @@ function addWindow(g, room, w) {
     const c = sh(new THREE.Mesh(geo, Mat.fabric(room.id === 'bedroom' ? 0x6b8fcf : 0xb98c63, 1.5).clone()));
     c.material.side = THREE.DoubleSide;
     c.position.set(s * (w.w / 2 + 0.6), h / 2 + 0.3, 0.35);
+    c.userData.softBlock = true; // Blåhaj's nose shouldn't vanish into it
     grp.add(c);
   }
   box(grp, w.w + 4.2, 0.18, 0.18, Mat.brass(), 0, h + 0.9, 0.35, 0.05, 1);

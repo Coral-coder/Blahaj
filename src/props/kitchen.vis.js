@@ -30,10 +30,11 @@ export const KITCHEN = {
     for (const sx of p.sink ? [p.sink] : []) { // a steel basin and a tall tap
       box(g, 2.4, 0.06, 1.7, Mat.steel(), sx, h - 0.02, 0.15, 0.1, 1);
       box(g, 2.1, 0.05, 1.4, Mat.paint(0x6d7378, 0.3), sx, h - 0.0, 0.15, 0.1, 1);
-      const tap = new THREE.Mesh(new THREE.TorusGeometry(0.45, 0.07, 10, 20, Math.PI), Mat.steel()); tap.position.set(sx, h + 1.1, -0.9); tap.rotation.y = Math.PI / 2; sh(tap); g.add(tap);
-      cyl(g, 0.08, 0.1, 0.7, Mat.steel(), sx, h, -1.35, 12);
+      // a low swan-neck tap that tucks in under the windowsill
+      const tap = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.06, 10, 20, Math.PI), Mat.steel()); tap.position.set(sx, h + 0.6, -0.9); tap.rotation.y = Math.PI / 2; sh(tap); g.add(tap);
+      cyl(g, 0.07, 0.1, 0.6, Mat.steel(), sx, h, -1.2, 12);
       for (const s of [-1, 1]) cyl(g, 0.12, 0.12, 0.18, Mat.steel(), sx + s * 0.5, h, -1.2, 12);
-      const drip = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 6), Mat.glass()); drip.position.set(sx, h + 0.6, -0.45); g.add(drip);
+      const drip = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 6), Mat.glass()); drip.position.set(sx, h + 0.4, -0.6); g.add(drip);
     }
     for (const sx of p.stove ? [p.stove] : []) { // black glass hob, rings, knobs, an oven door
       box(g, 3.0, 0.06, 2.3, new THREE.MeshPhysicalMaterial({ color: 0x0c0c10, roughness: 0.1, clearcoat: 1 }), sx, h, 0.05, 0.05, 1);

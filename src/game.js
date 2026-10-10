@@ -95,6 +95,9 @@ export class Game {
         if (side) { o.userData.cutSide = side; this.cutaway.push(o); }
       };
       this.roomFx.shell.traverse((o) => add(o, 0.4, 1e9));
+      // soft things she can't walk into visually (curtains): a thick box round each
+      this.softBoxes = [];
+      this.roomFx.shell.traverse((o) => { if (o.userData.softBlock) { if (!o.geometry.boundingBox) o.geometry.computeBoundingBox(); this.softBoxes.push(o.geometry.boundingBox.clone().applyMatrix4(o.matrixWorld).expandByScalar(0.12)); } });
       this.roomFx.props.traverse((o) => add(o, 1.2, 1.8, true)); // pictures, shelves and doors hung on the walls
     }
 
@@ -241,6 +244,7 @@ export class Game {
 
     // the player
     this.rig = Art.createBlahaj();
+    this.rig.root.userData.noAO = true; // the AO pass drew a halo round her outline; her own soft contact shadow is enough
     scene.add(this.rig.root);
     const [sx, sy, sz] = ch.spawn;
     this.p = {
@@ -816,8 +820,8 @@ export class Game {
   // how far a horizontal ray from o along d travels before meeting anything solid
   clearance(o, d, maxD) {
     let best = maxD;
-    for (const s of this.solids) {
-      if (!s.active || o.y < s.min.y || o.y > s.max.y) continue;
+    for (const s of this.solids.concat(this.softBoxes || [])) {
+      if ((s.active === false || (!s.isBox3 && !s.active)) || o.y < s.min.y || o.y > s.max.y) continue;
       if (o.x > s.min.x && o.x < s.max.x && o.z > s.min.z && o.z < s.max.z) continue; // standing inside it (a soft cushion)
       let t0 = 0, t1 = best, ok = true;
       for (const ax of ['x', 'z']) {
