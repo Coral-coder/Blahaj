@@ -65,6 +65,34 @@ export class Game {
     this.roomFx.props.updateMatrixWorld(true);
     for (const m of this.fadeables) { if (!m.geometry.boundingBox) m.geometry.computeBoundingBox(); m.userData.box = m.geometry.boundingBox.clone().applyMatrix4(m.matrixWorld); }
     this.ray = new THREE.Raycaster();
+    // dollhouse cutaway: walls, the ceiling and anything fixed flat against them go
+    // see-through whenever the camera is behind them, so the camera never has to
+    // crowd in on Blåhaj to see past a wall
+    this.cutaway = [];
+    {
+      const r = ch.room, bb = new THREE.Box3();
+      this.roomFx.shell.updateMatrixWorld(true);
+      // shell pieces lie wholly beyond a wall's inner face; props count if they're
+      // thin things fixed within `thin` of the wall (frames, shelves, doors)
+      const sideOf = (b, thin, maxW) => {
+        if (b.min.y >= r.h - 0.3) return 'ceil';
+        if (b.min.x >= r.x1 - thin && b.max.x - b.min.x < maxW) return '+x';
+        if (b.max.x <= r.x0 + thin && b.max.x - b.min.x < maxW) return '-x';
+        if (b.min.z >= r.z1 - thin && b.max.z - b.min.z < maxW) return '+z';
+        if (b.max.z <= r.z0 + thin && b.max.z - b.min.z < maxW) return '-z';
+        return null;
+      };
+      const add = (o, thin, maxW, prop) => {
+        if (!o.isMesh || Array.isArray(o.material) || o.material.transparent || o.material.isShaderMaterial) return;
+        if (!o.geometry.boundingBox) o.geometry.computeBoundingBox();
+        bb.copy(o.geometry.boundingBox).applyMatrix4(o.matrixWorld);
+        if (prop && bb.min.y < 0.8 && bb.max.y - bb.min.y < 4) return; // table legs by a wall stay put; only things hung on the wall (or tall flat doors) go
+        const side = sideOf(bb, thin, maxW);
+        if (side) { o.userData.cutSide = side; this.cutaway.push(o); }
+      };
+      this.roomFx.shell.traverse((o) => add(o, 0.4, 1e9));
+      this.roomFx.props.traverse((o) => add(o, 1.2, 1.8, true)); // pictures, shelves and doors hung on the walls
+    }
 
     // collision
     this.solids = [];
@@ -217,7 +245,7 @@ export class Game {
     };
     this.respawn = { pos: V(sx, sy, sz), dark: ch.rising ? ch.rising.from : 0 };
     this.fill = new THREE.PointLight(0xfff0e0, 2.6, 7, 2); scene.add(this.fill);
-    this.cam = { yaw: ch.camYaw !== undefined ? ch.camYaw : angDiff(0, (ch.spawnYaw || 0) + Math.PI), pitch: 0.36, dist: 8.8, target: V(sx, sy, sz), idle: 0, fovKick: 0, shake: 0 };
+    this.cam = { yaw: ch.camYaw !== undefined ? ch.camYaw : angDiff(0, (ch.spawnYaw || 0) + Math.PI), pitch: 0.42, dist: 10.5, target: V(sx, sy, sz), idle: 0, fovKick: 0, shake: 0 };
     this.R.build(scene, this.camera, { bloom: 0.55, threshold: 0.85, exposure: 1.05, vignette: 0.42, warmth: 0.02 });
     this.updateCamera(1, true);
   }
@@ -722,9 +750,20 @@ export class Game {
     this.goalMarker.material.opacity = goalReady ? 0.13 + Math.sin(t * 2) * 0.04 : 0.03;
     if (goalReady && !this.cine && Math.random() < 0.3) { const g = this.ch.goal; this.sparks.emit({ p: V(g.x + (Math.random() - 0.5) * g.r, g.y + 0.2, g.z + (Math.random() - 0.5) * g.r), v: V(0, 1.2, 0), life: 1.6, size: 0.16, color: new THREE.Color(0xffe2a8), drag: 0.2, alpha: 0.8 }); }
 
-    // player
+    // player. Her collision box is a short square, but she's a long shark: when her
+    // nose or tail would poke into a wall or a cupboard, slide the body back out so
+    // she never looks half buried in it
     this.rig.root.position.copy(P.pos);
     this.rig.root.rotation.y = P.yaw;
+    if (!this.cine || !this.cine.ownsPlayer) {
+      const f = V(Math.sin(P.yaw), 0, Math.cos(P.yaw)), o = V(P.pos.x, P.pos.y + 0.36, P.pos.z);
+      const nose = this.clearance(o, f, 1.4), tail = this.clearance(o, f.clone().negate(), 1.4);
+      let push = -Math.max(0, 1.22 - nose) + Math.max(0, 1.15 - tail);
+      if (nose + tail < 2.37) push = (tail - nose) / 2 - (1.15 - 1.22) / 2; // tight spot: centre her
+      push = THREE.MathUtils.clamp(push, -0.85, 0.85);
+      this.nudge = (this.nudge || 0) + (push - (this.nudge || 0)) * Math.min(1, dt * 14);
+      this.rig.root.position.addScaledVector(f, this.nudge);
+    }
     if (!this.cine || !this.cine.ownsPlayer) {
       const sp = Math.min(1, Math.hypot(P.vel.x, P.vel.z) / CFG.run);
       this.rig.update(dt, { speed: sp, grounded: P.grounded, vx: P.vel.x, vy: P.vel.y, vz: P.vel.z, pound: !!P.pound, glide: P.glide });
@@ -754,6 +793,25 @@ export class Game {
   }
 
   // camera ray vs boxes (slab test); returns nearest hit distance
+  // how far a horizontal ray from o along d travels before meeting anything solid
+  clearance(o, d, maxD) {
+    let best = maxD;
+    for (const s of this.solids) {
+      if (!s.active || o.y < s.min.y || o.y > s.max.y) continue;
+      if (o.x > s.min.x && o.x < s.max.x && o.z > s.min.z && o.z < s.max.z) continue; // standing inside it (a soft cushion)
+      let t0 = 0, t1 = best, ok = true;
+      for (const ax of ['x', 'z']) {
+        const inv = 1 / (d[ax] || 1e-9);
+        let a = (s.min[ax] - o[ax]) * inv, b = (s.max[ax] - o[ax]) * inv;
+        if (a > b) [a, b] = [b, a];
+        t0 = Math.max(t0, a); t1 = Math.min(t1, b);
+        if (t0 > t1) { ok = false; break; }
+      }
+      if (ok && t0 < best) best = t0;
+    }
+    return best;
+  }
+
   rayHit(o, d, maxD, roomOnly = false) {
     let best = maxD;
     for (const s of this.solids) {
@@ -794,31 +852,22 @@ export class Game {
       C.target.y += (goal.y - C.target.y) * Math.min(1, dt * (P.grounded ? 6 : 3));
     }
     const look = C.target.clone().add(V(0, 1.0, 0));
-    // The camera keeps its distance: furniture in the way fades out (fadeOccluders)
-    // instead of pulling the camera in. Only the room itself (walls, ceiling) can
-    // push it closer, and then it eases in and swings up a little to look down.
-    // Backed up against a wall? Ease in a little (never closer than 5), and only if
-    // even that doesn't fit, rise up and look down over it.
-    const dirAt = (p) => V(Math.sin(C.yaw) * Math.cos(p), Math.sin(p), Math.cos(C.yaw) * Math.cos(p));
-    let liftGoal = 0, bestHit = -1;
-    for (const k of [0, 0.12, 0.24, 0.36, 0.5, 0.65, 0.8, -0.12, -0.24]) {
-      const p = THREE.MathUtils.clamp(C.pitch + k, -0.1, 1.3), h = this.rayHit(look, dirAt(p), C.dist + 0.4, true);
-      if (h >= Math.min(C.dist, 5.0) + 0.4) { liftGoal = p - C.pitch; bestHit = h; break; } // room for a comfortable distance
-      if (h > bestHit) { bestHit = h; liftGoal = p - C.pitch; }
-    }
-    C.lift = (C.lift || 0) + (liftGoal - (C.lift || 0)) * Math.min(1, dt * (snap ? 60 : 2.2));
-    const pitch = THREE.MathUtils.clamp(C.pitch + C.lift, -0.1, 1.3);
-    const dir = dirAt(pitch);
-    const hit = this.rayHit(look, dir, C.dist + 0.4, true);
-    const want = Math.max(3.2, Math.min(C.dist, hit - 0.4));
-    C.cur = snap || C.cur === undefined ? want : C.cur + (want - C.cur) * Math.min(1, dt * (want < C.cur ? 5 : 1.5));
+    // The camera always keeps its full distance. Furniture in the way fades out, and
+    // walls or the ceiling it ends up behind turn see-through (fadeOccluders), so you
+    // can always see Blåhaj and what's around her instead of the camera crowding in.
+    const pitch = THREE.MathUtils.clamp(C.pitch, -0.1, 1.3);
+    const dir = V(Math.sin(C.yaw) * Math.cos(pitch), Math.sin(pitch), Math.cos(C.yaw) * Math.cos(pitch));
+    // in a small room don't back off so far that the view is mostly empty night:
+    // come in along the same line to just outside the walls (like looking into a
+    // dollhouse), but never closer than 7 so you can always see around her
+    const r = this.ch.room, O = 1.6;
+    let t = C.dist;
+    if (dir.x > 1e-3) t = Math.min(t, (r.x1 + O - look.x) / dir.x); else if (dir.x < -1e-3) t = Math.min(t, (r.x0 - O - look.x) / dir.x);
+    if (dir.z > 1e-3) t = Math.min(t, (r.z1 + O - look.z) / dir.z); else if (dir.z < -1e-3) t = Math.min(t, (r.z0 - O - look.z) / dir.z);
+    const want = Math.max(Math.min(C.dist, 7), t);
+    C.cur = snap || C.cur === undefined ? want : C.cur + (want - C.cur) * Math.min(1, dt * 3);
     this.camera.position.copy(look).addScaledVector(dir, C.cur);
-    // never leave the room (e.g. out through a window), and keep well off the
-    // walls so they don't fill the screen edge-on: from there it looks across at Blåhaj
-    const r = this.ch.room, M = 1.5;
-    this.camera.position.x = THREE.MathUtils.clamp(this.camera.position.x, r.x0 + M, r.x1 - M);
-    this.camera.position.z = THREE.MathUtils.clamp(this.camera.position.z, r.z0 + M, r.z1 - M);
-    this.camera.position.y = THREE.MathUtils.clamp(this.camera.position.y, 0.4, r.h - 0.35);
+    this.camera.position.y = Math.max(0.4, this.camera.position.y);
     if (C.shake) { C.shake = Math.max(0, C.shake - dt); this.camera.position.add(V(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(C.shake * 0.5)); }
     this.camera.lookAt(look);
     this.fadeOccluders(look, snap ? 1 : dt);
@@ -842,12 +891,15 @@ export class Game {
     for (let i = 0; i <= 8; i++) sight.push(cam.clone().lerp(look, i / 8));
     for (const m of this.fadeables) {
       const box = m.matrixAutoUpdate ? (m.userData.box.copy(m.geometry.boundingBox).applyMatrix4(m.matrixWorld)) : m.userData.box;
-      if (box.distanceToPoint(cam) < 1.1) { hits.add(m); continue; }
-      for (let i = 1; i < 8; i++) if (box.distanceToPoint(sight[i]) < 0.55) { hits.add(m); break; }
+      if (box.distanceToPoint(cam) < 1.6) { hits.add(m); continue; }
+      for (let i = 1; i < 8; i++) if (box.distanceToPoint(sight[i]) < (i <= 3 ? 1.9 : 0.55)) { hits.add(m); break; } // near the lens, anything framing the view goes too
     }
+    // walls and the ceiling the camera is behind
+    const r = this.ch.room, M = 1.6, behind = { '+x': cam.x > r.x1 - M, '-x': cam.x < r.x0 + M, '+z': cam.z > r.z1 - M, '-z': cam.z < r.z0 + M, ceil: cam.y > r.h - 0.6 }; // behind it, or so close it would fill the screen edge-on
+    for (const m of this.cutaway) if (behind[m.userData.cutSide]) { hits.add(m); m.userData.cutNow = true; } else m.userData.cutNow = false;
     for (const m of hits) if (!this.faded.has(m)) this.faded.set(m, 1);
     for (const [m, a0] of this.faded) {
-      const a = a0 + ((hits.has(m) ? 0.18 : 1) - a0) * Math.min(1, dt * 8);
+      const a = a0 + ((hits.has(m) ? (m.userData.cutNow ? 0.06 : 0.18) : 1) - a0) * Math.min(1, dt * 8);
       if (a > 0.98 && !hits.has(m)) { m.material = m.userData.solidMat; this.faded.delete(m); continue; }
       if (!m.userData.fadeMat) { m.userData.solidMat = m.material; m.userData.fadeMat = m.material.clone(); m.userData.fadeMat.onBeforeCompile = m.material.onBeforeCompile; m.userData.fadeMat.transparent = true; m.userData.fadeMat.depthWrite = false; }
       m.material = m.userData.fadeMat; m.material.opacity = a; this.faded.set(m, a);

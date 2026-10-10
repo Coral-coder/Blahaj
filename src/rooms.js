@@ -522,14 +522,17 @@ function buildShell(room, scene) {
   const wallMat = (WALLS[room.wall] || WALLS.livingWall)();
   const floorMat = room.floor === 'woodDark' ? Mat.walnutFloor() : Mat.oakFloor();
   for (const b of boxes) {
-    const w = b.max[0] - b.min[0], h = b.max[1] - b.min[1], d = b.max[2] - b.min[2];
+    let w = b.max[0] - b.min[0], h = b.max[1] - b.min[1], d = b.max[2] - b.min[2];
     let mat = wallMat, uv = 0.22;
-    if (b.tag === 'floor') { mat = floorMat; uv = 0.42; }
+    if (b.tag === 'floor') { // only under the room itself: when the camera looks in from outside, there's no floor sticking out past the walls
+      mat = floorMat; uv = 0.42;
+      w = room.x1 - room.x0 + 0.6; d = room.z1 - room.z0 + 0.6;
+    }
     else if (b.tag === 'ceiling') { mat = Mat.paint(0xf4f1ea, 0.95); uv = 0.15; }
     else if (b.tag === 'sill') { mat = Mat.whiteWood(); uv = 0.6; }
     else if (b.tag === 'landing') { mat = Mat.carpet(0x8f3b3f); uv = 0.6; }
     const m = new THREE.Mesh(worldUV(new THREE.BoxGeometry(w, h, d), uv), mat);
-    m.position.set((b.min[0] + b.max[0]) / 2, (b.min[1] + b.max[1]) / 2, (b.min[2] + b.max[2]) / 2);
+    m.position.set(b.tag === 'floor' ? (room.x0 + room.x1) / 2 : (b.min[0] + b.max[0]) / 2, (b.min[1] + b.max[1]) / 2, b.tag === 'floor' ? (room.z0 + room.z1) / 2 : (b.min[2] + b.max[2]) / 2);
     m.receiveShadow = true;
     m.castShadow = b.tag !== 'floor';
     g.add(m);
