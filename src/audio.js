@@ -1,14 +1,13 @@
-// Tiny Web Audio synth: all sound effects and the background tune are
+// Tiny Web Audio synth: all sound effects and the background music are
 // generated at runtime, so the game needs no audio files.
+import { createMusic } from './music.js';
 
 export const Audio = {
     ctx: null,
     master: null,
     musicGain: null,
     muted: false,
-    musicTimer: null,
-    _nextBar: 0,
-    _barIndex: 0,
+    music: null,
 
     init() {
       if (this.ctx) return;
@@ -19,7 +18,7 @@ export const Audio = {
       this.master.gain.value = 0.5;
       this.master.connect(this.ctx.destination);
       this.musicGain = this.ctx.createGain();
-      this.musicGain.gain.value = 0.35;
+      this.musicGain.gain.value = 0.55;
       this.musicGain.connect(this.master);
       try { localStorage.getItem('blahaj-muted') === '1' && this.setMuted(true); } catch (e) {}
     },
@@ -108,71 +107,19 @@ export const Audio = {
       const t = this.ctx.currentTime;
       this.droneGain.gain.setTargetAtTime(Math.max(0, 0.6 - d) * 0.22, t, 0.5);
       this.drone.frequency.setTargetAtTime(55 + (1 - d) * 4, t, 0.5);
-      if (this.musicGain) this.musicGain.gain.setTargetAtTime(0.12 + d * 0.23, t, 0.5);
+      if (this.musicGain) this.musicGain.gain.setTargetAtTime(0.3 + d * 0.25, t, 0.5);
+      if (this.music) this.music.setDream(d);
     },
 
-    // --- background music -------------------------------------------------
-    // A gentle looping tune built from a chord progression; each level
-    // can pick a different "mood" (tempo + scale offset).
+    // --- background music: generative, mellow and underwater (see music.js) ---
     startMusic(mood = 0) {
       if (!this.ctx) return;
-      this.stopMusic();
-      this.mood = mood;
-      this._barIndex = 0;
-      this._nextBar = this.ctx.currentTime + 0.1;
-      const tick = () => {
-        while (this._nextBar < this.ctx.currentTime + 0.6) {
-          this._scheduleBar(this._nextBar, this._barIndex++);
-          this._nextBar += this._barLen();
-        }
-      };
-      tick();
-      this.musicTimer = setInterval(tick, 200);
+      if (!this.music) this.music = createMusic(this.ctx, this.musicGain);
+      this.music.start(mood);
+      if (this.dream !== undefined) this.music.setDream(this.dream);
     },
 
-    stopMusic() {
-      if (this.musicTimer) clearInterval(this.musicTimer);
-      this.musicTimer = null;
-    },
-
-    _barLen() { return [3.0, 2.8, 2.4, 3.2, 3.0][this.mood % 5] * (this.dream !== undefined && this.dream < 0.4 ? 1.15 : 1); },
-
-    _note(freq, t, dur, vol, type) {
-      const d = this.dream === undefined ? 1 : this.dream;
-      freq *= 1 + (1 - d) * (Math.random() - 0.5) * 0.06;
-      const o = this.ctx.createOscillator();
-      const g = this.ctx.createGain();
-      o.type = type;
-      o.frequency.value = freq;
-      g.gain.setValueAtTime(0, t);
-      g.gain.linearRampToValueAtTime(vol, t + 0.02);
-      g.gain.exponentialRampToValueAtTime(0.001, t + dur);
-      o.connect(g).connect(this.musicGain);
-      o.start(t);
-      o.stop(t + dur + 0.05);
-    },
-
-    _scheduleBar(t, bar) {
-      // chord progression in C major-ish; mood shifts the root.
-      const roots = [[0, 4, 7, 11], [5, 9, 12, 16], [7, 11, 14, 17], [9, 12, 16, 19]];
-      const chord = roots[bar % 4];
-      const shift = [0, -2, 3, -5, 2][this.mood % 5];
-      const len = this._barLen();
-      const f = (semi) => 261.63 * Math.pow(2, (semi + shift) / 12);
-      // bass
-      this._note(f(chord[0] - 12), t, len * 0.9, 0.16, 'triangle');
-      // arpeggio
-      const steps = 8;
-      for (let i = 0; i < steps; i++) {
-        const semi = chord[[0, 1, 2, 3, 2, 1, 3, 1][i]];
-        this._note(f(semi + 12), t + (i * len) / steps, len / steps * 0.9, 0.07, 'sine');
-      }
-      // little melody on every other bar
-      if (bar % 2 === 1) {
-        const mel = [chord[3] + 12, chord[2] + 12, chord[1] + 12];
-        mel.forEach((semi, i) => this._note(f(semi), t + len * (0.5 + i * 0.16), 0.3, 0.06, 'triangle'));
-      }
-    },
+    stopMusic() { if (this.music) this.music.stop(); },
   };
 
 
