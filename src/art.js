@@ -457,7 +457,7 @@ const BLAHAJ_DEFORM = `
 #ifndef BLAHAJ_TEETH
   float fz = abs(position.z);
   float fk = smoothstep(0.8, 1.3, fz) * (1.0 - smoothstep(0.2, 0.7, position.y)) * step(-1.5, position.x) * step(position.x, 0.8);
-  transformed.y += flap * fk * (fz - 0.8) * 1.6;
+  transformed.y += (position.z > 0.0 ? flapR : flapL) * fk * (fz - 0.8) * 1.6; // each side fin on its own spring
   // well-loved fins: years of cuddles have squashed the stuffing out of them.
   // The side fins droop, and the dorsal fin and top of the tail slump over and
   // curl (more toward the tip), swinging a little as he moves.
@@ -466,11 +466,13 @@ const BLAHAJ_DEFORM = `
   float dh = max(0.0, position.y - 0.92) * dm;
   transformed.z -= position.z * 0.45 * smoothstep(0.0, 0.25, dh); // squashed thin
   transformed.y -= fk * (position.y - 0.25) * 0.4;                  // side fins flattened
-  float kd = finFlop + bendH * 0.9;
+  float kd = finFlop + bendH * 0.9 + dorsal;
+  if (abs(kd) < 0.05) kd = 0.05;
   transformed.y += sin(kd * dh) / kd - dh;
   transformed.z += (1.0 - cos(kd * dh)) / kd;
   float th = max(0.0, position.y - 0.5) * smoothstep(2.2, 2.7, position.x);
-  float kt = finFlop * 0.75 - wag * 2.0;
+  float kt = finFlop * 0.75 - wag * 2.0 + tailFlop;
+  if (abs(kt) < 0.05) kt = 0.05;
   transformed.y += sin(kt * th) / kt - th;
   transformed.z -= (1.0 - cos(kt * th)) / kt;
 #endif
@@ -478,7 +480,7 @@ const BLAHAJ_DEFORM = `
 function addBlahajDeform(m, uni, teeth) {
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, uni);
-    sh.vertexShader = (teeth ? '#define BLAHAJ_TEETH\n' : '') + 'uniform float wag;\nuniform float flap;\nuniform float bendV;\nuniform float bendH;\nuniform float finFlop;\n' +
+    sh.vertexShader = (teeth ? '#define BLAHAJ_TEETH\n' : '') + 'uniform float wag;\nuniform float flapL;\nuniform float flapR;\nuniform float dorsal;\nuniform float tailFlop;\nuniform float bendV;\nuniform float bendH;\nuniform float finFlop;\n' +
       sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n' + BLAHAJ_DEFORM);
   };
   m.customProgramCacheKey = () => (teeth ? 'blahajDeformTeeth' : 'blahajDeform');
@@ -490,7 +492,7 @@ export function createBlahaj() {
   const root = new THREE.Group();
   const body = new THREE.Group();
   root.add(body);
-  const uni = { wag: { value: 0 }, flap: { value: 0 }, bendV: { value: 0 }, bendH: { value: 0 }, finFlop: { value: 2.5 } };
+  const uni = { wag: { value: 0 }, flapL: { value: 0 }, flapR: { value: 0 }, dorsal: { value: 0 }, tailFlop: { value: 0 }, bendV: { value: 0 }, bendH: { value: 0 }, finFlop: { value: 2.5 } };
   const S = MODEL.worldLength / MODEL.length;
   const holder = new THREE.Group();
   holder.rotation.y = Math.PI / 2;      // snout (-x) -> forward (+z)
@@ -502,6 +504,7 @@ export function createBlahaj() {
     const mesh = new THREE.Mesh(part.geometry, plushModelMaterial(part.material, uni, true));
     mesh.castShadow = isShark; mesh.receiveShadow = true;
     if (isShark) mesh.customDepthMaterial = addBlahajDeform(new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking }), uni, false);
+    mesh.userData.aoMask = addBlahajDeform(new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide }), uni, !isShark); // keeps her solid in the AO pass
     holder.add(mesh);
   }
   const blob = new THREE.Mesh(new THREE.CircleGeometry(0.6, 32), new THREE.MeshBasicMaterial({ map: softDotTexture(), color: 0x0a1020, transparent: true, opacity: 0.35, depthWrite: false }));
@@ -514,7 +517,15 @@ export function createBlahaj() {
   // pool-noodle flex: two damped springs driven by how hard the body accelerates.
   // The ends lag behind (inertia) and wobble back. Free fall doesn't bend it.
   const noodle = { v: 0, vVel: 0, h: 0, hVel: 0, lastV: new THREE.Vector3(), primed: false };
-  const NOODLE = { k: 90, damp: 3.2, gainV: 0.5, gainH: 0.5, max: 1.2, gravity: 32 };
+  const NOODLE = { k: 60, damp: 2.4, gainV: 0.62, gainH: 0.62, max: 1.3, gravity: 32 };
+  // the fins are floppy too: each one is a loose, under-damped spring that lags the body and wobbles back
+  const fins = { L: 0, Lv: 0, R: 0, Rv: 0, d: 0, dv: 0, tl: 0, tlv: 0, lastYaw: null };
+  const spring = (x, v, target, force, k, damp, max, dt) => {
+    v += (force - k * (x - target) - damp * v) * dt;
+    x += v * dt;
+    if (x > max) { x = max; v = Math.min(0, v); } else if (x < -max) { x = -max; v = Math.max(0, v); }
+    return [x, v];
+  };
   const vNow = new THREE.Vector3(), accel = new THREE.Vector3();
   rig.update = (dt, st) => {
     rig.t += dt;
@@ -539,20 +550,30 @@ export function createBlahaj() {
     const wag = 4 + st.speed * 10;
     uni.wag.value = Math.sin(rig.t * wag) * (0.08 + st.speed * 0.16);
     body.rotation.y = -Math.sin(rig.t * wag - 0.6) * st.speed * 0.06;
-    uni.flap.value = Math.sin(rig.t * (st.glide ? 14 : 4)) * (st.glide ? 0.2 : 0.06) + (st.grounded ? 0 : st.glide ? 0.45 : 0.25);
+    // fins: pushed around by how the body accelerates and turns, then left to flop
+    const yawRate = fins.lastYaw === null ? 0 : Math.atan2(Math.sin(yaw - fins.lastYaw), Math.cos(yaw - fins.lastYaw)) / step;
+    fins.lastYaw = yaw;
+    const turn = THREE.MathUtils.clamp(yawRate, -12, 12) * Math.hypot(vNow.x, vNow.z) * 0.6 - aRight; // sideways "g-force" on the fins
+    const pecRest = st.glide ? 0.4 + Math.sin(rig.t * 13) * 0.16 : st.grounded ? Math.sin(rig.t * 3) * 0.03 : 0.12;
+    [fins.L, fins.Lv] = spring(fins.L, fins.Lv, pecRest, -ay * 0.3 - turn * 0.08, 60, 2.6, 1.1, step);
+    [fins.R, fins.Rv] = spring(fins.R, fins.Rv, pecRest, -ay * 0.3 + turn * 0.08, 60, 2.6, 1.1, step);
+    [fins.d, fins.dv] = spring(fins.d, fins.dv, Math.sin(rig.t * 2.3) * 0.08, turn * 1.1 - ay * 0.12, 34, 2.0, 1.9, step);
+    [fins.tl, fins.tlv] = spring(fins.tl, fins.tlv, 0, -ay * 0.18 + turn * 0.3, 40, 2.4, 0.95, step);
+    uni.flapL.value = fins.L; uni.flapR.value = fins.R; uni.dorsal.value = fins.d; uni.tailFlop.value = fins.tl;
     // keep the belly on the floor when the ends droop
     // on the floor, drooping ends can't sink in: the middle humps up instead
     body.position.y = st.grounded ? Math.sin(rig.t * 2.2) * 0.012 + Math.max(0, -noodle.v) * S : 0.04;
     const targetPitch = st.grounded ? 0 : st.pound ? 0.9 : THREE.MathUtils.clamp(-st.vy * 0.04, -0.4, 0.4);
     body.rotation.x += (targetPitch - body.rotation.x) * Math.min(1, dt * 10);
     if (rig.spin > 0) { rig.spin = Math.max(0, rig.spin - dt * 18); body.rotation.z = rig.spin; } else body.rotation.z *= 0.8;
-    const acc = -170 * (rig.squash - 1) - 12 * rig.squashVel;
+    const acc = -130 * (rig.squash - 1) - 8.5 * rig.squashVel;
     rig.squashVel += acc * dt;
     rig.squash += rig.squashVel * dt;
     const s = rig.squash;
     body.scale.set(1 / Math.sqrt(s), s, 1 / Math.sqrt(s));
   };
   rig.noodle = noodle;
+  rig.fins = fins;
   rig.impulse = (v) => { rig.squashVel += v; };
   return rig;
 }
