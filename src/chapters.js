@@ -136,6 +136,7 @@ export const CHAPTERS = [
   // ---------------------------------------------------------------------------
   {
     id: 'kitchen', title: 'Midnight Kitchen', music: 2,
+    gloom: 3.6, trails: 0.6, // a bit gentler: the kitchen also has oranges flying
     hazard: { type: 'lobber', kind: 'orange', imp: [11.0, 0, -7.0], from: [11.0, 2.6, -7.3], every: 2.6, speed: 10, spread: 2.2, bounce: 0.55, friction: 0.4, max: 5, life: 6, radius: 0.45, title: 'The fridge nightmare is chucking oranges!', hint: 'They bounce and roll — dodge or jump them', msg: 'Bonk! An orange!' },
     goalText: 'Gather Leo’s fridge magnets, then open the pet gate',
     intro: 'kitchen', newAbility: 'dash',

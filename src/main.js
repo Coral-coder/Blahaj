@@ -106,6 +106,7 @@ function newGame(i, opts = {}) {
 
 // Title: a slow orbit around Leo asleep, hugging Blåhaj.
 function startTitle() {
+  Audio.stopRoom();
   loading(true);
   setTimeout(() => {
     mode = 'title';
@@ -142,6 +143,7 @@ function startChapter(i, withIntro) {
     $('fishTotal').textContent = ch.fish.length;
     updateHud();
     Audio.startMusic(ch.id);
+    Audio.startRoom(game); // the room's own sounds, and its nightmares'
     if (withIntro && ch.intro && CINES[ch.intro]) runCine(CINES[ch.intro](game, hooks), () => chapterTitle(i));
     else chapterTitle(i);
     $('game').focus();
@@ -206,7 +208,7 @@ function onComplete(r) {
   save.best[i] = save.best[i] ? Math.min(save.best[i], r.time) : r.time;
   persist();
   const after = () => {
-    if (ch.outro === 'ending') { Audio.stopMusic(); mode = 'menu'; showEnding(r); return; }
+    if (ch.outro === 'ending') { Audio.stopMusic(); Audio.stopRoom(); mode = 'menu'; showEnding(r); return; }
     if (i + 1 < CHAPTERS.length) startChapter(i + 1, true);
   };
   if (ch.outro && CINES[ch.outro]) setTimeout(() => runCine(CINES[ch.outro](game, hooks), after), 250);
@@ -315,6 +317,7 @@ function frame(now) {
     beatT -= dt;
     if (game.comfort < 25 && beatT <= 0) { Audio.heartbeat(); beatT = 0.9 + game.comfort / 40; }
   } else if (mode !== 'paused') Audio.setDream(1); // cutscene or menu: the nightmare hum fades away
+  Audio.updateRoom(game.camera);
   game.render();
   perf.sample(dt);
 }

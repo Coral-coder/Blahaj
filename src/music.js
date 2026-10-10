@@ -30,15 +30,15 @@ const THEMES = {
   edge:      { key: 0, bpm: 72, mode: 'major', chain: 'happy', start: 'I', lead: 'kalimba', color: 'musicbox', amb: 'bubbles', goof: 0.9 },
   downstairs:{ key: -3, bpm: 76, mode: 'mixo', chain: 'happy', start: 'I', lead: 'marimba', color: 'rhodes', amb: 'fire', goof: 1 },
   kitchen:   { key: 2, bpm: 86, mode: 'major', chain: 'happy', start: 'I', lead: 'marimba', color: 'pizz', amb: 'drips', goof: 1.4 },
-  laundry:   { key: -2, bpm: 80, mode: 'mixo', chain: 'happy', start: 'I', lead: 'kalimba', color: 'glock', amb: 'bubbles', goof: 1.3 },
+  laundry:   { key: -2, bpm: 80, mode: 'mixo', chain: 'happy', start: 'I', lead: 'kalimba', color: 'glock', amb: 'churn', goof: 1.3 },
   backyard:  { key: 5, bpm: 70, mode: 'lydian', chain: 'dreamy', start: 'I', lead: 'flute', color: 'harp', amb: 'crickets', goof: 0.7 },
-  garage:    { key: -5, bpm: 82, mode: 'dorian', chain: 'moody', start: 'i', lead: 'rhodes', color: 'pizz', amb: 'hum', goof: 0.9 },
-  basement:  { key: -7, bpm: 66, mode: 'minor', chain: 'moody', start: 'i', lead: 'celesta', color: 'harp', amb: 'drips', goof: 0.5 },
-  stairs:    { key: 0, bpm: 96, mode: 'major', chain: 'happy', start: 'I', lead: 'marimba', color: 'harp', amb: 'none', goof: 0.6 },
+  garage:    { key: -5, bpm: 82, mode: 'dorian', chain: 'moody', start: 'i', lead: 'rhodes', color: 'pizz', amb: 'buzz', goof: 0.9 },
+  basement:  { key: -7, bpm: 66, mode: 'minor', chain: 'moody', start: 'i', lead: 'celesta', color: 'harp', amb: 'chuff', goof: 0.5 },
+  stairs:    { key: 0, bpm: 96, mode: 'major', chain: 'happy', start: 'I', lead: 'marimba', color: 'harp', amb: 'clock', goof: 0.6 },
   hallway:   { key: 3, bpm: 74, mode: 'lydian', chain: 'dreamy', start: 'I', lead: 'flute', color: 'musicbox', amb: 'clock', goof: 0.8 },
   bathroom:  { key: 1, bpm: 78, mode: 'major', chain: 'happy', start: 'I', lead: 'kalimba', color: 'glock', amb: 'drips', goof: 1.5 },
   parents:   { key: -1, bpm: 68, mode: 'major', chain: 'dreamy', start: 'I', lead: 'musicbox', color: 'rhodes', amb: 'snore', goof: 1.1 },
-  playroom:  { key: 4, bpm: 90, mode: 'major', chain: 'happy', start: 'I', lead: 'glock', color: 'pizz', amb: 'bubbles', goof: 1.6 },
+  playroom:  { key: 4, bpm: 90, mode: 'major', chain: 'happy', start: 'I', lead: 'glock', color: 'pizz', amb: 'toys', goof: 1.6 },
   attic:     { key: -4, bpm: 70, mode: 'dorian', chain: 'moody', start: 'i', lead: 'celesta', color: 'strings', amb: 'wind', goof: 0.4 },
   bed:       { key: 0, bpm: 64, mode: 'major', chain: 'dreamy', start: 'I', lead: 'musicbox', color: 'harp', amb: 'bubbles', goof: 0.6 },
 };
@@ -163,16 +163,28 @@ export function createMusic(ctx, out) {
       const o = osc('sine', f, tt, tt + 0.12, g); o.frequency.exponentialRampToValueAtTime(f * (1.6 + rnd() * 0.8), tt + 0.09);
     }
   }
-  function ambience(t) { // a little sound of the room under the music
-    const a = S.th.amb, p = (rnd() - 0.5) * 1.4;
+  // a bit of the room in the music, in time with it
+  function ambience(t, step, chord) {
+    const a = S.th.amb, p = (rnd() - 0.5) * 1.4, inBar = step % 16, sd = stepDur();
     if (a === 'bubbles' && rnd() < 0.035) bubbles(t);
-    else if (a === 'drips' && rnd() < 0.03) { const g = voice(bus, p), f = 1400 + rnd() * 900; env(g, t, 0.002, 0.04, 0.12); const o = osc('sine', f, t, t + 0.15, g); o.frequency.exponentialRampToValueAtTime(f * 0.45, t + 0.1); }
-    else if (a === 'crickets' && rnd() < 0.04) { for (let i = 0; i < 3; i++) { const g = voice(bus, p), tt = t + i * 0.06; env(g, tt, 0.004, 0.012, 0.035); osc('sine', 4200 + rnd() * 300, tt, tt + 0.05, g); } }
-    else if (a === 'fire' && rnd() < 0.05) noiseHit(t, 0.03, 2500, 0.03, 'bandpass', p);
-    else if (a === 'clock' && S.step % 8 === 0) woodblock(t, 0.25);
-    else if (a === 'wind' && S.step % 64 === 0) noiseHit(t, 3.5, 500, 0.02, 'bandpass', p);
-    else if (a === 'snore' && S.step % 128 === 0) { const g = voice(bus); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.02, t + 1.2); g.gain.linearRampToValueAtTime(0, t + 2.6); const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 300; lp.connect(g); osc('sawtooth', 70, t, t + 2.7, lp); }
-    else if (a === 'hum' && S.step % 64 === 0) { const g = voice(bus); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.008, t + 1); g.gain.linearRampToValueAtTime(0, t + 5); osc('sine', 120, t, t + 5.2, g); }
+    else if (a === 'drips' && inBar % 2 === 1 && rnd() < 0.14) { // drips, tuned to the chord
+      const f = hz(chord[Math.floor(rnd() * 4)] + 24), g = voice(bus, p); env(g, t, 0.002, 0.05, 0.14);
+      const o = osc('sine', f * 1.5, t, t + 0.18, g); o.frequency.exponentialRampToValueAtTime(f, t + 0.05);
+    } else if (a === 'crickets' && (inBar === 4 || inBar === 12) && rnd() < 0.7) { // chirps on the backbeat
+      const f = hz(chord[2] + 36); for (let i = 0; i < 3; i++) { const g = voice(bus, p), tt = t + i * 0.055; env(g, tt, 0.004, 0.012, 0.03); osc('sine', f, tt, tt + 0.05, g); }
+    } else if (a === 'fire') { // crackles on the off-beats, and a soft whoomph every two bars
+      if (inBar % 2 === 1 && rnd() < 0.35) noiseHit(t + rnd() * sd * 0.3, 0.02 + rnd() * 0.02, 1800 + rnd() * 2500, 0.05, 'bandpass', p);
+      if (step % 32 === 0) { const g = voice(bus); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.02, t + 0.8); g.gain.linearRampToValueAtTime(0, t + 2.4); const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 260; lp.connect(g); noiseHit(t, 0.001, 200, 0, 'lowpass'); osc('sawtooth', hz(chord[0] - 36), t, t + 2.5, lp); }
+    } else if (a === 'clock' && inBar % 4 === 0) { const g = voice(bus, -0.4); env(g, t, 0.001, 0.05, 0.03); osc('sine', inBar % 8 === 0 ? 2300 : 1800, t, t + 0.06, g); } // tick... tock
+    else if (a === 'churn' && inBar % 4 === 0) { noiseHit(t, 0.18, 500, 0.05, 'lowpass', p); if (inBar === 0) { const g = voice(bus); env(g, t, 0.005, 0.1, 0.15); osc('sine', hz(chord[0] - 36), t, t + 0.2, g); } } // the washing machine's rhythm
+    else if (a === 'buzz' && step % 64 === 0) { const g = voice(bus), lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 700; g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.008, t + 1); g.gain.linearRampToValueAtTime(0, t + sd * 64); lp.connect(g); osc('sawtooth', hz(chord[0] - 24), t, t + sd * 64 + 0.1, lp); } // the strip light, humming in key
+    else if (a === 'chuff' && inBar % 2 === 0) noiseHit(t, 0.07, 900, inBar % 4 === 0 ? 0.04 : 0.025, 'bandpass', 0.2); // a toy train chuffing along
+    else if (a === 'snore' && step % 64 === 0) { // Dad's snore, in key (and a bit silly)
+      const g = voice(bus), lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 400; g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.03, t + 0.9); g.gain.linearRampToValueAtTime(0, t + 1.8); lp.connect(g);
+      const o = osc('sawtooth', hz(chord[0] - 24), t, t + 1.9, lp); o.frequency.linearRampToValueAtTime(hz(chord[0] - 22), t + 1.6);
+    } else if (a === 'toys' && inBar >= 12 && rnd() < 0.6) woodblock(t, 0.25); // a wind-up toy's ratchet at the end of the bar
+    else if (a === 'wind' && step % 64 === 0) noiseHit(t, 3.5, 500, 0.02, 'bandpass', p);
+    else if (a === 'hum' && step % 64 === 0) { const g = voice(bus); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.008, t + 1); g.gain.linearRampToValueAtTime(0, t + 5); osc('sine', 120, t, t + 5.2, g); }
   }
   function slideWhistle(t, up = true) {
     const g = voice(bus, 0.2), f0 = hz(up ? 12 : 31), f1 = hz(up ? 31 : 12);
@@ -250,7 +262,7 @@ export function createMusic(ctx, out) {
       if ((inBar === 6 || inBar === 14) && rnd() < 0.7) woodblock(t, 0.8);
       if (st >= 5 && (inBar === 0 || inBar === 10)) softKick(t);
     }
-    ambience(t);
+    ambience(t, step, chord);
     if (inBar === 12 && step % 32 >= 16 && rnd() < 0.06 * th.goof) slideWhistle(t, rnd() < 0.6);
   }
 

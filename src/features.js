@@ -381,6 +381,7 @@ export function stepFeatures(game, dt) {
       const e_ = e.e, period = e_.period || 4, k = (e.t % period) / period;
       // hangs, drops fast, waits, climbs back slowly
       const d = k < 0.35 ? 0 : k < 0.45 ? (k - 0.35) / 0.1 : k < 0.65 ? 1 : 1 - (k - 0.65) / 0.35;
+      if (d > 0 && !(e.drop > 0) && e.pos.distanceTo(P.pos) < 12) Audio.hiss(); // it drops with a hiss
       e.drop = d * (e_.drop || 3);
       e.pos.set(e_.at[0], e_.at[1] - e.drop, e_.at[2]);
     }

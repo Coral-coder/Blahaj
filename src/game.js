@@ -544,6 +544,7 @@ export class Game {
       this.hooks.pop(this.knotsLeft ? `Nightmare broken! ${this.knotsLeft} left` : 'Leo is safe… go to him!');
     } else {
       this.addComfort(COMFORT.stomp); if (!linked) this.hooks.pop('Poof!');
+      if (e.type === 'shadow') Audio.dissolve();
       // the moths feed on the nightmares down on the floor: poof a moth and half of
       // those go with it; poof the last one on the floor and the moths fade away too
       const ground = this.enemies.filter((x) => x.type === 'shadow' && x.alive && x.doomT === undefined);
@@ -627,7 +628,9 @@ export class Game {
         e.hitCool -= dt;
         const playerLow = P.pos.y < 0.6; // they only come after you when you're down on the floor
         const near = Math.hypot(P.pos.x - e.pos.x, P.pos.z - e.pos.z);
+        const was = e.chase;
         e.chase = playerLow && near < 6.5 && !inSafe(this.safe, P.pos.x, P.pos.z);
+        if (e.chase && !was && (e.growlT || 0) < this.clock) { Audio.growl(); e.growlT = this.clock + 3; } // it's noticed you
         // wander the open floor, idling now and then; chase you if you're down there with them
         let tx, tz;
         if (e.chase) { tx = P.pos.x; tz = P.pos.z; }
