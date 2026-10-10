@@ -9,6 +9,24 @@ const bark = () => Mat.woodDark();
 // leaves catch a little moonlight so the tree reads against the night sky
 const leafMat = () => { const m = Mat.hedge(); if (!m.userData.lit) { m.userData.lit = true; m.emissive = new THREE.Color(0x1d3a24); m.emissiveIntensity = 0.55; } return m; };
 
+// one little flower: stem, a leaf, a ring of petals and a yellow middle (shared geometry keeps it cheap)
+const FG = {};
+function flower(g, x, y, z, stem, color, seed = 0) {
+  FG.stem ||= new THREE.CylinderGeometry(0.025, 0.035, 1, 5).translate(0, 0.5, 0);
+  FG.petal ||= new THREE.SphereGeometry(0.1, 8, 6).scale(1, 0.32, 0.55).translate(0.1, 0, 0);
+  FG.mid ||= new THREE.SphereGeometry(0.065, 8, 6).scale(1, 0.6, 1);
+  FG.leaf ||= new THREE.SphereGeometry(0.12, 6, 4).scale(1, 0.15, 0.45).translate(0.12, 0, 0);
+  const green = Mat.paint(0x3f7a3a, 0.8), pm = Mat.plastic(color);
+  const f = new THREE.Group(); f.position.set(x, y, z); f.rotation.set((hashf(seed, 7) - 0.5) * 0.25, hashf(seed, 8) * 6.28, (hashf(seed, 9) - 0.5) * 0.25); g.add(f);
+  const st = new THREE.Mesh(FG.stem, green); st.scale.y = stem; f.add(st);
+  const lf = new THREE.Mesh(FG.leaf, green); lf.position.y = stem * 0.4; lf.rotation.z = 0.5; f.add(lf);
+  const head = new THREE.Group(); head.position.y = stem; head.rotation.z = 0.25; f.add(head);
+  const n = 5 + Math.floor(hashf(seed, 5) * 2);
+  for (let i = 0; i < n; i++) { const pe = new THREE.Mesh(FG.petal, pm); pe.rotation.set(0, (i / n) * Math.PI * 2, 0.18); head.add(pe); }
+  const mid = new THREE.Mesh(FG.mid, Mat.plastic(0xf2c230)); mid.position.y = 0.03; head.add(mid);
+  return f;
+}
+
 export const BACKYARD = {
   trampoline(p) {
     const g = new THREE.Group(), r = p.r || 3.2, h = p.h || 1.6;
@@ -28,11 +46,23 @@ export const BACKYARD = {
     return g;
   },
   swingSeat(p) {
-    const g = new THREE.Group(), top = (p.top || 8) - (p.y || 0);
-    box(g, 1.6, 0.25, 0.9, Mat.plastic(0xf2b632), 0, 0, 0, 0.08, 1);
-    for (const s of [-1, 1]) { const ch = cyl(g, 0.03, 0.03, top, Mat.steel(), s * 0.7, 0.2, 0, 6); ch.position.y = 0.2 + top / 2 - 0.2; }
-    // swinging: tilt the chains toward the bar the seat hangs from
-    if (p.pivotZ !== undefined) g.userData.tick = () => { g.rotation.x = Math.atan2(g.position.z - p.pivotZ, (p.top || 8) - g.position.y); };
+    const g = new THREE.Group(), barY = (p.top || 8) - 0.3;
+    const seat = box(g, 1.6, 0.25, 0.9, Mat.plastic(0xf2b632), 0, 0, 0, 0.08, 1);
+    // the chains hang from the bar: a frame pivoting at the seat that always points up at the hook
+    const hang = new THREE.Group(); g.add(hang);
+    const chains = [];
+    for (const s of [-1, 1]) {
+      const ch = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 1, 6), Mat.steel()); ch.geometry.translate(0, 0.5, 0); ch.position.set(s * 0.7, 0.2, 0); ch.castShadow = true; hang.add(ch); chains.push(ch);
+      const hook = new THREE.Mesh(new THREE.TorusGeometry(0.1, 0.03, 6, 12), Mat.steel()); hook.position.set(s * 0.7, 0.2, 0); hook.rotation.y = Math.PI / 2; hang.add(hook);
+    }
+    const aim = () => {
+      const dz = (p.pivotZ !== undefined ? p.pivotZ : g.position.z) - g.position.z, dy = barY - g.position.y - 0.2;
+      const th = Math.atan2(dz, dy), L = Math.hypot(dz, dy);
+      hang.rotation.x = th; for (const c of chains) c.scale.y = L;
+      seat.rotation.x = th * 0.35; // the seat rocks a little with the chains
+    };
+    g.position.set(p.x, p.y || 0, p.z); aim();
+    g.userData.tick = aim;
     return g;
   },
   playhouse(p) {
@@ -48,7 +78,8 @@ export const BACKYARD = {
     box(g, 1.4, 2.6, 0.08, Mat.paint(0x3f8fd8, 0.6), -0.8, 0, d / 2 + 0.02, 0.04, 1);
     const win = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 1.0), new THREE.MeshBasicMaterial({ color: 0xffd69a })); win.position.set(1.3, 2.4, d / 2 + 0.03); g.add(win);
     for (const s of [-1, 1]) box(g, 0.35, 1.1, 0.06, Mat.paint(0x4fb06a, 0.6), 1.3 + s * 0.8, 1.85, d / 2 + 0.04, 0.02, 1);
-    for (let i = 0; i < 3; i++) { const f = new THREE.Mesh(new THREE.SphereGeometry(0.16, 8, 6), Mat.plastic([0xe5484d, 0xf2b632, 0xd94f6b][i])); f.position.set(0.9 + i * 0.4, 1.95, d / 2 + 0.25); g.add(f); }
+    box(g, 1.5, 0.3, 0.35, Mat.paint(0x4fb06a, 0.6), 1.3, 1.62, d / 2 + 0.2, 0.03, 1); // window box
+    for (let i = 0; i < 4; i++) flower(g, 0.82 + i * 0.32, 1.9, d / 2 + 0.2, 0.32 + hashf(i, 2) * 0.12, [0xe5484d, 0xf2b632, 0xd94f6b, 0xa46ad8][i], i + 40);
     return g;
   },
   sandbox(p) {
@@ -96,8 +127,7 @@ export const BACKYARD = {
     const cols = [0xe5484d, 0xf2b632, 0xd94f6b, 0xa46ad8, 0xffffff];
     for (let i = 0; i < 7; i++) {
       const a = hashf(i, r) * Math.PI * 2, rr = hashf(r, i) * r * 0.6, stem = 0.6 + hashf(i, 3) * 0.7;
-      cyl(g, 0.03, 0.03, stem, Mat.paint(0x3f7a3a), Math.cos(a) * rr, h, Math.sin(a) * rr, 5);
-      const f = new THREE.Mesh(new THREE.SphereGeometry(0.17, 8, 6), Mat.plastic(cols[(i + Math.round(r * 10)) % cols.length])); f.position.set(Math.cos(a) * rr, h + stem, Math.sin(a) * rr); f.scale.y = 0.6; g.add(f);
+      flower(g, Math.cos(a) * rr, h - 0.05, Math.sin(a) * rr, stem, cols[(i + Math.round(r * 10)) % cols.length], i + r * 10);
     }
     return g;
   },

@@ -12,7 +12,7 @@ export const LAUNDRY = {
     for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) out.push(B(sx * (w / 2 - 0.1), 0, sz * (d / 2 - 0.1), 0.18, ys[ys.length - 1], 0.18, { tag: 'shelfPost' }));
     return out;
   },
-  ironingBoard: (p) => [B(0, (p.h || 3.8) - 0.15, 0, 5.4, 0.15, 1.5, { tag: 'ironing', surface: 'cloth' }), B(-0.6, 0, 0, 0.2, (p.h || 3.8) - 0.15, 1.2, { tag: 'ironLeg' })],
+  ironingBoard: (p) => [B(0, (p.h || 3.8) - 0.15, 0, 5.4, 0.15, 1.5, { tag: 'ironing', surface: 'cloth' }), B(0, 0, 0, 0.2, (p.h || 3.8) - 0.15, 1.0, { tag: 'ironLeg' })],
   dryingRack: (p) => [B(0, (p.h || 4.2) - 0.15, 0, 3.6, 0.15, 1.6, { tag: 'rack', surface: 'cloth' })],
   stepLadder: () => [B(0, 0, 0.8, 2.0, 1.2, 0.8, { tag: 'ladder1', surface: 'metal' }), B(0, 0, 0, 2.0, 2.4, 0.8, { tag: 'ladder2', surface: 'metal' }), B(0, 0, -0.8, 2.0, 3.6, 0.8, { tag: 'ladder3', surface: 'metal' })],
   // a laundry basket hanging off the clothesline: rides back and forth (a mover)

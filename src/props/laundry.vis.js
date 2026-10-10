@@ -58,8 +58,16 @@ export const LAUNDRY = {
   },
   ironingBoard(p) {
     const g = new THREE.Group(), h = p.h || 3.8;
-    const top = new THREE.Mesh(new THREE.CapsuleGeometry(0.75, 3.9, 6, 16), Mat.fabric(0x9fc3e6, 2)); top.rotation.z = Math.PI / 2; top.scale.set(1, 1, 0.12); top.position.y = h - 0.08; sh(top); g.add(top);
-    for (const s of [-1, 1]) { const leg = cyl(g, 0.06, 0.06, h * 1.15, Mat.steel(), 0, 0, 0, 8); leg.position.set(-0.6 + s * 0.0, h / 2, 0); leg.rotation.z = s * 0.35; leg.scale.y = 1; leg.position.y = (h - 0.2) / 2 - h * 0.075; }
+    // the board lies flat (the capsule's thin axis points up once it's turned lengthways)
+    const top = new THREE.Mesh(new THREE.CapsuleGeometry(0.75, 3.9, 6, 16), Mat.fabric(0x9fc3e6, 2)); top.rotation.z = Math.PI / 2; top.scale.set(0.12, 1, 1); top.position.y = h - 0.08; sh(top); g.add(top);
+    // scissor legs crossing under the middle: each side is a U of tubing with a foot bar
+    const lift = h - 0.15, lean = 0.32, len = lift / Math.cos(lean), reach = lift * Math.tan(lean) / 2;
+    for (const s of [-1, 1]) {
+      for (const z of [-0.42, 0.42]) { const leg = cyl(g, 0.05, 0.05, len, Mat.steel(), 0, lift / 2, z + s * 0.03, 8); leg.position.y = lift / 2; leg.rotation.z = s * lean; }
+      const foot = cyl(g, 0.06, 0.06, 1.0, Mat.plastic(0x2b2f36), s * reach, 0.06, 0, 8); foot.position.y = 0.06; foot.rotation.x = Math.PI / 2;
+      const brace = cyl(g, 0.04, 0.04, 0.84, Mat.steel(), -s * reach, lift - 0.06, 0, 8); brace.position.y = lift - 0.06; brace.rotation.x = Math.PI / 2;
+    }
+    const pin = cyl(g, 0.07, 0.07, 0.96, Mat.steel(), 0, lift / 2, 0, 8); pin.position.y = lift / 2; pin.rotation.x = Math.PI / 2;
     const iron = new THREE.Group(); iron.position.set(2.0, h, 0); g.add(iron);
     const ib = sh(new THREE.Mesh(new THREE.ConeGeometry(0.4, 1.0, 4), Mat.plastic(0x3f8fd8))); ib.rotation.set(0, Math.PI / 4, Math.PI / 2); ib.scale.set(1, 1, 0.5); ib.position.y = 0.2; iron.add(ib);
     return g;
