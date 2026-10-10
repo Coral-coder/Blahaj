@@ -141,7 +141,7 @@ function startChapter(i, withIntro) {
     $('objective').textContent = ch.goalText;
     $('fishTotal').textContent = ch.fish.length;
     updateHud();
-    Audio.startMusic(ch.music);
+    Audio.startMusic(ch.id);
     if (withIntro && ch.intro && CINES[ch.intro]) runCine(CINES[ch.intro](game, hooks), () => chapterTitle(i));
     else chapterTitle(i);
     $('game').focus();
@@ -311,6 +311,7 @@ function frame(now) {
     $('timer').textContent = fmt(game.stats.time);
     updateHud();
     Audio.setDream(game.comfort / 100);
+    Audio.setProgress(...game.progress());
     beatT -= dt;
     if (game.comfort < 25 && beatT <= 0) { Audio.heartbeat(); beatT = 0.9 + game.comfort / 40; }
   }

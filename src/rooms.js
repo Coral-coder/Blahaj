@@ -686,22 +686,21 @@ function moonbeam(room, win, dir) {
 
 // ------------------------------------------------------------- the dark --
 // The nightmare pools on the floor wherever there is no light.
-export function createDarkFloor(room, everywhere = false) { // everywhere: dark all over (the rising dark), else only in the gloom round each nightmare
+export function createDarkFloor(room) {
   const w = room.x1 - room.x0 + 0.2, d = room.z1 - room.z0 + 0.2;
   const geo = new THREE.PlaneGeometry(w, d, 1, 1);
   geo.rotateX(-Math.PI / 2);
   const MAXC = 16, MAXR = 6;
   const uniforms = {
-    time: { value: 0 }, comfort: { value: 1 }, everywhere: { value: everywhere ? 1 : 0 },
+    time: { value: 0 }, comfort: { value: 1 },
     circles: { value: Array.from({ length: MAXC }, () => new THREE.Vector3(0, 0, -1)) },
     rects: { value: Array.from({ length: MAXR }, () => new THREE.Vector4(0, 0, -1, -1)) },
-    gloom: { value: Array.from({ length: MAXC }, () => new THREE.Vector3(0, 0, -1)) }, // the pools round each nightmare
   };
   const mat = new THREE.ShaderMaterial({
     transparent: true, depthWrite: false, uniforms,
     vertexShader: 'varying vec3 vW; void main(){ vW = (modelMatrix*vec4(position,1.)).xyz; gl_Position = projectionMatrix*viewMatrix*vec4(vW,1.); }',
-    fragmentShader: `varying vec3 vW; uniform float time; uniform float comfort; uniform float everywhere;
-      uniform vec3 circles[${MAXC}]; uniform vec4 rects[${MAXR}]; uniform vec3 gloom[${MAXC}];
+    fragmentShader: `varying vec3 vW; uniform float time; uniform float comfort;
+      uniform vec3 circles[${MAXC}]; uniform vec4 rects[${MAXR}];
       float h(vec2 p){ return fract(sin(dot(p, vec2(41.3, 289.1))) * 43758.5); }
       float n(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.-2.*f); return mix(mix(h(i),h(i+vec2(1,0)),f.x), mix(h(i+vec2(0,1)),h(i+vec2(1,1)),f.x), f.y); }
       float fbm(vec2 p){ float s=0., a=.5; for(int i=0;i<5;i++){ s+=a*n(p); p=p*2.03+vec2(1.7,9.2); a*=.5; } return s; }
@@ -713,26 +712,11 @@ export function createDarkFloor(room, everywhere = false) { // everywhere: dark 
         float smoke = fbm(p * 0.45 + vec2(time * 0.04, -time * 0.03));
         float wisps = fbm(p * 1.3 - vec2(time * 0.09, time * 0.05));
         float edge = d + (smoke - 0.5) * 0.9;
-        float g = 1e5;
-        for (int i = 0; i < ${MAXC}; i++) { if (gloom[i].z > 0.) g = min(g, length(p - gloom[i].xy) - gloom[i].z); }
-        float gedge = g + (smoke - 0.5) * 1.1 + (wisps - 0.5) * 0.4;
-        float lit = smoothstep(-0.15, 0.6, edge);
-        if (everywhere > 0.5) {
-          float a = lit * (0.38 + 0.32 * smoke + 0.14 * wisps) * mix(1.0, 0.62, comfort);
-          vec3 col = mix(vec3(0.01, 0.005, 0.03), vec3(0.06, 0.02, 0.11), wisps);
-          col += vec3(0.3, 0.1, 0.55) * smoothstep(0.6, 0.0, abs(edge - 0.15)) * 0.22;
-          gl_FragColor = vec4(col, clamp(a, 0., 0.93));
-          return;
-        }
-        // a pool of inky gloom round each nightmare, swirling, with a glowing violet edge so you can see where it hurts
-        float pool = 1.0 - smoothstep(-0.7, 0.05, gedge);
-        float rim = smoothstep(0.45, 0.0, abs(gedge + 0.12)) * lit;
-        float swirl = fbm(p * 2.2 + vec2(sin(time * 0.6), cos(time * 0.5)) * 0.8);
-        float a = pool * lit * (0.66 + 0.18 * smoke + 0.12 * swirl);
-        vec3 col = mix(vec3(0.015, 0.005, 0.035), vec3(0.09, 0.03, 0.16), swirl * wisps * 1.6);
-        col += vec3(0.42, 0.14, 0.78) * rim * (0.7 + 0.3 * sin(time * 2.0 + p.x + p.y));
-        a = max(a, rim * 0.55);
-        gl_FragColor = vec4(col, clamp(a, 0., 0.94));
+        float dark = smoothstep(-0.15, 0.6, edge);
+        float a = dark * (0.38 + 0.32 * smoke + 0.14 * wisps) * mix(1.0, 0.62, comfort);
+        vec3 col = mix(vec3(0.01, 0.005, 0.03), vec3(0.06, 0.02, 0.11), wisps);
+        col += vec3(0.3, 0.1, 0.55) * smoothstep(0.6, 0.0, abs(edge - 0.15)) * 0.22;   // faint violet rim where light meets dark
+        gl_FragColor = vec4(col, clamp(a, 0., 0.93));
       }`,
   });
   const mesh = new THREE.Mesh(geo, mat);
@@ -751,9 +735,6 @@ export function createDarkFloor(room, everywhere = false) { // everywhere: dark 
       for (; ri < MAXR; ri++) uniforms.rects.value[ri].set(0, 0, -1, -1);
     },
     update(t, comfort) { uniforms.time.value = t; uniforms.comfort.value = comfort; },
-    setGloom(list) { // [[x, z, r], ...]
-      for (let i = 0; i < MAXC; i++) { const gl = list[i]; if (gl) uniforms.gloom.value[i].set(gl[0], gl[1], gl[2]); else uniforms.gloom.value[i].set(0, 0, -1); }
-    },
   };
 }
 
@@ -761,7 +742,7 @@ export function createDarkFloor(room, everywhere = false) { // everywhere: dark 
 export function createRisingDark(room) {
   const g = new THREE.Group();
   const w = room.x1 - room.x0, d = room.z1 - room.z0;
-  const top = createDarkFloor({ x0: room.x0, x1: room.x1, z0: room.z0, z1: room.z1 }, true);
+  const top = createDarkFloor({ x0: room.x0, x1: room.x1, z0: room.z0, z1: room.z1 });
   top.mesh.material.uniforms.circles.value.forEach((c) => c.set(0, 0, -1));
   g.add(top.mesh);
   const body = new THREE.Mesh(new THREE.BoxGeometry(w + 0.2, 1, d + 0.2), new THREE.MeshBasicMaterial({ color: 0x07020d, transparent: true, opacity: 0.88, depthWrite: false }));

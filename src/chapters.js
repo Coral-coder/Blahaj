@@ -1,6 +1,6 @@
 // The story campaign. Pure data: rooms, furniture, light, pickups, enemies.
-// Rule of the night: each nightmare on the floor sits in a pool of gloom that eats
-// the dream. Poof them all to open the way on. Light and anything you can climb onto are safe.
+// Rule of the night: the dark FLOOR feeds the nightmare; light, rugs and anything you
+// can climb onto are safe. The nightmares on the floor must all be poofed to open the way on.
 const line = (a, b, n) => Array.from({ length: n }, (_, i) => {
   const t = n === 1 ? 0.5 : i / (n - 1);
   return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
@@ -27,6 +27,7 @@ export const CHAPTERS = [
   // ---------------------------------------------------------------------------
   {
     id: 'edge', title: 'Off the Edge', room: BEDROOM, music: 0,
+    hazard: { type: 'rings', at: [-5.4, 0, 6.6], imp: [-5.6, 0, 4.6], every: 4.6, speed: 3.2, maxR: 12, color: 0x5a2aa8, dmg: 8, title: 'The wardrobe is breathing out bad dreams!', hint: 'Hop over the waves of dark', msg: 'A wave of bad dream!' },
     goalText: 'Climb back up to Leo',
     intro: 'prologue', outro: 'dog',
     abilities: {}, // just a hop: double jump is learned downstairs
@@ -75,6 +76,7 @@ export const CHAPTERS = [
   // ---------------------------------------------------------------------------
   {
     id: 'downstairs', title: 'Downstairs', music: 1,
+    hazard: { type: 'lobber', kind: 'cushion', imp: [0.5, 2.3, -9.7], from: [0.5, 3.2, -8.8], every: 4.8, speed: 9, spread: 2.5, bounce: 0.3, friction: 2.5, life: 5, radius: 0.55, dmg: 6, title: 'A nightmare on the sofa is throwing cushions!', hint: 'Keep moving!', msg: 'Flumph! A cushion!' },
     goalText: 'Sneak out to the kitchen',
     intro: 'downstairs', newAbility: ['doubleJump', 'flop'],
     room: {
@@ -84,7 +86,7 @@ export const CHAPTERS = [
     },
     abilities: { doubleJump: true, flop: true },
     spawn: [-8.6, 0.5, -5.6], spawnYaw: 0, camYaw: 1.35,
-    drain: 1.0,
+    drain: 0.75,
     props: [
       { type: 'dogBed', x: -8.6, z: -5.6 },
       { type: 'fireplace', x: -12.1, z: 0.5, rot: 1 },
@@ -134,6 +136,7 @@ export const CHAPTERS = [
   // ---------------------------------------------------------------------------
   {
     id: 'kitchen', title: 'Midnight Kitchen', music: 2,
+    hazard: { type: 'lobber', kind: 'orange', imp: [11.0, 0, -7.0], from: [11.0, 2.6, -7.3], every: 2.6, speed: 10, spread: 2.2, bounce: 0.55, friction: 0.4, max: 5, life: 6, radius: 0.45, title: 'The fridge nightmare is chucking oranges!', hint: 'They bounce and roll — dodge or jump them', msg: 'Bonk! An orange!' },
     goalText: 'Gather Leo’s fridge magnets, then open the pet gate',
     intro: 'kitchen', newAbility: 'dash',
     room: {
@@ -143,7 +146,7 @@ export const CHAPTERS = [
     },
     abilities: { doubleJump: true, flop: true, dash: true },
     spawn: [-8.6, 0, -6.2], spawnYaw: Math.PI / 2, camYaw: -1.25,
-    drain: 1.0,
+    drain: 0.85,
     props: [
       { type: 'counter', x: -9.5, z: -9.55, w: 8.6, stove: 0 },
       { type: 'counter', x: -2.0, z: -9.55, w: 6.4, sink: -2.0 },
@@ -206,6 +209,7 @@ export const CHAPTERS = [
   // ---------------------------------------------------------------------------
   {
     id: 'laundry', title: 'The Laundry Room', music: 0,
+    hazard: { type: 'rings', at: [-3.0, 0, -7.0], imp: [-3.0, 3.5, -8.3], every: 2.8, speed: 4.6, maxR: 16, color: 0x8fcaf2, title: 'The washing machine is thumping!', hint: 'Jump the sudsy shockwaves', msg: 'Splosh! A soapy wave!' },
     goalText: 'Find the five lost socks, then open the back door',
     intro: 'laundry',
     room: {
@@ -266,6 +270,7 @@ export const CHAPTERS = [
   // ---------------------------------------------------------------------------
   {
     id: 'backyard', title: 'The Back Garden', music: 1,
+    hazard: { type: 'sweeper', kind: 'water', at: [-1.5, 0, -6.5], len: 5.6, width: 0.45, speed: 1.0, imp: [-3.6, 0, -9.0], hitH: 0.9, title: 'A nightmare turned the sprinkler on!', hint: 'Jump the jet as it swings round', msg: 'Splash! Soaked!' },
     goalText: 'Catch six fireflies to light the way to the garage',
     intro: 'backyard', newAbility: 'glide',
     room: {
@@ -336,6 +341,7 @@ export const CHAPTERS = [
   // ---------------------------------------------------------------------------
   {
     id: 'garage', title: 'The Garage', music: 2,
+    hazard: { type: 'lobber', kind: 'tire', imp: [-8.6, 1.65, 0.6], from: [-7.6, 2.4, 0.6], every: 3.0, speed: 8, spread: 1.8, bounce: 0.25, friction: 0.12, life: 6, radius: 0.6, title: 'A nightmare is rolling tyres off the stack!', hint: 'Jump over them as they roll by', msg: 'Thud! A tyre!' },
     goalText: 'Find five batteries, then hit the switch to open the basement door',
     intro: 'garage',
     room: {
@@ -402,6 +408,7 @@ export const CHAPTERS = [
   // ---------------------------------------------------------------------------
   {
     id: 'basement', title: 'Down in the Basement', music: 1,
+    hazard: { type: 'roamer', kind: 'train', path: [[-9.0, -3.0], [-9.0, 3.0], [-5.6, 3.6], [-5.6, -2.6]], speed: 4.6, radius: 1.1, top: 1.6, title: 'A runaway toy train, with a nightmare driving!', hint: 'Jump over it, or bounce off its roof', msg: 'Choo-choo! Run over by the train!' },
     goalText: 'Find four light bulbs, then ride the dumbwaiter up',
     intro: 'basement',
     room: {
@@ -503,6 +510,7 @@ export const CHAPTERS = [
   // ---------------------------------------------------------------------------
   {
     id: 'hallway', title: 'The Upstairs Hallway', music: 1,
+    hazard: { type: 'sweeper', swing: { pivot: [0, 11.6, -10.0], len: 10.4, amp: 0.62, period: 3.4, dir: 0, bobR: 1.0 }, imp: [-6.2, 8.6, -10.0], title: 'The grandfather clock\'s pendulum has come loose!', hint: 'Time your run past it', msg: 'Tock! Knocked by the pendulum!' },
     goalText: 'Gather Leo’s five lost marbles, then slip into the bathroom',
     intro: 'hallway',
     room: {
@@ -568,6 +576,7 @@ export const CHAPTERS = [
   // ---------------------------------------------------------------------------
   {
     id: 'bathroom', title: 'Bubble Bath', music: 2,
+    hazard: { type: 'lobber', kind: 'duck', imp: [3.6, 1.7, -7.6], from: [3.6, 2.8, -6.6], every: 2.8, speed: 9, spread: 2.4, bounce: 0.5, friction: 1.2, life: 5.5, radius: 0.5, title: 'A nightmare in the bath is flinging rubber ducks!', hint: 'Quack! Dodge them', msg: 'Squeak! A rubber duck!' },
     goalText: 'Rescue Leo’s five rubber ducks',
     intro: 'bathroom',
     room: {
@@ -628,6 +637,7 @@ export const CHAPTERS = [
   // ---------------------------------------------------------------------------
   {
     id: 'parents', title: 'Mum and Dad’s Room', music: 1,
+    hazard: { type: 'rings', at: [0, 0, -6.4], r0: 3.6, imp: [0, 5.0, -11.0], every: 3.2, speed: 4.0, maxR: 18, color: 0xb9a8ff, sound: 'snore', title: 'Dad\'s snoring is shaking the floor!', hint: 'Hop over the snore waves', msg: 'SNNRRK! Bowled over by a snore!' },
     goalText: 'Find Mum’s six sewing buttons — without waking anyone',
     intro: 'parents',
     room: {
@@ -691,6 +701,7 @@ export const CHAPTERS = [
   // ---------------------------------------------------------------------------
   {
     id: 'playroom', title: 'The Playroom', music: 2,
+    hazard: { type: 'roamer', kind: 'car', path: [[6.0, -4.5], [5.0, -3.0], [2.5, -2.3], [-0.5, -2.3], [-3.0, -3.0], [-4.0, -4.5], [-3.0, -6.0], [-0.5, -6.7], [2.5, -6.7], [5.0, -6.0]], speed: 5.5, radius: 1.0, top: 1.3, title: 'A wind-up car is zooming round the rug!', hint: 'Jump it, or bounce off the roof', msg: 'Vroom! Run over!' },
     goalText: 'Find six puzzle pieces, then climb up to the attic',
     intro: 'playroom',
     room: {
@@ -759,7 +770,7 @@ export const CHAPTERS = [
     },
     abilities: { doubleJump: true, flop: true, dash: true, glide: true },
     spawn: [-11.6, 0, 6.4], spawnYaw: 2.21, camYaw: -0.93,
-    drain: 0.9,
+    drain: 0.8,
     props: [
       { type: 'roofSlope', x: 0, z: 0, l: 32, knee: 9, ridge: 14, half: 10 },
       { type: 'tieBeam', x: -10.0, z: 0, top: 8.6, l: 14 }, { type: 'tieBeam', x: -4.0, z: 0, top: 8.6, l: 14 },
@@ -808,6 +819,7 @@ export const CHAPTERS = [
   // ---------------------------------------------------------------------------
   {
     id: 'bed', title: 'Back to Bed', room: BEDROOM, music: 3,
+    hazard: { type: 'sweeper', at: [0.4, 0, 2.0], len: 5.2, width: 0.5, speed: 0.75, imp: [0.4, 0, 2.0], impScale: 0.8, title: 'A long shadowy arm is sweeping the floor!', hint: 'Jump it as it comes round', msg: 'Grabbed by the shadow arm!' },
     goalText: 'Chase the nightmares away from Leo',
     intro: 'bed', outro: 'ending',
     abilities: { doubleJump: true, flop: true, dash: true, glide: true },

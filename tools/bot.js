@@ -44,7 +44,7 @@ window.__bot = {
         if (o.trace && Math.round(t / step) % 5 === 0) log.push('  t' + t.toFixed(2) + ' ' + where() + ' vy' + P.vel.y.toFixed(1) + (bounced ? ' B' : ''));
         if (P.grounded && t > 0.15 && bounced) {
           stop(6);
-          const ok = P.pos.y > y - 0.4 && P.pos.y < y + 1.3 && hd(x, z) < 2.6;
+          const ok = P.pos.y > y - 0.4 && P.pos.y < y + (o.tolY ?? 1.3) && hd(x, z) < 2.6; // tolY: a mover may carry you higher
           return ok ? true : `landed ${where()} wanted (${x},${y},${z})`;
         }
       }

@@ -112,14 +112,16 @@ export const Audio = {
     },
 
     // --- background music: generative, mellow and underwater (see music.js) ---
-    startMusic(mood = 0) {
+    startMusic(theme = 'edge') {
       if (!this.ctx) return;
       if (!this.music) this.music = createMusic(this.ctx, this.musicGain);
-      this.music.start(mood);
+      this.music.start(theme);
       if (this.dream !== undefined) this.music.setDream(this.dream);
     },
 
     stopMusic() { if (this.music) this.music.stop(); },
+    // how far through the level you are (0..1) and whether the way out is open: the music builds with it
+    setProgress(p, unlocked) { if (this.music) this.music.setProgress(p, unlocked); },
   };
 
 
