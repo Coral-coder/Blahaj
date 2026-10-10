@@ -14,6 +14,9 @@ import { BLAHAJ_SPHERES } from './tumble.js';
 const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 const SOFT_GROUND = { kind: 'soft', active: true, type: 'solid', tag: 'soft' };
 const EPS = 0.001;
+// how far back the camera sits (pinch / scroll / +- to change it); remembered between chapters
+const ZOOM_KEY = 'blahaj-camera-distance';
+function savedZoom() { try { const v = +localStorage.getItem(ZOOM_KEY); if (v >= 5 && v <= 18) return v; } catch (e) { /* storage blocked */ } return 10.5; }
 const angDiff = (a, b) => { let d = b - a; while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2; return d; };
 const COMFORT = { fish: 4, starfish: 25, bunny: 3, stomp: 6, knot: 15, hit: 18, lego: 10, ball: 7, cat: 6, lampMin: 70, respawn: 60, darkDrain: 9, risingDrain: 26 };
 
@@ -245,7 +248,7 @@ export class Game {
     };
     this.respawn = { pos: V(sx, sy, sz), dark: ch.rising ? ch.rising.from : 0 };
     this.fill = new THREE.PointLight(0xfff0e0, 2.6, 7, 2); scene.add(this.fill);
-    this.cam = { yaw: ch.camYaw !== undefined ? ch.camYaw : angDiff(0, (ch.spawnYaw || 0) + Math.PI), pitch: 0.42, dist: 10.5, target: V(sx, sy, sz), idle: 0, fovKick: 0, shake: 0 };
+    this.cam = { yaw: ch.camYaw !== undefined ? ch.camYaw : angDiff(0, (ch.spawnYaw || 0) + Math.PI), pitch: 0.42, dist: savedZoom(), target: V(sx, sy, sz), idle: 0, fovKick: 0, shake: 0 };
     this.R.build(scene, this.camera, { bloom: 0.55, threshold: 0.85, exposure: 1.05, vignette: 0.42, warmth: 0.02 });
     this.updateCamera(1, true);
   }
@@ -836,6 +839,13 @@ export class Game {
     const manual = inp.camDX !== 0 || inp.camDY !== 0 || inp.camTurn() !== 0;
     C.yaw -= inp.camDX * 0.005 + inp.camTurn() * dt * 2.4;
     C.pitch = THREE.MathUtils.clamp(C.pitch + inp.camDY * 0.003, -0.05, 1.2);
+    let z = inp.zoom;
+    if (inp.keys.has('Equal') || inp.keys.has('NumpadAdd')) z *= Math.exp(-dt * 1.2);
+    if (inp.keys.has('Minus') || inp.keys.has('NumpadSubtract')) z *= Math.exp(dt * 1.2);
+    if (z !== 1) {
+      C.dist = THREE.MathUtils.clamp(C.dist * z, 5, 18);
+      clearTimeout(this.zoomSave); this.zoomSave = setTimeout(() => { try { localStorage.setItem(ZOOM_KEY, C.dist.toFixed(2)); } catch (e) { /* storage blocked */ } }, 400);
+    }
     C.idle = manual ? 0 : C.idle + dt;
     const hs = Math.hypot(P.vel.x, P.vel.z);
     if (C.idle > 1.2 && hs > 2 && this.state === 'play') {
@@ -864,8 +874,8 @@ export class Game {
     let t = C.dist;
     if (dir.x > 1e-3) t = Math.min(t, (r.x1 + O - look.x) / dir.x); else if (dir.x < -1e-3) t = Math.min(t, (r.x0 - O - look.x) / dir.x);
     if (dir.z > 1e-3) t = Math.min(t, (r.z1 + O - look.z) / dir.z); else if (dir.z < -1e-3) t = Math.min(t, (r.z0 - O - look.z) / dir.z);
-    const want = Math.max(Math.min(C.dist, 7), t);
-    C.cur = snap || C.cur === undefined ? want : C.cur + (want - C.cur) * Math.min(1, dt * 3);
+    const want = Math.max(Math.min(C.dist, 7), t), zooming = z !== 1;
+    C.cur = snap || zooming || C.cur === undefined ? want : C.cur + (want - C.cur) * Math.min(1, dt * 3); // zooming answers straight away
     this.camera.position.copy(look).addScaledVector(dir, C.cur);
     this.camera.position.y = Math.max(0.4, this.camera.position.y);
     if (C.shake) { C.shake = Math.max(0, C.shake - dt); this.camera.position.add(V(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(C.shake * 0.5)); }

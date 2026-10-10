@@ -10,12 +10,42 @@ import { CINES, restingHug } from './cinematics.js';
 
 const $ = (id) => document.getElementById(id);
 const SAVE_KEY = 'blahaj-backtobed-v1';
+const TOUCH = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 const ABILITIES = {
-  doubleJump: { icon: '🫧', name: 'Double Jump', how: 'Press Space again in the air' },
-  flop: { icon: '💥', name: 'Belly Flop', how: 'Press C in the air. Super-bounce off cushions and squash nightmares' },
-  dash: { icon: '🚀', name: 'Torpedo Dash', how: 'Press Shift to zoom forward' },
-  glide: { icon: '🪽', name: 'Fin Glide', how: 'Hold Space while falling' },
+  doubleJump: { icon: '🫧', name: 'Double Jump', how: TOUCH ? 'Tap ⤴ again in the air' : 'Press Space again in the air', key: '<kbd>Space</kbd> again in the air: double jump' },
+  flop: { icon: '💥', name: 'Belly Flop', how: TOUCH ? 'Tap 💥 in the air. Super-bounce off cushions and squash nightmares' : 'Press C in the air. Super-bounce off cushions and squash nightmares', key: '<kbd>C</kbd> in the air: belly flop' },
+  dash: { icon: '🚀', name: 'Torpedo Dash', how: TOUCH ? 'Tap 🚀 to zoom forward' : 'Press Shift to zoom forward', key: '<kbd>Shift</kbd>: torpedo dash' },
+  glide: { icon: '🪽', name: 'Fin Glide', how: TOUCH ? 'Hold ⤴ while falling' : 'Hold Space while falling', key: 'Hold <kbd>Space</kbd> falling: fin glide' },
 };
+// the controls you've learned so far; moves still to come stay locked until you find them
+function controlsHtml(ab) {
+  const rows = [
+    '<div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / arrows: move</div>',
+    '<div><kbd>Space</kbd>: jump</div>',
+    ...Object.entries(ABILITIES).map(([k, a]) => (ab[k] ? `<div>${a.icon} ${a.key}</div>` : '<div class="locked">🔒 a new move — you’ll learn it on the way</div>')),
+    '<div>Drag mouse or <kbd>Q</kbd>/<kbd>E</kbd>: turn camera</div>',
+    '<div>Scroll wheel or <kbd>+</kbd>/<kbd>−</kbd>: zoom</div>',
+    '<div><kbd>Esc</kbd> pause · <kbd>Enter</kbd> skip scene</div>',
+    `<div>${TOUCH ? 'Touch: stick to swim, drag to look, pinch to zoom' : 'Gamepad and touch work too'}</div>`,
+  ];
+  return rows.join('');
+}
+// every move from the chapters you've reached
+function learnedAbilities() {
+  const ab = {};
+  CHAPTERS.forEach((c, i) => { if (unlocked(i)) Object.assign(ab, c.abilities || {}); });
+  return ab;
+}
+// touch buttons only for moves this chapter lets you use; a new one pulses for a while
+function touchButtons(ch) {
+  const ab = ch.abilities || {}, fresh = [].concat(ch.newAbility || []);
+  for (const [id, k] of [['tDash', 'dash'], ['tFlop', 'flop']]) {
+    const el = $(id); if (!el) continue;
+    el.style.display = ab[k] ? '' : 'none';
+    el.classList.toggle('fresh', !!ab[k] && fresh.includes(k));
+    clearTimeout(el.freshT); if (fresh.includes(k)) el.freshT = setTimeout(() => el.classList.remove('fresh'), 12000);
+  }
+}
 
 function loadSave() {
   let s = null;
@@ -105,6 +135,7 @@ function startChapter(i, withIntro) {
     loading(false);
     mode = 'play';
     show(null);
+    touchButtons(ch);
     $('chapterName').textContent = `${i + 1}. ${ch.title}`;
     $('objective').textContent = ch.goalText;
     $('fishTotal').textContent = ch.fish.length;
@@ -201,7 +232,7 @@ function buildChapterList() {
 }
 
 function pause(on) {
-  if (on && mode === 'play') { mode = 'paused'; show('pause'); }
+  if (on && mode === 'play') { mode = 'paused'; $('pauseControls').innerHTML = controlsHtml(CHAPTERS[current].abilities || {}); show('pause'); }
   else if (!on && mode === 'paused') { mode = 'play'; show(null); $('game').focus(); }
 }
 const qualityLabel = () => `Graphics: ${QUALITY[renderer.quality].label}`;
@@ -215,7 +246,7 @@ function cycleQuality() {
 // ----------------------------------------------------------------- wiring --
 $('btnStart').onclick = () => { Audio.init(); Audio.click(); story = true; startChapter(save.completed[0] ? CHAPTERS.findIndex((c, i) => !save.completed[i]) : 0, true); };
 $('btnChapters').onclick = () => { Audio.init(); Audio.click(); buildChapterList(); show('chapters'); };
-$('btnHow').onclick = () => { Audio.init(); Audio.click(); show('how'); };
+$('btnHow').onclick = () => { Audio.init(); Audio.click(); $('howControls').innerHTML = controlsHtml(learnedAbilities()); show('how'); };
 $('btnHowBack').onclick = () => { Audio.click(); show('title'); };
 $('btnChaptersBack').onclick = () => { Audio.click(); show('title'); };
 $('btnResume').onclick = () => pause(false);

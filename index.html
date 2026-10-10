@@ -93,6 +93,9 @@
   #knob { position: absolute; left: 36px; top: 36px; width: 56px; height: 56px; border-radius: 50%; background: rgba(255,255,255,.6); }
   .tbtn { width: 74px; height: 74px; border-radius: 50%; background: rgba(255,255,255,.14); border: 1px solid var(--edge); font-size: 28px; display: flex; align-items: center; justify-content: center; }
   .tbtn.down { background: rgba(255,255,255,.35); }
+  .tbtn.fresh { animation: fresh 1.2s ease-in-out infinite; border-color: var(--gold); }
+  @keyframes fresh { 50% { box-shadow: 0 0 0 10px rgba(255,210,122,.35); transform: scale(1.08); } }
+  .controls .locked { opacity: .45; font-weight: 600; }
   #tJump { right: 30px; bottom: 40px; width: 90px; height: 90px; } #tDash { right: 132px; bottom: 30px; } #tFlop { right: 40px; bottom: 144px; } #tPause { right: 16px; top: 140px; width: 46px; height: 46px; font-size: 20px; }
   @media (max-width: 640px) { .controls { grid-template-columns: 1fr; } .card { padding: 20px; } #title { padding: 0 16px 6vh; } #dream { top: 70px; width: 70vw; } }
 </style>
@@ -135,16 +138,7 @@
   <div id="how" class="screen hidden">
     <div class="card">
       <h2>How to play</h2>
-      <div class="controls">
-        <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / arrows: move</div>
-        <div><kbd>Space</kbd>: jump, again for a double jump</div>
-        <div><kbd>C</kbd> in the air: belly flop</div>
-        <div><kbd>Shift</kbd>: torpedo dash</div>
-        <div>Hold <kbd>Space</kbd> falling: fin glide</div>
-        <div>Drag mouse or <kbd>Q</kbd>/<kbd>E</kbd>: camera</div>
-        <div><kbd>Esc</kbd> pause · <kbd>Enter</kbd> skip scene</div>
-        <div>Gamepad and touch work too</div>
-      </div>
+      <div class="controls" id="howControls"></div>
       <p>The meter at the top is <b>Leo’s dream</b>. It slowly fades while he’s alone, and it drains fast when you walk on the <b>dark floor</b>, where the nightmares live. Pools of light, rugs and furniture are safe. Collect 🐟 fish, switch on lamps, and find the three hidden ⭐ starfish in every chapter to keep the dream sweet. The 🐰 dust bunnies are friends: land on one for a big, giggly bounce. Jump on nightmares to make them go poof.</p>
       <button class="btn" id="btnHowBack">Got it</button>
     </div>
@@ -156,6 +150,7 @@
 
   <div id="pause" class="screen hidden">
     <div class="card" style="max-width:420px"><h2>Paused</h2><p>Leo is still asleep. Take a breath.</p>
+      <div class="controls" id="pauseControls" style="grid-template-columns:1fr;text-align:left;font-size:14px"></div>
       <button class="btn" id="btnResume">Resume</button><button class="btn ghost" id="btnRestart">Restart chapter</button><button class="btn ghost" id="btnQuit">Title</button><br><button class="btn ghost small qbtn">Graphics</button></div>
   </div>
   <div id="complete" class="screen hidden"></div>
