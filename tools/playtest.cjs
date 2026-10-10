@@ -29,7 +29,7 @@ const server = http.createServer((req, res) => {
   const page = await browser.newPage({ viewport: { width: 960, height: 540 } });
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.stack));
-  await page.addInitScript(() => localStorage.setItem('blahaj-backtobed-v1', JSON.stringify({ quality: 'low', qualityLocked: true })));
+  await page.addInitScript(() => localStorage.setItem('blahaj-big-adventure-v1', JSON.stringify({ quality: 'low', qualityLocked: true })));
   await page.goto(`http://localhost:${server.address().port}/`, { waitUntil: 'domcontentloaded', timeout: 120000 });
   await page.waitForFunction(() => window.__blahaj && window.__blahaj.game && window.__blahaj.mode === 'title', null, { timeout: 180000 });
   await page.addScriptTag({ content: fs.readFileSync(path.join(__dirname, 'bot.js'), 'utf8') });

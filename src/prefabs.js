@@ -6,6 +6,8 @@
 // the prefab's front. expand(p) returns world boxes:
 //   { min:[x,y,z], max:[x,y,z], type:'solid'|'bounce'|'hazard', tag, surface }
 
+import { COLS } from './props/cols.js';
+
 export const U = 1 / 0.22; // units per metre
 
 export function rotXZ(x, z, r) {
@@ -114,6 +116,8 @@ export const PREFABS = {
   // decorative only
   rug: () => [], window: () => [], door: () => [], picture: () => [], toyScatter: () => [], ceilingLamp: () => [], curtain: () => [],
 };
+
+Object.assign(PREFABS, COLS); // furniture for the other rooms of the house (src/props/*)
 
 export function expand(p) {
   const make = PREFABS[p.type];

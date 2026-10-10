@@ -6,10 +6,11 @@ import { Renderer, QUALITY, QUALITY_ORDER } from './renderer.js';
 import { Input } from './input.js';
 import { Game } from './game.js';
 import { loadBlahajModel } from './art.js';
+import { ITEMS } from './features.js';
 import { CINES, restingHug } from './cinematics.js';
 
 const $ = (id) => document.getElementById(id);
-const SAVE_KEY = 'blahaj-backtobed-v1';
+const SAVE_KEY = 'blahaj-big-adventure-v1';
 const ABILITIES = {
   doubleJump: { icon: '🫧', name: 'Double Jump', how: 'Press Space again in the air' },
   flop: { icon: '💥', name: 'Belly Flop', how: 'Press C in the air. Super-bounce off cushions and squash nightmares' },
@@ -161,6 +162,8 @@ function updateHud() {
   $('dream').classList.toggle('low', c < 30);
   $('dreamLabel').textContent = c > 66 ? 'Sweet dreams' : c > 33 ? 'Restless…' : 'Nightmare!';
   $('fish').textContent = game.stats.fish;
+  const F = game.features; // things to find before the way opens
+  if (F && F.collect) { const info = ITEMS[F.collect.kind] || ITEMS.key; $('objective').textContent = `${CHAPTERS[current].goalText} · ${info.icon} ${F.got}/${F.items.length}`; }
   $('stars').innerHTML = game.stars.map((st) => `<span class="${st.taken || save.stars[current][st.i] ? '' : 'off'}">⭐</span>`).join('');
 }
 

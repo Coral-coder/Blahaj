@@ -7,6 +7,7 @@ import { Mat, worldUV } from './materials.js';
 import { nightSkyTexture, softDotTexture, textTexture, vnoise } from './textures.js';
 import { expand, roomBoxes } from './prefabs.js';
 import * as Art from './art.js';
+import { VIS } from './props/vis.js';
 
 const sh = (m, c = true, r = true) => { m.castShadow = c; m.receiveShadow = r; return m; };
 const hashf = (a, b = 0) => { const s = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return s - Math.floor(s); };
@@ -501,6 +502,8 @@ const V = {
   ceilingLamp() { return new THREE.Group(); }, curtain() { return new THREE.Group(); },
 };
 
+Object.assign(V, VIS); // furniture for the other rooms of the house (src/props/*)
+
 export function propVisual(p) {
   const make = V[p.type];
   const g = make ? make(p) : new THREE.Group();
@@ -514,22 +517,51 @@ const WALLS = {
   kidsWall: () => Mat.wallpaper(0xc9d8ee),
   livingWall: () => Mat.paint(0xd8c9b4),
   hallWall: () => Mat.paint(0xd7dccb),
+  kitchenWall: () => Mat.paint(0xe7dcc6),
+  laundryWall: () => Mat.paint(0xc6dde3),
+  bathWall: () => Mat.tiles(0xcfe5ef, 5, 1),
+  garageWall: () => Mat.paint(0xc9c4b6, 0.95),
+  concreteWall: () => Mat.concrete(0xa7a39a),
+  atticWall: () => Mat.woodBoard(),
+  nurseryWall: () => Mat.wallpaper(0xf2d3e2),
+  parentsWall: () => Mat.paint(0xc5d1c0),
+  playWall: () => Mat.wallpaper(0xf6e3ad),
+  fence: () => Mat.fence(),
+  hedge: () => Mat.hedge(),
+  brick: () => Mat.brick(),
+};
+const FLOORS = {
+  wood: [() => Mat.oakFloor(), 0.42], woodDark: [() => Mat.walnutFloor(), 0.42],
+  checker: [() => Mat.checker(), 0.2], tile: [() => Mat.tiles(0xe2e6e8, 4), 0.25], concrete: [() => Mat.concrete(), 0.12],
+  grass: [() => Mat.grass(), 0.18], carpet: [() => Mat.carpet(0x7f93bf), 0.6], carpetPink: [() => Mat.carpet(0xd59ab4), 0.6],
+  carpetGreen: [() => Mat.carpet(0x7fa37a), 0.6], attic: [() => Mat.woodBoard(), 0.3],
 };
 
 function buildShell(room, scene) {
   const g = new THREE.Group();
   const boxes = roomBoxes(room);
   const wallMat = (WALLS[room.wall] || WALLS.livingWall)();
-  const floorMat = room.floor === 'woodDark' ? Mat.walnutFloor() : Mat.oakFloor();
+  const [floorMk, floorUV] = FLOORS[room.floor] || FLOORS.wood, floorMat = floorMk();
   for (const b of boxes) {
-    const w = b.max[0] - b.min[0], h = b.max[1] - b.min[1], d = b.max[2] - b.min[2];
-    let mat = wallMat, uv = 0.22;
-    if (b.tag === 'floor') { mat = floorMat; uv = 0.42; }
-    else if (b.tag === 'ceiling') { mat = Mat.paint(0xf4f1ea, 0.95); uv = 0.15; }
+    let w = b.max[0] - b.min[0], h = b.max[1] - b.min[1], d = b.max[2] - b.min[2];
+    let mat = wallMat, uv = 0.22, cy = (b.min[1] + b.max[1]) / 2;
+    const skin = b.tag.startsWith('wall:') && room.skins && room.skins[b.tag.slice(5)];
+    if (skin) mat = WALLS[skin]();
+    if (room.outdoor && b.tag === 'ceiling') continue; // open sky
+    if (room.outdoor && b.tag.startsWith('wall:') && !(skin === 'brick')) { // a garden fence, not a wall to the sky
+      const top = Math.min(b.max[1], room.fenceH || 5.5);
+      if (b.min[1] >= top) continue;
+      h = top - b.min[1]; cy = b.min[1] + h / 2;
+    }
+    if (b.tag === 'floor') { // only under the room itself: when the camera looks in from outside, there's no floor sticking out past the walls
+      mat = floorMat; uv = floorUV;
+      if (!room.outdoor) { w = room.x1 - room.x0 + 0.6; d = room.z1 - room.z0 + 0.6; }
+    }
+    else if (b.tag === 'ceiling') { mat = room.wall === 'atticWall' ? Mat.woodBoard() : Mat.paint(0xf4f1ea, 0.95); uv = 0.15; }
     else if (b.tag === 'sill') { mat = Mat.whiteWood(); uv = 0.6; }
-    else if (b.tag === 'landing') { mat = Mat.carpet(0x8f3b3f); uv = 0.6; }
+    else if (b.tag === 'landing') { mat = room.landing === 'wood' ? Mat.woodBoard() : Mat.carpet(0x8f3b3f); uv = 0.6; }
     const m = new THREE.Mesh(worldUV(new THREE.BoxGeometry(w, h, d), uv), mat);
-    m.position.set((b.min[0] + b.max[0]) / 2, (b.min[1] + b.max[1]) / 2, (b.min[2] + b.max[2]) / 2);
+    m.position.set(b.tag === 'floor' && !room.outdoor ? (room.x0 + room.x1) / 2 : (b.min[0] + b.max[0]) / 2, cy, b.tag === 'floor' && !room.outdoor ? (room.z0 + room.z1) / 2 : (b.min[2] + b.max[2]) / 2);
     m.receiveShadow = true;
     m.castShadow = b.tag !== 'floor';
     g.add(m);
@@ -537,7 +569,7 @@ function buildShell(room, scene) {
   // white skirting boards along the walls (skipping door gaps)
   const skirt = Mat.whiteWood();
   for (const b of boxes) {
-    if (!b.tag.startsWith('wall:') || b.min[1] > 0.01) continue;
+    if (room.outdoor || room.noSkirting || !b.tag.startsWith('wall:') || b.min[1] > 0.01) continue;
     const name = b.tag.slice(5);
     const alongX = name === '-z' || name === '+z';
     const len = alongX ? Math.min(b.max[0], room.x1) - Math.max(b.min[0], room.x0) : Math.min(b.max[2], room.z1) - Math.max(b.min[2], room.z0);
@@ -747,6 +779,11 @@ export function createLamp(l) {
     const shade = sh(new THREE.Mesh(new THREE.CylinderGeometry(0.9, 1.1, 1.3, 28, 1, true), shadeMat), true, false);
     shade.position.y = -0.35; g.add(shade);
     lightY = -0.5; range = 16; power = 26;
+  } else if (l.kind === 'porch') { // a lantern on the outside wall
+    box(g, 0.5, 0.15, 0.5, Mat.paint(0x1c1d20, 0.4), 0, 0, 0, 0.03, 1);
+    const glassL = sh(new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.9, 0.6), shadeMat), false, false); glassL.position.y = 0.6; g.add(glassL);
+    box(g, 0.8, 0.15, 0.8, Mat.paint(0x1c1d20, 0.4), 0, 1.05, 0, 0.03, 1);
+    lightY = 0.6; range = 18; power = 26;
   } else if (l.kind === 'plugLight') {
     box(g, 0.5, 0.5, 0.2, Mat.whiteWood(), 0, 0.6, 0, 0.08, 1);
     const moon = sh(new THREE.Mesh(new THREE.SphereGeometry(0.22, 14, 10), shadeMat), false, false);
@@ -785,9 +822,10 @@ export function buildRoom(scene, ch, quality) {
   }
   scene.add(propGroup);
   const upd = [];
+  for (const p of ch.props) if (p._visual.userData.tick) upd.push((t) => p._visual.userData.tick(t)); // spinning drums and the like
 
   // night fill: cool and dim, so silhouettes still read
-  const hemi = new THREE.HemisphereLight(0x3a4a80, 0x1a1420, 1.6);
+  const hemi = new THREE.HemisphereLight(0x3a4a80, 0x1a1420, 1.6 * (room.ambient || 1));
   scene.add(hemi);
   // moonlight through the first window
   const win = (room.windows || [])[0];
@@ -828,6 +866,35 @@ export function buildRoom(scene, ch, quality) {
       }
       pg.attributes.position.needsUpdate = true;
     });
+  }
+  // outdoors: a starry sky dome, a moon, and the moonlight that comes with it
+  if (room.outdoor) {
+    const sky = new THREE.Mesh(new THREE.SphereGeometry(140, 32, 16), new THREE.ShaderMaterial({
+      side: THREE.BackSide, depthWrite: false, fog: false,
+      vertexShader: 'varying vec3 vP; void main(){ vP = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+      fragmentShader: 'varying vec3 vP; void main(){ float h = clamp(vP.y, 0.0, 1.0); vec3 c = mix(vec3(0.16,0.12,0.30), vec3(0.02,0.03,0.10), pow(h, 0.5)); gl_FragColor = vec4(c, 1.0); }',
+    }));
+    sky.position.set((room.x0 + room.x1) / 2, 0, (room.z0 + room.z1) / 2); sky.userData.noAO = true; scene.add(sky);
+    const n = 900, sp = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) { const a = hashf(i, 1) * Math.PI * 2, e = 0.12 + hashf(i, 2) * 1.35, r = 130; sp[i * 3] = sky.position.x + Math.cos(a) * Math.cos(e) * r; sp[i * 3 + 1] = Math.sin(e) * r; sp[i * 3 + 2] = sky.position.z + Math.sin(a) * Math.cos(e) * r; }
+    const sg = new THREE.BufferGeometry(); sg.setAttribute('position', new THREE.BufferAttribute(sp, 3));
+    const stars = new THREE.Points(sg, new THREE.PointsMaterial({ size: 0.9, map: softDotTexture(), color: 0xe8eeff, transparent: true, depthWrite: false, fog: false, sizeAttenuation: true }));
+    stars.userData.noAO = true; scene.add(stars);
+    const md = new THREE.Vector3(-0.45, 0.62, -0.64).normalize();
+    const moonDisc = new THREE.Mesh(new THREE.SphereGeometry(5, 32, 16), new THREE.MeshBasicMaterial({ color: 0xfff6dc, fog: false }));
+    moonDisc.position.copy(sky.position).addScaledVector(md, 120); scene.add(moonDisc);
+    const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: softDotTexture(), color: 0xcdd8ff, transparent: true, opacity: 0.5, depthWrite: false, fog: false, blending: THREE.AdditiveBlending }));
+    halo.scale.setScalar(40); halo.position.copy(moonDisc.position); scene.add(halo);
+    if (!moon) {
+      moon = new THREE.DirectionalLight(0xa9bcff, 2.6);
+      const target = sky.position.clone(); moon.target.position.copy(target); moon.position.copy(target).addScaledVector(md, 60);
+      moon.castShadow = true;
+      const sz = Math.max(room.x1 - room.x0, room.z1 - room.z0) * 0.6 + 4, cam = moon.shadow.camera;
+      cam.left = -sz; cam.right = sz; cam.top = sz; cam.bottom = -sz; cam.near = 5; cam.far = 160;
+      const ms = { ultra: 4096, high: 4096, medium: 2048, low: 1024 }[quality] || 2048;
+      moon.shadow.mapSize.set(ms, ms); moon.shadow.bias = -0.0005; moon.shadow.normalBias = 0.04;
+      scene.add(moon, moon.target);
+    }
   }
   // the fireplace glows and flickers
   for (const p of ch.props) if (p.type === 'fireplace') {

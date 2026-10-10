@@ -570,7 +570,7 @@ export function createTeddy(scale = 1, color = 0xa8784e) {
 // ---------------------------------------------------------- shadow beasts --
 const shadowUniforms = { time: { value: 0 } };
 let shadowMat = null;
-function getShadowMat() {
+export function getShadowMat() {
   if (shadowMat) return shadowMat;
   shadowMat = new THREE.MeshStandardMaterial({ color: 0x050208, roughness: 1, emissive: 0x14061f, emissiveIntensity: 0.6, transparent: true, opacity: 0.94 });
   shadowMat.onBeforeCompile = (s) => {

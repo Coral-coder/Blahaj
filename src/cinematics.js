@@ -513,7 +513,77 @@ export function bedIntro(game, hooks) {
   return flyover(game, hooks, [
     { d: 4.4, from: V(4.6, 6.5, 9.0), to: V(-0.5, 7.5, 1.0), look0: V(-4, 5, -4), look1: V(-5.2, 7.0, -4.8), fov: 50 },
     { d: 3.2, from: V(-0.5, 7.5, 1.0), to: V(4.6, 3.6, 10.0), look0: V(-5.2, 7.0, -4.8), look1: V(4.6, 1.2, 6.0), fov: 54 },
-  ], [[0.4, 'The nightmare has found Leo.'], [4.4, 'Climb up and chase it away!']]);
+  ], [[0.4, 'Leo’s room at last… but one last nightmare has found him.'], [4.4, 'Climb up and chase it away!']]);
+}
+
+export function kitchenIntro(game, hooks) {
+  return flyover(game, hooks, [
+    { d: 4.6, from: V(-12.0, 3.0, 9.0), to: V(-3.0, 8.0, 8.4), look0: V(0, 2, 0), look1: V(9.0, 6.0, -8.6), fov: 54 },
+    { d: 4.0, from: V(-3.0, 8.0, 8.4), to: V(5.0, 4.2, 9.4), look0: V(11.0, 8.6, -9.4), look1: V(12.6, 2.0, 6.0), fov: 54 },
+  ], [[0.4, 'The kitchen. Leo’s drawing is still on the fridge…'], [3.0, '…but his magnet letters got knocked everywhere.'], [5.6, 'Find L, E and O — and a way past the pet gate.']]);
+}
+
+export function laundryIntro(game, hooks) {
+  return flyover(game, hooks, [
+    { d: 4.4, from: V(-10.0, 3.0, -5.0), to: V(-5.0, 7.5, 7.5), look0: V(-1.0, 3.0, -8.5), look1: V(-11.0, 8.0, 4.0), fov: 54 },
+    { d: 4.4, from: V(-5.0, 7.5, 7.5), to: V(5.0, 5.0, 8.4), look0: V(0.0, 7.0, 0.0), look1: V(11.4, 5.0, 3.0), fov: 54 },
+  ], [[0.4, 'The laundry room. The dryer’s still warm…'], [3.0, 'Leo’s socks are everywhere — five of them, at least.'], [5.8, 'And the back door is shut. There must be a way to open it.']]);
+}
+
+export function backyardIntro(game, hooks) {
+  return flyover(game, hooks, [
+    { d: 4.6, from: V(-12.0, 3.0, -8.0), to: V(-4.0, 9.0, 4.0), look0: V(-1.0, 2.0, 1.0), look1: V(6.0, 11.0, -6.0), fov: 56 },
+    { d: 4.6, from: V(-4.0, 9.0, 4.0), to: V(4.0, 6.0, 12.0), look0: V(6.0, 12.0, -8.0), look1: V(14.0, 3.0, -9.0), fov: 56 },
+  ], [[0.4, 'Outside! The garden at night…'], [3.0, 'Fireflies are drifting up in the trees.'], [6.0, 'Catch them all and they’ll light the way to the garage.']]);
+}
+
+export function garageIntro(game, hooks) {
+  return flyover(game, hooks, [
+    { d: 4.6, from: V(-12.0, 4.0, 8.0), to: V(-2.0, 9.0, 6.0), look0: V(-4.0, 3.0, -3.0), look1: V(8.0, 10.0, -7.5), fov: 56 },
+    { d: 4.4, from: V(-2.0, 9.0, 6.0), to: V(6.0, 5.0, 4.0), look0: V(8.0, 10.0, -7.5), look1: V(14.0, 6.0, 4.0), fov: 56 },
+  ], [[0.4, 'The garage. Dad left the car lights on again…'], [3.0, 'The basement switch is dead — it needs batteries.'], [6.0, 'Watch out for spiders dangling from the rafters!']]);
+}
+
+export function basementIntro(game, hooks) {
+  return flyover(game, hooks, [
+    { d: 4.6, from: V(-11.0, 10.0, 9.0), to: V(-6.0, 6.0, -2.0), look0: V(0.0, 3.0, 0.0), look1: V(5.0, 4.0, 1.4), fov: 56 },
+    { d: 4.6, from: V(-6.0, 6.0, -2.0), to: V(2.0, 7.0, 5.0), look0: V(5.0, 4.0, 1.4), look1: V(10.0, 8.0, 9.8), fov: 56 },
+  ], [[0.4, 'The basement. Every bulb down here has blown…'], [3.0, 'Dad’s train set is still running in the dark.'], [6.0, 'Find four bulbs, and the old dumbwaiter will take you up.']]);
+}
+
+export function hallwayIntro(game, hooks) {
+  return flyover(game, hooks, [
+    { d: 4.6, from: V(0.0, 8.0, 20.0), to: V(-3.0, 9.0, 4.0), look0: V(0.0, 3.0, 4.0), look1: V(6.0, 7.0, -8.0), fov: 56 },
+    { d: 4.2, from: V(-3.0, 9.0, 4.0), to: V(2.0, 5.0, -6.0), look0: V(6.0, 7.0, -8.0), look1: V(0.0, 3.0, -21.0), fov: 56 },
+  ], [[0.4, 'Upstairs at last. Leo’s door is shut tight…'], [3.0, 'His marbles have rolled all over the hallway.'], [6.0, 'Find all five — the way round is through the bathroom.']]);
+}
+
+export function bathroomIntro(game, hooks) {
+  return flyover(game, hooks, [
+    { d: 4.6, from: V(-2.0, 6.0, 9.0), to: V(-3.0, 9.0, 0.0), look0: V(3.6, 3.0, -7.6), look1: V(4.0, 9.0, -7.0), fov: 56 },
+    { d: 4.4, from: V(-3.0, 9.0, 0.0), to: V(3.0, 6.0, 6.0), look0: V(-9.6, 8.0, -7.6), look1: V(-11.0, 4.0, -0.8), fov: 56 },
+  ], [[0.4, 'The bathroom. Somebody left the bath running…'], [3.0, 'Leo’s rubber ducks are bobbing about up on the bubbles!'], [6.0, 'Save all five, then sneak through to Mum and Dad’s room.']]);
+}
+
+export function parentsIntro(game, hooks) {
+  return flyover(game, hooks, [
+    { d: 4.6, from: V(10.0, 6.0, 4.0), to: V(4.0, 9.0, 8.0), look0: V(0.0, 4.0, -8.0), look1: V(2.3, 6.0, -9.4), fov: 54 },
+    { d: 4.4, from: V(4.0, 9.0, 8.0), to: V(-4.0, 6.0, 6.0), look0: V(0.0, 8.6, 4.0), look1: V(-12.8, 8.0, 3.0), fov: 56 },
+  ], [[0.4, 'Mum and Dad’s room. Shh… they’re fast asleep.'], [3.0, 'Dad’s snoring is so loud it could lift a shark!'], [6.0, 'Mum’s sewing buttons are everywhere. Find all six.']]);
+}
+
+export function playroomIntro(game, hooks) {
+  return flyover(game, hooks, [
+    { d: 4.6, from: V(11.0, 6.0, -10.0), to: V(2.0, 9.0, -2.0), look0: V(-4.0, 4.0, -10.0), look1: V(-10.0, 5.0, 4.0), fov: 56 },
+    { d: 4.4, from: V(2.0, 9.0, -2.0), to: V(-6.0, 6.0, -4.0), look0: V(10.4, 5.0, 8.6), look1: V(-12.8, 10.0, -8.0), fov: 56 },
+  ], [[0.4, 'The playroom! Everything’s a mountain when you’re a little shark…'], [3.0, 'Leo’s favourite puzzle is scattered all over.'], [6.0, 'Put it back together — then up the ladder to the attic.']]);
+}
+
+export function atticIntro(game, hooks) {
+  return flyover(game, hooks, [
+    { d: 4.4, from: V(-12.0, 3.0, 8.0), to: V(-6.0, 10.0, 8.0), look0: V(0.0, 5.0, 0.0), look1: V(0.0, 6.0, -2.0), fov: 56 },
+    { d: 5.0, from: V(-6.0, 10.0, 8.0), to: V(6.0, 11.0, 7.0), look0: V(0.0, 6.0, -2.0), look1: V(8.0, 8.6, 0.0), fov: 56 },
+  ], [[0.4, 'The attic… something huge is fluttering up in the dark.'], [3.0, 'The Nightmare Moth Queen! She’s been sending all the bad dreams.'], [6.2, 'Climb onto the rafters and belly-flop her — three times!']]);
 }
 
 // ------------------------------------------------------------------ ending --
@@ -587,4 +657,4 @@ export function ending(game, hooks) {
   return c;
 }
 
-export const CINES = { prologue, dog: dogSnatch, downstairs, stairs: stairsIntro, bed: bedIntro, ending };
+export const CINES = { prologue, dog: dogSnatch, downstairs, kitchen: kitchenIntro, laundry: laundryIntro, backyard: backyardIntro, garage: garageIntro, basement: basementIntro, hallway: hallwayIntro, bathroom: bathroomIntro, parents: parentsIntro, playroom: playroomIntro, attic: atticIntro, stairs: stairsIntro, bed: bedIntro, ending };
