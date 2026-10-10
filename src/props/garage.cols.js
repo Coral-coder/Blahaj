@@ -3,9 +3,9 @@
 import { B } from './b.js';
 
 export const GARAGE = {
-  // the car: climb the bonnet, then the roof (its front is local +z)
+  // the minivan: climb the bonnet, then the long roof (its front is local +z)
   car: (p) => { const L = p.l || 10.4, W = p.w || 4.8;
-    return [B(0, 0, 0, W, 3.0, L, { tag: 'carBody', surface: 'metal' }), B(0, 3.0, -0.6, W - 0.5, 2.2, L * 0.5, { tag: 'carRoof', surface: 'metal' })]; },
+    return [B(0, 0, 0, W, 3.0, L, { tag: 'carBody', surface: 'metal' }), B(0, 3.0, -(L / 2 - 0.65 - 1.0) / 2, W - 0.6, 2.35, L / 2 - 0.65 + 1.0, { tag: 'carRoof', surface: 'metal' })]; },
   // a long workbench with a shelf above the pegboard
   workbench: (p) => { const w = p.w || 9, d = p.d || 2.6, h = p.h || 4.0, sy = p.shelf || 7.2;
     return [B(0, h - 0.3, 0, w, 0.3, d, { tag: 'bench', surface: 'wood' }), B(-w / 2 + 0.2, 0, 0, 0.3, h - 0.3, d - 0.3, { tag: 'benchLeg' }), B(w / 2 - 0.2, 0, 0, 0.3, h - 0.3, d - 0.3, { tag: 'benchLeg' }),
