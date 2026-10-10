@@ -19,6 +19,7 @@ const DESK = { type: 'desk', x: 3.75, z: -8.15, rot: 0 };
 const BOOKCASE = { type: 'bookcase', x: 7.5, z: -2.2, rot: 3 };
 const WALLSHELF = { type: 'wallShelf', x: 7.7, z: 0.55, rot: 3, w: 1.7, d: 1, y: 5 };
 const WARDROBE = { type: 'wardrobe', x: -6.9, z: 6.6, rot: 1 };
+const FLAG = { type: 'transFlag', x: -8.1, z: 2.1, rot: 1 }; // hanging on the wall beside Leo's bed
 
 // the ceiling fan in Mum and Dad's room: blades go round this circle
 
@@ -33,9 +34,9 @@ export const CHAPTERS = [
     spawn: [-1.1, 0, -5.8], spawnYaw: Math.PI / 2, camYaw: 0.95,
     drain: 0.8,
     props: [
-      BED, BEDSIDE, DESK, BOOKCASE, WALLSHELF, WARDROBE,
+      BED, BEDSIDE, DESK, BOOKCASE, WALLSHELF, WARDROBE, FLAG,
       { type: 'chair', x: -3.4, z: 5.2, rot: 1 },
-      { type: 'dresser', x: 7.3, z: 3.5, rot: 3, drawers: [{ y0: 0.2, h: 0.8, out: 2.4 }, { y0: 1.15, h: 0.85, out: 1.4 }, { y0: 2.2, h: 0.8, out: 0.6 }] },
+      { type: 'dresser', x: 7.3, z: 3.5, rot: 3, shutUntilPoofed: true, drawers: [{ y0: 0.2, h: 0.8, out: 2.4 }, { y0: 1.15, h: 0.85, out: 1.4 }, { y0: 2.2, h: 0.8, out: 0.6 }] },
       { type: 'toyBox', x: -1.5, z: 8.4, rot: 2 },
       { type: 'laundry', x: 2.0, z: 7.8 },
       { type: 'blocks', x: 0, z: 0, towers: [[2.4, 2.4, 1], [3.2, 3.5, 2], [2.6, -2.6, 1]] },
@@ -275,7 +276,7 @@ export const CHAPTERS = [
     goalText: 'Catch six fireflies to light the way to the garage',
     intro: 'backyard', newAbility: 'glide',
     room: {
-      id: 'garden', x0: -16, x1: 16, z0: -14, z1: 14, h: 30, floor: 'grass', wall: 'fence', outdoor: true, fenceH: 5.5, ambient: 1.25,
+      id: 'garden', x0: -16, x1: 16, z0: -14, z1: 14, h: 30, floor: 'grass', wall: 'fence', outdoor: true, fenceH: 5.5, ambient: 2.4,
       skins: { '-z': 'brick', '+x': 'brick' },
       doors: [{ wall: '-z', at: -11, w: 4.5, h: 9.5 }, { wall: '+x', at: -9, w: 4.5, h: 9.5 }],
     },
@@ -828,9 +829,9 @@ export const CHAPTERS = [
     spawn: [4.6, 0, 6.4], spawnYaw: Math.PI, camYaw: -0.7,
     drain: 1.1,
     props: [
-      BED, BEDSIDE, DESK, BOOKCASE, WALLSHELF, WARDROBE,
+      BED, BEDSIDE, DESK, BOOKCASE, WALLSHELF, WARDROBE, FLAG,
       { type: 'chair', x: 0.6, z: -3.0, rot: 2 },
-      { type: 'dresser', x: 7.3, z: 3.5, rot: 3, drawers: [{ y0: 0.2, h: 0.8, out: 2.0 }, { y0: 2.2, h: 0.8, out: 0.7 }] },
+      { type: 'dresser', x: 7.3, z: 3.5, rot: 3, shutUntilPoofed: true, drawers: [{ y0: 0.2, h: 0.8, out: 2.0 }, { y0: 2.2, h: 0.8, out: 0.7 }] },
       { type: 'toyBox', x: -1.5, z: 8.4, rot: 2 },
       { type: 'laundry', x: 2.0, z: 7.8 },
       { type: 'blocks', x: 0, z: 0, towers: [[-2.0, 5.0, 2], [-3.6, 2.6, 1]] },

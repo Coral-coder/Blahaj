@@ -22,6 +22,7 @@ const B = (x, y0, z, w, h, d, extra = {}) => Object.assign({ x, y0, z, w, h, d }
 
 // --- local collider definitions ------------------------------------------
 export const PREFABS = {
+  transFlag: () => [], // hangs on the wall: nothing to bump into
   cabinBed: (p) => {
     const w = p.w || 5.5, l = p.l || 9.1, h = p.h || 4.5;
     return [

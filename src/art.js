@@ -389,7 +389,8 @@ export function loadBlahajModel() {
       new GLTFLoader().parse(buf, '', (gltf) => {
         const meshes = [];
         gltf.scene.traverse((o) => { if (o.isMesh) meshes.push(o); });
-        blahajModel = meshes.map((m) => ({ name: m.name, geometry: m.material.name === 'teef' ? proceduralTeeth(m.geometry) : subdivideFins(m.geometry), material: m.material }));
+        const bodyPos = meshes.filter((m) => m.material.name !== 'teef').map((m) => m.geometry.attributes.position);
+        blahajModel = meshes.map((m) => ({ name: m.name, geometry: m.material.name === 'teef' ? proceduralTeeth(m.geometry, bodyPos) : subdivideFins(m.geometry), material: m.material }));
         resolve(true);
       }, (err) => { console.warn('Blåhaj model failed to load, using the procedural one', err); resolve(false); });
     } catch (err) { console.warn('Blåhaj model failed to load, using the procedural one', err); resolve(false); }
@@ -402,7 +403,7 @@ export function loadBlahajModel() {
 // pointing out of the mouth (down from the top jaw, up from the bottom one), and
 // leaning forward or back by up to 45 degrees, so the smile is crooked tooth
 // by tooth but the same every time.
-function proceduralTeeth(geo) {
+function proceduralTeeth(geo, bodyPos = []) {
   const pos = geo.attributes.position, idx = geo.index ? geo.index.array : [...Array(pos.count).keys()];
   const parent = [...Array(pos.count).keys()], find = (a) => (parent[a] === a ? a : (parent[a] = find(parent[a])));
   for (let i = 0; i < idx.length; i += 3) for (const j of [1, 2]) parent[find(idx[i + j])] = find(idx[i]);
@@ -413,10 +414,12 @@ function proceduralTeeth(geo) {
   let seed = 1234567; const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
   const parts = [];
   cards.forEach((k) => {
-    const upper = k.c.y > midY, vs = k.vs.slice().sort((a, b) => (upper ? b.y - a.y : a.y - b.y)); // gum side first
+    // the gum side is whichever edge of the card actually sits against Blåhaj's body: the tooth's wide base goes there
+    const surf = (v) => { let m = Infinity; for (const P of bodyPos) for (let i = 0; i < P.count; i++) { const dx = P.getX(i) - v.x, dy = P.getY(i) - v.y, dz = P.getZ(i) - v.z, d = dx * dx + dy * dy + dz * dz; if (d < m) m = d; } return m; };
+    const upper = k.c.y > midY;
+    const vs = bodyPos.length ? k.vs.map((v) => [v, surf(v)]).sort((a, b) => a[1] - b[1]).map((e) => e[0]) : k.vs.slice().sort((a, b) => (upper ? b.y - a.y : a.y - b.y));
     const base = vs[0].clone().add(vs[1]).multiplyScalar(0.5), tipMid = vs.slice(2).reduce((a, v) => a.add(v), new THREE.Vector3()).divideScalar(vs.length - 2);
-    const dir = tipMid.clone().sub(base); const h = dir.length() * 0.95; dir.normalize();
-    if (upper ? dir.y > 0 : dir.y < 0) dir.negate(); // always out of the mouth: down from the top jaw, up from the bottom
+    const dir = tipMid.clone().sub(base); const h = dir.length() * 0.95; dir.normalize(); // from the gum out to the tip
     const w = vs[0].distanceTo(vs[1]);
     const n = new THREE.Vector3().subVectors(vs[1], vs[0]).cross(new THREE.Vector3().subVectors(tipMid, vs[0])).normalize();
     n.addScaledVector(dir, -n.dot(dir)).normalize();
@@ -425,9 +428,11 @@ function proceduralTeeth(geo) {
     const tilt = (rnd() * 2 - 1) * (Math.PI / 4);
     const q = new THREE.Quaternion().setFromAxisAngle(ax, tilt);
     const y = dir.clone().applyQuaternion(q), z = n.clone().applyQuaternion(q), x = new THREE.Vector3().crossVectors(y, z).normalize();
-    const g = new THREE.ConeGeometry(w * 0.5, h, 8, 1); g.translate(0, h / 2, 0); g.scale(1, 1, 0.55);
+    const tri = new THREE.Shape(); tri.moveTo(-w / 2, 0); tri.quadraticCurveTo(-w * 0.2, h * 0.5, 0, h); tri.quadraticCurveTo(w * 0.2, h * 0.5, w / 2, 0); tri.closePath();
+    const th = w * 0.16, g = new THREE.ExtrudeGeometry(tri, { depth: th, bevelEnabled: true, bevelThickness: th * 0.3, bevelSize: th * 0.25, bevelSegments: 2, curveSegments: 6 });
+    g.translate(0, 0, -th / 2); // flat, with just enough thickness to see edge-on
     g.applyMatrix4(new THREE.Matrix4().makeBasis(x, y, z).setPosition(base));
-    parts.push(g.toNonIndexed());
+    parts.push(g.index ? g.toNonIndexed() : g);
   });
   const out = mergeGeometries(parts);
   out.computeVertexNormals();

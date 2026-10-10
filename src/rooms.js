@@ -158,23 +158,32 @@ const V = {
     box(g, w, h, d, Mat.whiteWood(), 0, 0, 0, 0.06, 0.5);
     box(g, w + 0.15, 0.15, d + 0.1, Mat.oak(), 0, h - 0.15, 0.02, 0.04, 0.5);
     const knobsC = [0xf2a7b8, 0x9fc3e6, 0xf5d77a];
+    // each drawer slides as one piece (built shut, then pulled out by its 'out'); a dresser can keep
+    // them shut until it's told to open (userData.open: 0 shut .. 1 out)
+    const slides = [];
     (p.drawers || []).forEach((dr, i) => {
-      const out = dr.out || 0;
-      const zf = d / 2 + out;
-      box(g, w - 0.2, dr.h, 0.12, Mat.whiteWood(), 0, dr.y0, zf + 0.02, 0.04, 1);
-      knob(g, -w / 4, dr.y0 + dr.h / 2, zf + 0.14, knobsC[i % 3]); knob(g, w / 4, dr.y0 + dr.h / 2, zf + 0.14, knobsC[i % 3]);
+      const out = dr.out || 0, dg = new THREE.Group(); g.add(dg); slides.push({ dg, out });
+      const zf = d / 2;
+      box(dg, w - 0.2, dr.h, 0.12, Mat.whiteWood(), 0, dr.y0, zf + 0.02, 0.04, 1);
+      knob(dg, -w / 4, dr.y0 + dr.h / 2, zf + 0.14, knobsC[i % 3]); knob(dg, w / 4, dr.y0 + dr.h / 2, zf + 0.14, knobsC[i % 3]);
       if (out > 0.05) {
-        box(g, 0.08, dr.h, out, Mat.oak(), -w / 2 + 0.24, dr.y0, d / 2 + out / 2, 0.02, 1);
-        box(g, 0.08, dr.h, out, Mat.oak(), w / 2 - 0.24, dr.y0, d / 2 + out / 2, 0.02, 1);
-        box(g, w - 0.4, 0.08, out, Mat.oak(), 0, dr.y0, d / 2 + out / 2, 0.02, 1);
-        // folded clothes poking out of open drawers
+        box(dg, 0.08, dr.h, out, Mat.oak(), -w / 2 + 0.24, dr.y0, d / 2 - out / 2, 0.02, 1);
+        box(dg, 0.08, dr.h, out, Mat.oak(), w / 2 - 0.24, dr.y0, d / 2 - out / 2, 0.02, 1);
+        box(dg, w - 0.4, 0.08, out, Mat.oak(), 0, dr.y0, d / 2 - out / 2, 0.02, 1);
+        // folded clothes in the drawer
         for (let k = 0; k < 4; k++) {
           const c = new THREE.Mesh(new THREE.SphereGeometry(0.5, 14, 10), Mat.fabric([0xe8a0b4, 0x8fb8de, 0xf2e3b8, 0xa8d5a2][(k + i) % 4], 2));
-          c.scale.set(1.0, 0.35, 0.75); c.position.set(-w / 2 + 0.75 + k * ((w - 1.5) / 3), dr.y0 + dr.h - 0.12, d / 2 + out / 2);
-          sh(c); g.add(c);
+          c.scale.set(1.0, 0.35, 0.75); c.position.set(-w / 2 + 0.75 + k * ((w - 1.5) / 3), dr.y0 + dr.h - 0.12, d / 2 - out / 2);
+          sh(c); dg.add(c);
         }
       }
+      dg.position.z = out;
     });
+    if (p.shutUntilPoofed) {
+      g.userData.open = 0;
+      g.userData.tick = () => { const k = g.userData.open; for (const sl of slides) sl.dg.position.z = sl.out * k; };
+      g.userData.tick();
+    }
     if (!(p.drawers || []).length) for (let i = 0; i < 3; i++) { box(g, w - 0.2, 0.95, 0.1, Mat.whiteWood(), 0, 0.25 + i * 1.1, d / 2 + 0.03, 0.04, 1); knob(g, 0, 0.72 + i * 1.1, d / 2 + 0.14, knobsC[i]); }
     // photo frame
     const fr = box(g, 0.9, 1.1, 0.12, Mat.oak(), -1.2, h, -0.3, 0.03, 1); fr.rotation.x = -0.15;
@@ -503,6 +512,32 @@ const V = {
 };
 
 Object.assign(V, VIS); // furniture for the other rooms of the house (src/props/*)
+
+// a trans pride flag, hanging vertically (stripes running down it) from a little wooden rod
+// on a cord, its fabric rippling gently. Local +z faces into the room.
+V.transFlag = (p) => {
+  const g = new THREE.Group(), w = p.w || 2.1, h = p.h || 3.4, top = p.top || 6.8;
+  const c = document.createElement('canvas'); c.width = 250; c.height = 16;
+  const x = c.getContext('2d'); ['#5BCEFA', '#F5A9B8', '#FFFFFF', '#F5A9B8', '#5BCEFA'].forEach((col, i) => { x.fillStyle = col; x.fillRect(i * 50, 0, 50, 16); });
+  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
+  const geo = new THREE.PlaneGeometry(w, h, 12, 20);
+  // (the fabric catches a little of the night-light, so its colours read)
+  const cloth = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ map: tex, emissiveMap: tex, emissive: 0xffffff, emissiveIntensity: 0.32, roughness: 0.85, side: THREE.DoubleSide }));
+  cloth.position.set(0, top - h / 2 - 0.1, 0.08); cloth.receiveShadow = true; g.add(cloth);
+  const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, w + 0.4, 10), Mat.oak()); rod.rotation.z = Math.PI / 2; rod.position.set(0, top, 0.1); g.add(rod);
+  for (const s_ of [-1, 1]) { const end = new THREE.Mesh(new THREE.SphereGeometry(0.09, 10, 8), Mat.oak()); end.position.set(s_ * (w / 2 + 0.22), top, 0.1); g.add(end); }
+  // the cord up to a nail
+  const pts = [new THREE.Vector3(-w / 2 - 0.1, top, 0.1), new THREE.Vector3(0, top + 0.7, 0.03), new THREE.Vector3(w / 2 + 0.1, top, 0.1)];
+  g.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: 0x8a6a4a })));
+  const nail = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 6), Mat.brass()); nail.position.set(0, top + 0.7, 0.03); g.add(nail);
+  // a gentle ripple, more at the free bottom edge than at the rod
+  const pos = geo.attributes.position, base = pos.array.slice();
+  g.userData.tick = (t) => {
+    for (let i = 0; i < pos.count; i++) { const bx = base[i * 3], by = base[i * 3 + 1], k = (h / 2 - by) / h; pos.setZ(i, Math.sin(bx * 2.2 + t * 1.3) * 0.05 * k + Math.sin(by * 1.7 - t * 0.9) * 0.03 * k); }
+    pos.needsUpdate = true; geo.computeVertexNormals();
+  };
+  void p; return g;
+};
 
 export function propVisual(p) {
   const make = V[p.type];

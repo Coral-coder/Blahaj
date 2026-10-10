@@ -55,6 +55,8 @@ function paintAoMask(renderer, target, ao, camera, roots) {
   const prevT = renderer.getRenderTarget(), prevAC = renderer.autoClear;
   renderer.setRenderTarget(target); renderer.autoClear = false;
   for (const root of roots) {
+    let has = false; root.traverse((o) => { if (o.isMesh && o.userData.aoMask) has = true; });
+    if (!has) continue; // only things that opted in (Blåhaj); never the dark floor or other overlays
     const saved = [];
     root.traverse((o) => {
       if (!o.isMesh) return;

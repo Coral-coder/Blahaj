@@ -119,7 +119,9 @@ function startTitle() {
         a += dt * 0.05;
         restingHug(g, dt); // Blåhaj in Leo's arm, on the slipped-down duvet
         g.comfort = 100;
-        g.camera.position.set(-5.0 + Math.cos(a + 0.9) * 7.5, 7.2 + Math.sin(a * 2) * 0.3, -5.0 + Math.sin(a + 0.9) * 7.5);
+        // sweep gently back and forth along the arc that stays inside the room (never out through a wall)
+        const th = 0.7 + 0.85 * Math.sin(a * 1.3), R = g.ch.room;
+        g.camera.position.set(THREE.MathUtils.clamp(-5.0 + Math.cos(th) * 7.5, R.x0 + 0.8, R.x1 - 0.8), 7.2 + Math.sin(a * 2) * 0.3, THREE.MathUtils.clamp(-5.0 + Math.sin(th) * 7.5, R.z0 + 0.8, R.z1 - 0.8));
         g.camera.lookAt(-4.9, 5.6, -6.0);
       },
     };

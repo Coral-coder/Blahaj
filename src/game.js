@@ -58,7 +58,7 @@ export class Game {
     const scene = (this.scene = new THREE.Scene());
     scene.background = new THREE.Color(0x05060c);
     scene.fog = new THREE.Fog(0x0a0c18, 30, 70);
-    this.camera = new THREE.PerspectiveCamera(58, innerWidth / innerHeight, 0.05, 300);
+    this.camera = new THREE.PerspectiveCamera(58, innerWidth / innerHeight, 0.2, 300); // near 0.2 (not 0.05): far better depth precision, no flickering surfaces
     this.roomFx = buildRoom(scene, ch, q);
     const movingVis = new Set(ch.props.filter((p) => p.move || (p._visual && p._visual.userData.tick)).map((p) => p._visual)); // movers and animated props keep updating
     for (const grp of [this.roomFx.shell, this.roomFx.props]) grp.traverse((o) => { let n = o, moving = false; while (n) { if (movingVis.has(n)) { moving = true; break; } n = n.parent; } if (!moving) { o.updateMatrix(); o.matrixAutoUpdate = false; } });
@@ -243,6 +243,17 @@ export class Game {
     }
     this.knotsLeft = this.enemies.filter((x) => x.type === 'knot').length;
     this.features = buildFeatures(this, ch, scene); // collectibles, buttons and gates, updrafts, moths, spiders
+    // Leo's dresser: the drawers (the steps up) stay shut until every floor nightmare in the room is poofed
+    for (const p of ch.props) if (p.type === 'dresser' && p.shutUntilPoofed && p.drawers) {
+      const outs = p.drawers.filter((dr) => dr.out > 0).map((dr) => dr.out);
+      const ds = this.solids.filter((s_) => s_.tag === 'drawer' && Math.hypot((s_.min.x + s_.max.x) / 2 - p.x, (s_.min.z + s_.max.z) / 2 - p.z) < 4);
+      this.drawerLock = { vis: p._visual, open: 0, opening: false, solids: ds.map((s_, i) => {
+        const dir = V((s_.min.x + s_.max.x) / 2 - p.x, 0, (s_.min.z + s_.max.z) / 2 - p.z); dir.y = 0;
+        if (Math.abs(dir.x) > Math.abs(dir.z)) dir.set(Math.sign(dir.x), 0, 0); else dir.set(0, 0, Math.sign(dir.z));
+        return { s: s_, min0: s_.min.clone(), max0: s_.max.clone(), dir, out: outs[i] || 1 };
+      }) };
+      this.setDrawers(0);
+    }
     this.hazard = buildHazard(this, ch, scene); // the room's own bad dream: flung things, sweeping arms, waves, a runaway toy
 
     // goal marker: a soft shaft of light that fades upward, with rising sparkles
@@ -667,6 +678,10 @@ export class Game {
       }
     }
     updateHazard(this, dt);
+    if (this.drawerLock && this.drawerLock.open < 1) { // the floor's clear: out slide the drawers
+      if (!this.drawerLock.opening && this.shadowsLeft() === 0) { this.drawerLock.opening = true; Audio.tone(180, { type: 'triangle', dur: 0.5, slide: 60, vol: 0.12 }); this.hooks.toast('The drawers slide open!', 'Climb them up to Leo'); }
+      if (this.drawerLock.opening) this.setDrawers(Math.min(1, this.drawerLock.open + dt / 1.1));
+    }
     // stairs: rolling balls and a grumpy cat
     if (this.ballSpawner) {
       const bs = this.ballSpawner;
@@ -733,6 +748,11 @@ export class Game {
   inGloom(x, z) {
     for (const g of this.gloomSpots || []) if (g[2] > 0.3 && Math.hypot(x - g[0], z - g[1]) < g[2] - 0.4) return true;
     return false;
+  }
+  setDrawers(k) {
+    const L = this.drawerLock; L.open = k;
+    for (const d of L.solids) { const off = d.dir.clone().multiplyScalar(d.out * (k - 1)); d.s.min.copy(d.min0).add(off); d.s.max.copy(d.max0).add(off); d.s.active = k > 0.97; }
+    if (L.vis) L.vis.userData.open = k;
   }
   // a little stream of golden sparks from one nightmare to the next, showing they're linked
   linkSparks(from, to) {

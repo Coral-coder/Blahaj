@@ -42,8 +42,25 @@ export function updateHazard(game, dt) {
     if (hz.arm) hz.fade = 1;
   }
   if (hz.fade !== undefined) { hz.fade = Math.max(0, hz.fade - dt); if (hz.arm) { hz.arm.scale.setScalar(Math.max(0.001, hz.fade)); if (hz.fade <= 0) hz.arm.visible = false; } }
+  // it can be poofed too: two bounces on it (land on it, belly flop or dash through)
+  hz.hitCool = Math.max(0, (hz.hitCool || 0) - dt);
+  const bonk = (at) => {
+    if (hz.calm || hz.hitCool > 0) return;
+    hz.hitCool = 0.6; hz.hp = (hz.hp ?? 2) - 1;
+    P.vel.y = 14; P.pound = 0; Audio.stomp();
+    game.sparks.burst(at.clone().add(V(0, 0.6, 0)), 18, { color: new THREE.Color(0xffe2a8), speed: 5, life: 0.7, size: 0.3 });
+    if (hz.imp) hz.flinch = 0.4;
+    if (hz.hp > 0) game.hooks.pop('Once more!');
+    else { game.hooks.pop('Poof!'); game.addComfort(15); hz.poofed = true; }
+  };
+  if (!hz.calm && hz.imp && hz.imp.group.visible) {
+    const ip = hz.imp.group.getWorldPosition(V()), d = Math.hypot(P.pos.x - ip.x, P.pos.z - ip.z);
+    if (d < 1.4 && P.pos.y > ip.y - 0.4 && P.pos.y < ip.y + 2.0 && (P.pound || P.dashT > 0 || (P.vel.y < 0 && P.pos.y > ip.y + 0.4))) bonk(ip);
+  }
+  if (hz.poofed && !hz.calm) { hz.calm = true; if (hz.imp) { game.sparks.burst(hz.imp.group.getWorldPosition(V()).add(V(0, 0.8, 0)), 30, { color: new THREE.Color(0xffe2a8), speed: 6, life: 1, size: 0.35 }); hz.imp.group.visible = false; } if (hz.arm) hz.fade = 1; if (hz.driver) hz.driver.group.visible = false; }
+  if (hz.flinch) { hz.flinch = Math.max(0, hz.flinch - dt); if (hz.imp) hz.imp.group.scale.setScalar((H.impScale || 1) * (1 - Math.sin(hz.flinch / 0.4 * Math.PI) * 0.35)); }
   // first time it acts, say what it is
-  const announce = () => { if (!hz.hinted && H.title) { hz.hinted = true; game.hooks.toast(H.title, H.hint || ''); } };
+  const announce = () => { if (!hz.hinted && H.title) { hz.hinted = true; game.hooks.toast(H.title, (H.hint ? H.hint + ' — ' : '') + 'or bounce on it twice to poof it'); } };
   // the nightmare bobs about and lunges when it acts
   hz.act = Math.max(0, hz.act - dt);
   if (hz.imp && !hz.calm) {
@@ -159,7 +176,7 @@ export function updateHazard(game, dt) {
       const d = Math.hypot(P.pos.x - x, P.pos.z - z);
       if (hz.clock > 1.5) announce();
       if (d < (H.radius || 1.2) + 0.3 && P.pos.y < (H.top || 1.2)) {
-        if (P.vel.y < 0 && P.pos.y > (H.top || 1.2) - 0.6) { P.vel.y = 13; Audio.bounce(); } // landed on it: boing
+        if (P.vel.y < 0 && P.pos.y > (H.top || 1.2) - 0.6) bonk(hz.car.position); // landed on it: that's a bounce on its driver
         else hit(V(x, 0, z), H.msg);
       }
     }
@@ -247,7 +264,7 @@ function buildRoamer(hz, H) {
     const band = new THREE.Mesh(new THREE.TorusGeometry(0.46, 0.04, 6, 18), gold); band.position.set(0, 0.75, 0.6); car.add(band);
     const wheels = [];
     for (const s of [-1, 1]) for (const z of [-0.7, 0, 0.6]) { const w = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.12, 14), blk); w.rotation.z = Math.PI / 2; w.position.set(s * 0.5, 0.28, z); car.add(w); wheels.push(w); }
-    const driver = createShadow(0.38); driver.group.position.set(0, 1.0, -0.75); car.add(driver.group);
+    const driver = createShadow(0.38); driver.group.position.set(0, 1.0, -0.75); car.add(driver.group); hz.driver = driver;
     const lamp = new THREE.Sprite(new THREE.SpriteMaterial({ map: softDotTexture(), color: 0xffe0a0, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })); lamp.scale.setScalar(1.1); lamp.position.set(0, 0.85, 1.15); car.add(lamp);
     car.scale.setScalar(1.45);
     hz.carTick = (t) => { wheels.forEach((w) => (w.rotation.x = t * 9)); driver.update(1 / 60, t); };
@@ -258,7 +275,7 @@ function buildRoamer(hz, H) {
     const k1 = new THREE.Mesh(new THREE.TorusGeometry(0.18, 0.05, 6, 14), Mat.brass()); k1.position.y = 0.2; key.add(k1);
     const wheels = [];
     for (const s of [-1, 1]) for (const z of [-0.55, 0.55]) { const w = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.16, 14), Mat.paint(0x1c1d20, 0.6)); w.rotation.z = Math.PI / 2; w.position.set(s * 0.58, 0.24, z); car.add(w); wheels.push(w); }
-    const imp = createShadow(0.34); imp.group.position.set(0, 1.0, 0.55); car.add(imp.group);
+    const imp = createShadow(0.34); imp.group.position.set(0, 1.0, 0.55); car.add(imp.group); hz.driver = imp;
     for (const sx of [-0.35, 0.35]) { const l = new THREE.Sprite(new THREE.SpriteMaterial({ map: softDotTexture(), color: 0xfff0b0, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })); l.scale.setScalar(0.6); l.position.set(sx, 0.5, 0.9); car.add(l); }
     car.scale.setScalar(1.35);
     hz.carTick = (t) => { key.rotation.z = t * 4; wheels.forEach((w) => (w.rotation.x = t * 12)); imp.update(1 / 60, t); };
