@@ -342,7 +342,7 @@ export function stepFeatures(game, dt) {
             const ms = createMoth(0.8); game.scene.add(ms.group);
             const cx = e.pos.x + (k ? 3 : -3), cz = e.pos.z, cy = Math.max(3, e.pos.y);
             const path = [[cx, cy, cz - 2.5], [cx + 2.5, cy + 0.5, cz], [cx, cy, cz + 2.5], [cx - 2.5, cy + 0.5, cz]];
-            game.enemies.push({ e: { type: 'moth', path }, s: ms, type: 'moth', pos: V(...path[0]), alive: true, deadT: 0, t: k * 2, hitCool: 0, heading: 0, mv: { path3: path, loop: true, speed: 1.6 } });
+            game.enemies.push({ e: { type: 'moth', path }, s: ms, type: 'moth', minion: true, pos: V(...path[0]), alive: true, deadT: 0, t: k * 2, hitCool: 0, heading: 0, mv: { path3: path, loop: true, speed: 1.6 } });
           }
         }
       } else if (!above && e.hitCool <= 0 && e.inv <= 0) { e.hitCool = 1.2; game.hurt(e.pos, 15, 'The Moth Queen buffets you!'); }

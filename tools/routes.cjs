@@ -14,7 +14,7 @@ const ROUTES = {
   edge: [['walk', 0.6, -4.8], ['walk', 2.6, -4.0], ['jump', 2.6, 0.95, -2.6], ['jump', 2.4, 0, -0.6], ['walk', 2.0, 1.4], ['jump', 2.4, 0.95, 2.4], ['jump', 3.2, 1.9, 3.5], ['jump', 4.6, 1.0, 3.5],
       ['jump', 5.4, 2.0, 3.5], ['jump', 6.1, 3.0, 3.5], ['jump', 7.1, 3.6, 3.4], ['walk', 7.4, 4.2], ['walk', 7.4, 1.9], ['snap'],
       ['jump', 7.7, 5.0, 0.6], ['jump', 7.5, 6.4, -1.4], ['snap'], ['walk', 7.5, -3.5], ['jump', 5.0, 4.6, -9.0, { hold: 0.4 }]],
-  downstairs: [['walk', -7.2, -2.6], ['walk', -6.0, 0.6], ['walk', 2.0, 1.4], ['snap'], ['walk', 9.0, 4.6], ['walk', 12.2, 7.5]],
+  downstairs: [['walk', -7.2, -2.6], ['walk', -6.0, 0.6], ['walk', 2.0, 1.4], ['snap'], ['go', 9.0, 4.6], ['walk', 12.2, 7.5]],
   kitchen: [['walk', -6.0, -3.6], ['walk', -5.0, 0.0], ['jump', -5.0, 2.05, 1.9, { double: true, hold: 0.3 }], ['jump', -5.4, 3.5, 4.8], ['walk', -7.2, 6.0],
     ['jump', -2.2, 0, 5.6], ['walk', -3.0, -3.4], ['walk', -4.0, -5.4], ['jump', -4.0, 1.2, -6.5], ['jump', -4.0, 2.4, -7.5], ['jump', -3.0, 4.1, -9.0],
     ['jump', -4.0, 5.4, -10.3], ['jump', -4.6, 4.1, -8.4], ['walk', -5.2, -8.3], ['jump', -6.4, 6.0, -8.7, { brake: 0.15 }], ['jump', -6.5, 8.6, -10.2, { double: true, hold: 0.35 }],
@@ -36,7 +36,7 @@ const ROUTES = {
     ['walk', -6.0, -4.6], ['walk', 3.0, -6.6], ['walk', 11.0, -7.4], ['walk', 14.6, -9.0]],
   garage: [['walk', -8.6, 3.4], ['jump', -8.6, 1.6, 0.6], ['jump', -5.0, 3.0, 0.4], ['jump', -4.0, 5.2, -3.8, { double: true }], ['walk', -4.0, -4.3],
     ['walk', -5.6, -3.8], ['jump', -13.8, 7.6, -4.0, { double: true, glide: true, max: 6 }], ['wait', 0.3],
-    ['jump', -9.0, 0, 4.0], ['walk', -2.6, 7.6], ['jump', -1.0, 1.8, 9.6], ['jump', 1.4, 4.0, 9.0, { double: true }], ['walk', 2.0, 8.6],
+    ['jump', -9.6, 0, 5.4], ['walk', -2.6, 7.6], ['jump', -1.0, 1.8, 9.6], ['jump', 1.4, 4.0, 9.0, { double: true }], ['walk', 2.0, 8.6],
     ['jump', 2.0, 7.2, 10.3, { double: true, up: 0.25 }], ['walk', 9.0, 10.3],
     ['jump', 13.6, 9.0, 2.0, { double: true, glide: true, dash: true, max: 7 }], ['walk', 13.9, 1.6], ['wait', 0.6],
     ['jump', 10.8, 10.6, -6.4, { double: true, glide: true, max: 6 }], ['walk', 10.4, -7.5],
@@ -46,7 +46,7 @@ const ROUTES = {
     ['jump', 5.0, 6.0, 1.4, { max: 6 }], ['wait', 0.2], ['jump', 7.0, 0, 6.6, { max: 6 }], ['walk', 9.0, 7.6],
     ['waitMover', 9.0, 0.3, 9.8, 0.3], ['walk', 9.0, 9.8, 0.4], ['waitMover', 9.0, 9.0, 9.8, 0.2], ['walk', 12.6, 9.8]],
   stairs: stairsRoute(),
-  hallway: [['walk', 3.0, 16.6], ['jump', 2.4, 0, 12.6, { via: [6.0, 16.6], flop: true, up: 0.8, max: 7 }],
+  hallway: [['walk', 3.0, 16.6], ['jump', 2.4, 0, 12.6, { via: [6.0, 16.6], flop: true, double: true, up: 0.8, max: 7 }],
     ['walk', -3.2, 7.4], ['jump', -6.0, 2.8, 7.6, { double: true }], ['jump', -6.0, 5.6, 4.6, { double: true, up: 0.2 }],
     ['jump', -6.0, 8.4, 1.4, { double: true, up: 0.2 }], ['walk', -5.6, 0.6],
     ['jump', 6.4, 6.4, -2.4, { double: true, glide: true, max: 7 }], ['walk', 6.5, -3.4], ['walk', 6.5, -5.4], ['jump', 6.5, 8.0, -9.0, { double: true }], ['walk', 6.5, -13.6],
@@ -62,7 +62,7 @@ const ROUTES = {
     ['jump', 0.0, 9.4, 4.0, { via: [0.0, -2.4], flop: true, up: 0.3, glide: true, double: true, djAt: -1, max: 7 }], ['wait', 0.2],
     ['waitMover', 3.0, 8.8, 4.0, 0.7], ['jump', 3.2, 8.8, 4.0, { max: 6 }], ['jump', 0.0, 1.7, 0.4, { max: 6 }], ['jump', -6.4, 0, 1.6], ['walk', -6.6, -7.2], ['jump', -6.6, 3.0, -10.4, { double: true }],
     ['jump', 6.6, 3.0, -10.6, { via: [0.0, -10.9], flop: true, up: 1.0, max: 8 }], ['wait', 0.3], ['updraft', 2.3, -8.8, -7.4, 0, -3.0, { noWalk: true, rise: 10.4 }],
-    ['walk', -7.6, 6.0], ['jump', -12.8, 6.6, 8.0, { via: [-9.8, 8.0], flop: true, max: 7 }], ['jump', -12.8, 9.6, 4.6, { double: true }], ['walk', -12.8, 3.0],
+    ['walk', -7.6, 6.0], ['jump', -12.8, 6.6, 8.0, { via: [-9.8, 8.0], flop: true, double: true, max: 7 }], ['jump', -12.8, 9.6, 4.6, { double: true }], ['walk', -12.8, 3.0],
     ['jump', -10.6, 0, -4.0, { glide: true, double: true, max: 7 }], ['walk', -13.0, -6.0]],
   playroom: [['walk', 10.4, 5.2], ['waitMover', 10.4, 2.4, 8.6, 0.3], ['jump', 10.4, 2.4, 8.6, { double: true }], ['waitMover', 10.4, 7.4, 8.6, 0.3],
     ['jump', 12.9, 6.0, 1.6, { double: true, glide: true, max: 6 }], ['walk', 12.9, 0.0],
@@ -76,4 +76,6 @@ const ROUTES = {
   bed: [['walk', 4.0, 4.6], ['jump', 4.9, 1.0, 4.0], ['jump', 6.0, 3.0, 4.0, { double: true }], ['jump', 7.2, 3.6, 3.6], ['walk', 7.4, 4.2], ['walk', 7.4, 1.9],
       ['jump', 7.7, 5.0, 0.6], ['jump', 7.5, 6.4, -1.6], ['walk', 7.6, -1.6], ['snap'], ['jump', -3.6, 4.5, -2.4, { double: true, glide: true, dash: true, hold: 0.35, max: 8 }], ['snap'], ['knots'], ['snap'], ['walk', -5.0, -6.6]],
 };
+// every chapter starts by hunting down the nightmares on the floor (the way out stays shut until they're poofed)
+for (const k in ROUTES) ROUTES[k].unshift(['poof']);
 module.exports = ROUTES;

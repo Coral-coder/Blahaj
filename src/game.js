@@ -19,7 +19,7 @@ const EPS = 0.001;
 const ZOOM_KEY = 'blahaj-camera-distance';
 function savedZoom() { try { const v = +localStorage.getItem(ZOOM_KEY); if (v >= 5 && v <= 18) return v; } catch (e) { /* storage blocked */ } return 10.5; }
 const angDiff = (a, b) => { let d = b - a; while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2; return d; };
-const COMFORT = { fish: 4, starfish: 25, bunny: 3, stomp: 6, knot: 15, hit: 18, lego: 10, ball: 7, cat: 6, lampMin: 70, respawn: 60, darkDrain: 9, risingDrain: 26 };
+const COMFORT = { fish: 4, starfish: 25, bunny: 3, stomp: 12, knot: 15, hit: 18, lego: 10, ball: 7, cat: 6, lampMin: 70, respawn: 60, darkDrain: 7, risingDrain: 26 };
 
 function pathPoint(path, dist) {
   // position along a closed polyline at arc length `dist`
@@ -120,6 +120,9 @@ export class Game {
     }
     this.hazards = this.hazards || [];
 
+    // where the floor nightmares may wander: open floor, not under furniture that stands on it
+    // nightmares keep to open floor: not through furniture, and not under anything low you couldn't jump down on them from
+    this.floorBlocks = this.solids.filter((sd) => !sd.room && sd.min.y < 3.4 && sd.max.y > 0.35 && !sd.mover);
     // the dark
     this.safe = ch.safe.slice();
     if (ch.rising) {
@@ -211,7 +214,14 @@ export class Game {
     for (const e of ch.enemies) {
       if (e.type === 'shadow') {
         const s = createShadow(1); scene.add(s.group);
-        this.enemies.push({ e, s, type: 'shadow', pos: V(...e.path[0]), home: 0, dist: 0, alive: true, deadT: 0, chase: false, hitCool: 0 });
+        this.enemies.push({ e, s, type: 'shadow', pos: V(...e.path[0]), home: 0, dist: 0, alive: true, deadT: 0, chase: false, hitCool: 0, gloom: e.gloom || 2.5, gloomR: e.gloom || 2.5, target: null, pause: Math.random() });
+        const sh_ = this.enemies[this.enemies.length - 1];
+        if (!this.floorFree(sh_.pos.x, sh_.pos.z)) { // spawned somewhere you couldn't reach it: nudge it out onto open floor
+          for (let k = 1, done = false; k <= 40 && !done; k++) for (let a = 0; a < 12 && !done; a++) {
+            const x = sh_.pos.x + Math.cos(a * 0.5236) * k * 0.35, z = sh_.pos.z + Math.sin(a * 0.5236) * k * 0.35;
+            if (this.floorFree(x, z) && !inSafe(this.safe, x, z)) { sh_.pos.set(x, 0, z); done = true; }
+          }
+        }
       } else if (e.type === 'knot') {
         const k = createKnot(e.r || 1); scene.add(k.group);
         this.enemies.push({ e, s: k, type: 'knot', pos: V(...e.at), base: V(...e.at), alive: true, deadT: 0, ph: Math.random() * 6 });
@@ -374,11 +384,11 @@ export class Game {
     }
     if (this.state !== 'play') return;
 
-    // the dream slowly fades on its own; the dark floor eats it fast
+    // the dream slowly fades on its own; the gloom round a nightmare eats it fast
     let drain = ch.drain;
     const onFloor = P.grounded && P.ground && P.ground.kind === 'floor';
     P.inDark = false;
-    if (this.darkFloor && (onFloor || P.pos.y < 0.5) && !inSafe(this.safe, P.pos.x, P.pos.z)) { P.inDark = true; drain += COMFORT.darkDrain; }
+    if (this.darkFloor && (onFloor || P.pos.y < 0.5) && !inSafe(this.safe, P.pos.x, P.pos.z) && this.inGloom(P.pos.x, P.pos.z)) { P.inDark = true; drain += COMFORT.darkDrain; }
     if (this.rising && P.pos.y < this.darkLevel + 0.2) { P.inDark = true; drain += COMFORT.risingDrain; }
     this.addComfort(-drain * dt);
     if (this.state !== 'play') return;
@@ -513,7 +523,7 @@ export class Game {
     }
   }
 
-  defeat(e) {
+  defeat(e, linked = false) {
     if (!e.alive) return;
     e.alive = false; e.deadT = 0;
     this.stats.nightmares++;
@@ -525,7 +535,22 @@ export class Game {
       this.knotsLeft--;
       this.addComfort(COMFORT.knot);
       this.hooks.pop(this.knotsLeft ? `Nightmare broken! ${this.knotsLeft} left` : 'Leo is safe… go to him!');
-    } else { this.addComfort(COMFORT.stomp); this.hooks.pop('Poof!'); }
+    } else {
+      this.addComfort(COMFORT.stomp); if (!linked) this.hooks.pop('Poof!');
+      // the moths feed on the nightmares down on the floor: poof a moth and half of
+      // those go with it; poof the last one on the floor and the moths fade away too
+      const ground = this.enemies.filter((x) => x.type === 'shadow' && x.alive && x.doomT === undefined);
+      const moths = this.enemies.filter((x) => x.type === 'moth' && x.alive && !x.minion && x.doomT === undefined);
+      if (e.type === 'moth' && !e.minion && ground.length) {
+        const n = Math.ceil(ground.length / 2);
+        ground.sort((a, b) => a.pos.distanceToSquared(e.pos) - b.pos.distanceToSquared(e.pos)).slice(0, n).forEach((x, i) => { x.doomT = 0.45 + i * 0.4; this.linkSparks(e.pos, x.pos); });
+        this.hooks.toast(n > 1 ? `The moth took ${n} nightmares with it!` : 'The moth took a nightmare with it!', ground.length - n ? `${ground.length - n} left on the floor` : 'That was the last of them');
+      }
+      if (e.type === 'shadow' && this.enemies.some((x) => x.type === 'shadow') && ground.length === 0 && this.shadowsLeft() === 0) {
+        moths.forEach((x, i) => { x.doomT = 0.5 + i * 0.35; this.linkSparks(e.pos, x.pos); });
+        this.hooks.toast('The gloom is gone!', moths.length ? 'The whole floor is safe — and the moths fade away too' : 'The whole floor is safe now'); Audio.checkpoint();
+      }
+    }
   }
 
   interact(dt) {
@@ -586,27 +611,32 @@ export class Game {
         P.vel.y = 9;
       }
     }
-    // shadows: patrol the dark floor, chase you if you're down there with them
+    // shadows: wander the open floor in their pool of gloom, chase you if you're down there with them
     for (const e of this.enemies) {
       if (!e.alive) continue;
+      // nightmares that a poofed moth (or the last ground nightmare) is taking with it
+      if (e.doomT !== undefined) { e.doomT -= dt; if (e.doomT <= 0) { this.defeat(e, true); continue; } }
       if (e.type === 'shadow') {
         e.hitCool -= dt;
         const playerLow = P.pos.y < 1.6;
         const near = Math.hypot(P.pos.x - e.pos.x, P.pos.z - e.pos.z);
         e.chase = playerLow && near < 6.5 && !inSafe(this.safe, P.pos.x, P.pos.z);
+        // wander the open floor, idling now and then; chase you if you're down there with them
         let tx, tz;
         if (e.chase) { tx = P.pos.x; tz = P.pos.z; }
         else {
-          const path = e.e.path.map((p) => [p[0], p[2]]);
-          e.dist += (e.e.speed || 1.4) * dt;
-          if (path.length === 2) { const L = Math.hypot(path[1][0] - path[0][0], path[1][1] - path[0][1]); const k = Math.abs(((e.dist / L) % 2) - 1); [tx, tz] = [path[1][0] + (path[0][0] - path[1][0]) * k, path[1][1] + (path[0][1] - path[1][1]) * k]; }
-          else [tx, tz] = pathPoint(path, e.dist);
+          if (!e.target || Math.hypot(e.target.x - e.pos.x, e.target.z - e.pos.z) < 0.3) { e.pause -= dt; if (e.pause <= 0) { e.target = this.wanderTarget(e); e.pause = 0.6 + Math.random() * 1.6; } }
+          tx = e.target ? e.target.x : e.pos.x; tz = e.target ? e.target.z : e.pos.z;
         }
         const dx = tx - e.pos.x, dz = tz - e.pos.z, dl = Math.hypot(dx, dz);
-        const sp = (e.chase ? 2.6 : 1.4) * (1 + (1 - this.comfort / 100) * 0.7) * dt;
+        const sp = (e.chase ? 2.6 : (e.e.speed || 1.4)) * (1 + (1 - this.comfort / 100) * 0.7) * dt;
         if (dl > 0.01) {
           const nx = e.pos.x + (dx / dl) * Math.min(sp, dl), nz = e.pos.z + (dz / dl) * Math.min(sp, dl);
-          if (!inSafe(this.safe, nx, nz)) { e.pos.x = nx; e.pos.z = nz; } // light holds them back
+          const ok = (x, z) => !inSafe(this.safe, x, z) && this.floorFree(x, z); // light holds them back; furniture is in the way
+          if (ok(nx, nz)) { e.pos.x = nx; e.pos.z = nz; }
+          else if (Math.abs(dx) > 0.05 && ok(e.pos.x + Math.sign(dx) * sp, e.pos.z)) e.pos.x += Math.sign(dx) * sp; // slide along it
+          else if (Math.abs(dz) > 0.05 && ok(e.pos.x, e.pos.z + Math.sign(dz) * sp)) e.pos.z += Math.sign(dz) * sp;
+          else e.target = null;
         }
         // contact
         const hd = Math.hypot(P.pos.x - e.pos.x, P.pos.z - e.pos.z);
@@ -673,9 +703,39 @@ export class Game {
     }
   }
 
+  // is (x, z) open floor a nightmare can drift over?
+  floorFree(x, z, rad = 0.7) {
+    const r = this.ch.room;
+    if (x < r.x0 + rad || x > r.x1 - rad || z < r.z0 + rad || z > r.z1 - rad) return false;
+    for (const b of this.floorBlocks) if (b.active !== false && x > b.min.x - rad && x < b.max.x + rad && z > b.min.z - rad && z < b.max.z + rad) return false;
+    return true;
+  }
+  wanderTarget(e) {
+    for (let k = 0; k < 24; k++) {
+      const a = Math.random() * Math.PI * 2, d = 2 + Math.random() * 7, x = e.pos.x + Math.cos(a) * d, z = e.pos.z + Math.sin(a) * d;
+      if (this.floorFree(x, z) && !inSafe(this.safe, x, z)) return V(x, 0, z);
+    }
+    return null;
+  }
+  // floor that hurts: the gloom round each nightmare still on the loose
+  inGloom(x, z) {
+    for (const e of this.enemies) if (e.type === 'shadow' && e.gloomR > 0.2 && Math.hypot(x - e.pos.x, z - e.pos.z) < e.gloomR - 0.3) return true;
+    return false;
+  }
+  // a little stream of golden sparks from one nightmare to the next, showing they're linked
+  linkSparks(from, to) {
+    for (let i = 0; i < 14; i++) {
+      const k = i / 13, p = from.clone().lerp(to, k); p.y += 0.6 + Math.sin(k * Math.PI) * 1.5;
+      this.sparks.emit({ p, v: V(0, 0.6, 0), life: 0.5 + k * 0.6, size: 0.22, color: new THREE.Color(0xffe2a8), alpha: 0.9, drag: 0.5 });
+    }
+  }
+  shadowsLeft() { return this.enemies.filter((e) => e.type === 'shadow' && e.alive).length; }
+
   // what still stands between you and the goal, as [title, hint] (or null)
   goalLock() {
     if (this.ch.goal.needsKnots && this.knotsLeft > 0) return ['Break the nightmares first!', 'Jump on them, or belly flop'];
+    const sl = this.shadowsLeft();
+    if (sl > 0) return [`${sl} more nightmare${sl > 1 ? 's' : ''} to poof`, 'Their gloom hurts — jump on them, belly flop or dash through'];
     const left = collectLeft(this.features);
     if (left > 0) { const c = this.ch.collect, info = ITEMS[c.kind] || ITEMS.key; return [`${left} more ${c.label || info.name} to find`, c.hint || 'Look high and low']; }
     return null;
@@ -695,6 +755,18 @@ export class Game {
     const t = this.clock, P = this.p;
     const c01 = this.comfort / 100;
     updateShadowTime(t);
+    // gloom pools: follow their nightmare, and melt away once it's poofed
+    if (this.darkFloor) {
+      const pools = [];
+      for (const e of this.enemies) {
+        if (e.type !== 'shadow') continue;
+        const want = e.alive ? e.gloom : 0, was = e.gloomR;
+        e.gloomR += (want - e.gloomR) * Math.min(1, dt * (e.alive ? 2 : 1.4));
+        if (!e.alive && was > 0.3 && Math.random() < 0.6) { const a = Math.random() * Math.PI * 2, r = Math.random() * was; this.sparks.emit({ p: V(e.pos.x + Math.cos(a) * r, 0.15, e.pos.z + Math.sin(a) * r), v: V(0, 1.6, 0), life: 0.9, size: 0.18, color: new THREE.Color(0xffe2a8), alpha: 0.8, drag: 0.5 }); }
+        if (e.gloomR > 0.05) pools.push([e.pos.x, e.pos.z, e.gloomR]);
+      }
+      this.darkFloor.setGloom(pools);
+    }
     for (const e of this.enemies) {
       if (!e.alive) {
         e.deadT += dt;

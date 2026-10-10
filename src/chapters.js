@@ -1,6 +1,6 @@
 // The story campaign. Pure data: rooms, furniture, light, pickups, enemies.
-// Rule of the night: dark FLOOR feeds the nightmare. Light, rugs and anything
-// you can climb onto are safe.
+// Rule of the night: each nightmare on the floor sits in a pool of gloom that eats
+// the dream. Poof them all to open the way on. Light and anything you can climb onto are safe.
 const line = (a, b, n) => Array.from({ length: n }, (_, i) => {
   const t = n === 1 ? 0.5 : i / (n - 1);
   return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
