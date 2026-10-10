@@ -470,14 +470,14 @@ export const CHAPTERS = [
   {
     id: 'stairs', title: 'The Big Stairs', music: 2,
     goalText: 'Climb before the dark catches you',
-    intro: 'stairs', newAbility: 'dash',
+    intro: 'stairs',
     room: {
       id: 'stairwell', x0: -5, x1: 5, z0: -14, z1: 10, h: 22.8, floor: 'woodDark', wall: 'hallWall',
       doors: [{ wall: '+z', at: 2.5, w: 4, h: 9.5 }, { wall: '-z', at: 2.4, w: 3.8, h: 9.1, y0: 11.4 }],
       windows: [{ wall: '+x', at: -4, w: 4, y0: 13.5, y1: 19.5 }],
       upper: [{ x0: -5, x1: 5, z0: -14, z1: -10.2, y: 11.4 }],
     },
-    abilities: { doubleJump: true, flop: true, dash: true },
+    abilities: { doubleJump: true, flop: true, dash: true, glide: true },
     spawn: [2.5, 0, 8.0], spawnYaw: Math.PI,
     drain: 0.5,
     rising: { start: 5, speed: 0.42, from: -1.2 },
@@ -809,7 +809,7 @@ export const CHAPTERS = [
   {
     id: 'bed', title: 'Back to Bed', room: BEDROOM, music: 3,
     goalText: 'Chase the nightmares away from Leo',
-    intro: 'bed', newAbility: 'glide', outro: 'ending',
+    intro: 'bed', outro: 'ending',
     abilities: { doubleJump: true, flop: true, dash: true, glide: true },
     spawn: [4.6, 0, 6.4], spawnYaw: Math.PI, camYaw: -0.7,
     drain: 1.1,

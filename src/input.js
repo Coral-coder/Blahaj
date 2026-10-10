@@ -4,6 +4,7 @@ export class Input {
     this.keys = new Set();
     this.pressed = new Set(); // edge-triggered this frame
     this.camDX = 0; this.camDY = 0;
+    this.zoom = 1; // camera zoom this frame (multiplies the distance): pinch, scroll wheel or +/-
     this.touch = { x: 0, y: 0, jump: false, dash: false, flop: false };
     this.pad = null;
     this.prevPad = {};
@@ -13,6 +14,7 @@ export class Input {
       this.keys.add(e.code);
     });
     addEventListener('keyup', (e) => this.keys.delete(e.code));
+    canvas.addEventListener('wheel', (e) => { e.preventDefault(); this.zoom *= Math.exp(Math.max(-60, Math.min(60, e.deltaY)) * 0.004); }, { passive: false });
     addEventListener('blur', () => this.keys.clear());
     let dragging = false, lx = 0, ly = 0;
     canvas.addEventListener('mousedown', (e) => { dragging = true; lx = e.clientX; ly = e.clientY; });
@@ -61,10 +63,24 @@ export class Input {
       }
     };
     addEventListener('touchend', end); addEventListener('touchcancel', end);
-    document.getElementById('game').addEventListener('touchstart', (e) => {
+    // fingers on the game view itself: one drags the camera round, two pinch to zoom
+    const fingers = new Map();
+    let pinch = 0;
+    const spread = () => { const [a, b] = [...fingers.values()]; return Math.hypot(a.x - b.x, a.y - b.y); };
+    const canvasEl = document.getElementById('game');
+    canvasEl.addEventListener('touchstart', (e) => {
+      for (const t of e.changedTouches) fingers.set(t.identifier, { x: t.clientX, y: t.clientY });
+      if (fingers.size >= 2) { camId = null; pinch = spread(); return; }
       const t = e.changedTouches[0];
       if (t.clientX > innerWidth * 0.4) { camId = t.identifier; clx = t.clientX; cly = t.clientY; }
     }, { passive: true });
+    canvasEl.addEventListener('touchmove', (e) => {
+      e.preventDefault();
+      for (const t of e.changedTouches) if (fingers.has(t.identifier)) fingers.set(t.identifier, { x: t.clientX, y: t.clientY });
+      if (fingers.size >= 2 && pinch > 0) { const d = spread(); if (d > 10) { this.zoom *= pinch / d; pinch = d; } } // fingers apart: zoom in
+    }, { passive: false });
+    const lift = (e) => { for (const t of e.changedTouches) fingers.delete(t.identifier); if (fingers.size < 2) pinch = 0; };
+    canvasEl.addEventListener('touchend', lift); canvasEl.addEventListener('touchcancel', lift);
     const btn = (id, key) => {
       const el = document.getElementById(id);
       el.addEventListener('touchstart', (e) => { e.preventDefault(); if (!this.touch[key]) this.pressed.add('touch-' + key); this.touch[key] = true; el.classList.add('down'); }, { passive: false });
@@ -110,5 +126,5 @@ export class Input {
   dashPressed() { return this.pressed.has('ShiftLeft') || this.pressed.has('ShiftRight') || this.pressed.has('KeyK') || this.pressed.has('touch-dash') || this.pressed.has('pad-dash'); }
   flopPressed() { return this.pressed.has('KeyC') || this.pressed.has('ControlLeft') || this.pressed.has('KeyL') || this.pressed.has('touch-flop') || this.pressed.has('pad-flop'); }
   camTurn() { let t = 0; if (this.keys.has('KeyQ')) t -= 1; if (this.keys.has('KeyE')) t += 1; return t; }
-  endFrame() { this.pressed.clear(); this.camDX = 0; this.camDY = 0; }
+  endFrame() { this.pressed.clear(); this.camDX = 0; this.camDY = 0; this.zoom = 1; }
 }
