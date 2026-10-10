@@ -17,7 +17,10 @@ export const Audio = {
       this.ctx = new AC();
       this.master = this.ctx.createGain();
       this.master.gain.value = 0.5;
-      this.master.connect(this.ctx.destination);
+      // a gentle limiter at the end, so many sounds at once can never clip into crackle
+      const lim = this.ctx.createDynamicsCompressor();
+      lim.threshold.value = -6; lim.knee.value = 6; lim.ratio.value = 12; lim.attack.value = 0.003; lim.release.value = 0.25;
+      this.master.connect(lim).connect(this.ctx.destination);
       this.musicGain = this.ctx.createGain();
       this.musicGain.gain.value = 0.55;
       this.musicGain.connect(this.master);

@@ -33,7 +33,7 @@ function buffer(ctx, kind) {
     for (let i = 0; i < n; i++) { let v = 0; for (const c of chirps) { const x = t(i) - c; if (x >= 0 && x < 0.25) v += ph(4300 + (c * 100 % 300), i) * env(x % 0.06, 0.004, 0.012) * 0.5; } d[i] = v * loopSafe(i); }
   } else if (kind === 'wind' || kind === 'night' || kind === 'house') {
     const f = kind === 'wind' ? 0.985 : kind === 'night' ? 0.993 : 0.997;
-    for (let i = 0; i < n; i++) { lp = lp * f + r() * (1 - f); const sw = 0.55 + 0.45 * Math.sin(2 * Math.PI * t(i) / secs + Math.sin(t(i) * 1.3)); d[i] = lp * (kind === 'wind' ? 9 : 12) * sw * loopSafe(i); }
+    for (let i = 0; i < n; i++) { lp = lp * f + r() * (1 - f); lp2 = lp2 * f + lp * (1 - f); const sw = 0.55 + 0.45 * Math.sin(2 * Math.PI * t(i) / secs + Math.sin(t(i) * 1.3)); d[i] = (kind === 'wind' ? lp : lp2) * sw * loopSafe(i); } // filtered twice: a soft rumble, not static
   } else if (kind === 'drips') {
     const drops = events(7);
     for (let i = 0; i < n; i++) { let v = 0; for (const p of drops) { const x = t(i) - p; if (x >= 0 && x < 0.2) v += Math.sin(2 * Math.PI * (1500 - x * 4000) * x) * env(x, 0.002, 0.04); } d[i] = v * 0.7 * loopSafe(i); }
@@ -49,9 +49,19 @@ function buffer(ctx, kind) {
     for (let i = 0; i < n; i++) { let v = 0; for (const p of notes) { const x = t(i) - p; if (x >= 0 && x < 1.2) v += Math.sin(2 * Math.PI * 1046 * Math.pow(2, sc[Math.floor(p * 13) % sc.length] / 12) * x) * env(x, 0.002, 0.3); } d[i] = v * 0.4 * loopSafe(i); }
   } else if (kind === 'chuff') { for (let i = 0; i < n; i++) { lp = lp * 0.7 + r() * 0.3; const x = t(i) % 0.3; d[i] = lp * env(x, 0.005, 0.07) * 1.4 + ph(70, i) * 0.15 * env(x, 0.005, 0.05); }
   } else if (kind === 'spray') { for (let i = 0; i < n; i++) { lp = lp * 0.3 + r() * 0.7; d[i] = lp * (0.4 + 0.6 * env((t(i) % 0.25), 0.01, 0.12)); }
-  } else if (kind === 'murmur') { // a nightmare: a low, breathy, wobbling growl with whispers in it
-    for (let i = 0; i < n; i++) { lp = lp * 0.96 + r() * 0.04; lp2 = lp2 * 0.5 + r() * 0.5; const x = t(i), wob = 0.6 + 0.4 * Math.sin(2 * Math.PI * x * 0.7 + Math.sin(x * 2.3)); const g = Math.sin(2 * Math.PI * (68 + 6 * Math.sin(x * 1.7)) * x); const whisper = lp2 * 0.08 * Math.max(0, Math.sin(2 * Math.PI * x / 1.3)); d[i] = (g * 0.45 * wob + lp * 2.5 * wob + whisper) * loopSafe(i); }
-  } else if (kind === 'flutter') { for (let i = 0; i < n; i++) { lp = lp * 0.6 + r() * 0.4; d[i] = lp * (0.5 + 0.5 * Math.sin(2 * Math.PI * t(i) * 24)); }
+  } else if (kind === 'murmur') { // a nightmare: a low, wobbling growl and a slow breath; no hiss in it
+    let b1 = 0, b2 = 0;
+    for (let i = 0; i < n; i++) {
+      b1 = b1 * 0.992 + r() * 0.008; b2 = b2 * 0.992 + b1 * 0.008; // breath: noise filtered twice, down to a soft rumble
+      const x = t(i), wob = 0.55 + 0.45 * Math.sin(2 * Math.PI * x / secs * 3 + Math.sin(x * 2.1));
+      const f0 = 62 + 5 * Math.sin(2 * Math.PI * x / secs * 2);
+      const growl = Math.sin(2 * Math.PI * f0 * x) * 0.6 + Math.sin(2 * Math.PI * f0 * 1.01 * 2 * x) * 0.22 + Math.sin(2 * Math.PI * f0 * 3 * x) * 0.07;
+      const breath = Math.max(0, Math.sin(2 * Math.PI * x / secs * 2));
+      d[i] = (growl * wob + b2 * 60 * breath) * loopSafe(i);
+    }
+  } else if (kind === 'flutter') { // moth wings: a soft, low thrum
+    let b1 = 0, b2 = 0;
+    for (let i = 0; i < n; i++) { b1 = b1 * 0.97 + r() * 0.03; b2 = b2 * 0.97 + b1 * 0.03; const beat = 0.5 + 0.5 * Math.sin(2 * Math.PI * t(i) * 22); d[i] = (b2 * 8 + Math.sin(2 * Math.PI * 110 * t(i)) * 0.3) * beat * beat; }
   } else if (kind === 'skitter') {
     const clicks = events(40);
     for (let i = 0; i < n; i++) { let v = 0; for (const p of clicks) { const x = t(i) - p; if (x >= 0 && x < 0.01) v += r() * env(x, 0.0003, 0.002); } d[i] = v; }
@@ -93,7 +103,8 @@ export function createSoundscape(ctx, out) {
   function loop(kind, vol, at, rate = 1) {
     const s = ctx.createBufferSource(); s.buffer = buffer(ctx, kind); s.loop = true; s.playbackRate.value = rate * (0.97 + Math.random() * 0.06);
     s.loopStart = 0; const g = ctx.createGain(); g.gain.value = vol;
-    s.connect(g);
+    const cut = { murmur: 420, flutter: 900, house: 300, night: 500, furnace: 400, hum: 500 }[kind];
+    if (cut) { const lpf = ctx.createBiquadFilter(); lpf.type = 'lowpass'; lpf.frequency.value = cut; lpf.Q.value = 0.5; s.connect(lpf).connect(g); } else s.connect(g); // keep the low ones free of hiss
     let p = null; if (at) { p = panner(at[0], at[1], at[2]); g.connect(p).connect(bus); } else g.connect(bus);
     s.start(ctx.currentTime + Math.random() * 0.2, Math.random() * s.buffer.duration);
     const o = { s, g, p, vol }; srcs.push(o); return o;
@@ -112,7 +123,7 @@ export function createSoundscape(ctx, out) {
       for (const e of g.enemies) {
         const kind = e.type === 'shadow' ? 'murmur' : e.type === 'moth' ? 'flutter' : e.type === 'spider' ? 'skitter' : e.type === 'boss' ? 'boss' : null;
         if (!kind || !e.pos) continue;
-        follow.push({ e, o: loop(kind, e.type === 'shadow' ? 0.35 : e.type === 'boss' ? 0.5 : 0.18, [e.pos.x, e.pos.y + 0.8, e.pos.z], e.type === 'shadow' ? 0.85 + Math.random() * 0.3 : 1) });
+        follow.push({ e, o: loop(kind, e.type === 'shadow' ? 0.22 : e.type === 'boss' ? 0.4 : 0.14, [e.pos.x, e.pos.y + 0.8, e.pos.z], e.type === 'shadow' ? 0.85 + Math.random() * 0.3 : 1) });
       }
       // the room's bad dream: the train chuffs, the sprinkler sprays, the others grumble
       const hz = g.hazard;
@@ -139,7 +150,7 @@ export function createSoundscape(ctx, out) {
         if (fo.e) {
           const e = fo.e;
           setPos(fo.o.p, e.pos.x, (e.pos.y || 0) + 0.8, e.pos.z);
-          const want = !e.alive ? 0 : e.type === 'shadow' ? (e.chase ? 0.75 : 0.35) : fo.o.vol;
+          const want = !e.alive ? 0 : e.type === 'shadow' ? (e.chase ? 0.45 : 0.22) : fo.o.vol;
           fo.o.g.gain.setTargetAtTime(want, now, e.alive ? 0.25 : 0.15);
           if (e.type === 'shadow' && e.chase) fo.o.s.playbackRate.setTargetAtTime(1.25, now, 0.3); else if (e.type === 'shadow') fo.o.s.playbackRate.setTargetAtTime(0.95, now, 0.5);
         } else if (fo.hz) {
@@ -159,3 +170,5 @@ export function previewRoom(ctx, out, id) {
     const g = ctx.createGain(); g.gain.value = vol * 0.6; s.connect(g).connect(out); s.start(0);
   }
 }
+// for tests: the raw loop for a sound
+export function debugBuffer(ctx, kind) { return buffer(ctx, kind); }
