@@ -721,9 +721,9 @@ export class Game {
     }
     return null;
   }
-  // inside a floor nightmare's gloom pool?
+  // inside a floor nightmare's gloom (its pool or its trail)?
   inGloom(x, z) {
-    for (const e of this.enemies) if (e.type === 'shadow' && e.gloomR > 0.3 && Math.hypot(x - e.pos.x, z - e.pos.z) < e.gloomR - 0.4) return true;
+    for (const g of this.gloomSpots || []) if (g[2] > 0.3 && Math.hypot(x - g[0], z - g[1]) < g[2] - 0.4) return true;
     return false;
   }
   // a little stream of golden sparks from one nightmare to the next, showing they're linked
@@ -773,17 +773,30 @@ export class Game {
     const t = this.clock, P = this.p;
     const c01 = this.comfort / 100;
     updateShadowTime(t);
-    // the gloom pools: follow their nightmare, and drain away once it's poofed
+    // the gloom: a pool round each floor nightmare and a trail of it behind them as they wander.
+    // It dissolves slowly from the outside in: trail patches as they age, a pool once its nightmare is poofed.
     if (this.darkFloor) {
-      const pools = [];
+      const pools = [], trails = [];
       for (const e of this.enemies) {
         if (e.type !== 'shadow') continue;
-        const want = e.alive ? e.gloom * (1 + Math.sin(this.clock * 1.3 + e.pause * 9) * 0.06) : 0, was = e.gloomR;
-        e.gloomR += (want - e.gloomR) * Math.min(1, dt * (e.alive ? 2 : 0.9));
-        if (!e.alive && was > 0.3 && Math.random() < 0.7) { const a = Math.random() * Math.PI * 2, r = Math.random() * was; this.sparks.emit({ p: V(e.pos.x + Math.cos(a) * r, 0.15, e.pos.z + Math.sin(a) * r), v: V(0, 1.4, 0), life: 0.8, size: 0.16, color: new THREE.Color(0xb48cff), alpha: 0.7, drag: 0.6 }); }
+        e.trail ||= [];
+        if (e.alive) {
+          e.gloomR += (e.gloom * (1 + Math.sin(this.clock * 1.3 + e.pause * 9) * 0.06) - e.gloomR) * Math.min(1, dt * 2);
+          const last = e.trail[e.trail.length - 1];
+          if (!last || Math.hypot(e.pos.x - last.x, e.pos.z - last.z) > 1.3) e.trail.push({ x: e.pos.x, z: e.pos.z, r0: e.gloom * 0.62, r: e.gloom * 0.62 });
+          if (e.trail.length > 10) e.trail.shift();
+        } else {
+          const was = e.gloomR;
+          e.gloomR = Math.max(0, e.gloomR - dt * e.gloom / 5); // the pool shrinks away over about five seconds
+          if (was > 0.3 && Math.random() < 0.6) { const a = Math.random() * Math.PI * 2, r = was * (0.85 + Math.random() * 0.15); this.sparks.emit({ p: V(e.pos.x + Math.cos(a) * r, 0.15, e.pos.z + Math.sin(a) * r), v: V(0, 1.2, 0), life: 0.8, size: 0.16, color: new THREE.Color(0xb48cff), alpha: 0.7, drag: 0.6 }); }
+        }
+        for (const t of e.trail) t.r -= dt * t.r0 / 8; // a trail patch lasts about eight seconds
+        e.trail = e.trail.filter((t) => t.r > 0.15);
         if (e.gloomR > 0.05) pools.push([e.pos.x, e.pos.z, e.gloomR]);
+        for (const t of e.trail) trails.push([t.x, t.z, t.r]);
       }
-      this.darkFloor.setGloom(pools);
+      this.gloomSpots = pools.concat(trails).slice(0, 48);
+      this.darkFloor.setGloom(this.gloomSpots);
     }
     for (const e of this.enemies) {
       if (!e.alive) {

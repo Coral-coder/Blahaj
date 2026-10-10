@@ -409,7 +409,7 @@ export const CHAPTERS = [
   // ---------------------------------------------------------------------------
   {
     id: 'basement', title: 'Down in the Basement', music: 1,
-    hazard: { type: 'roamer', kind: 'train', path: [[-9.0, -3.0], [-9.0, 3.0], [-5.6, 3.6], [-5.6, -2.6]], speed: 4.6, radius: 1.1, top: 1.6, title: 'A runaway toy train, with a nightmare driving!', hint: 'Jump over it, or bounce off its roof', msg: 'Choo-choo! Run over by the train!' },
+    hazard: { type: 'roamer', kind: 'train', squoval: { x: -7.3, z: 0.4, rx: 2.4, rz: 3.6, n: 4 }, track: true, speed: 4.6, radius: 1.1, top: 1.6, title: 'A runaway toy train, with a nightmare driving!', hint: 'Jump over it, or bounce off its roof', msg: 'Choo-choo! Run over by the train!' },
     goalText: 'Find four light bulbs, then ride the dumbwaiter up',
     intro: 'basement',
     room: {

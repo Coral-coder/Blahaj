@@ -221,9 +221,22 @@ function buildSweeper(hz, H) {
 }
 
 function buildRoamer(hz, H) {
-  const loop = H.path.map(([x, z]) => V(x, 0, z)); let L = 0; const segs = [];
+  // a squoval loop (a rounded square: |x/rx|^n + |z/rz|^n = 1), or a list of points
+  const pts = H.squoval ? Array.from({ length: 48 }, (_, i) => {
+    const a = (i / 48) * Math.PI * 2, c = Math.cos(a), s_ = Math.sin(a), Q = H.squoval, e = 2 / Q.n;
+    return [Q.x + Q.rx * Math.sign(c) * Math.pow(Math.abs(c), e), Q.z + Q.rz * Math.sign(s_) * Math.pow(Math.abs(s_), e)];
+  }) : H.path;
+  const loop = pts.map(([x, z]) => V(x, 0, z)); let L = 0; const segs = [];
   for (let i = 0; i < loop.length; i++) { const a = loop[i], b = loop[(i + 1) % loop.length], l = a.distanceTo(b); segs.push({ a, b, l, s: L }); L += l; }
   hz.loop = { segs, L }; hz.dist = 0;
+  if (H.track) { // toy track under it: two rails on sleepers, following the loop
+    const rail = Mat.steel(), wood = Mat.paint(0x6a4a2e, 0.8);
+    for (const sg of segs) {
+      const mid = sg.a.clone().add(sg.b).multiplyScalar(0.5), ang = Math.atan2(sg.b.x - sg.a.x, sg.b.z - sg.a.z);
+      for (const off of [-0.45, 0.45]) { const r = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, sg.l + 0.06), rail); r.position.set(mid.x + Math.cos(ang) * off, 0.1, mid.z - Math.sin(ang) * off); r.rotation.y = ang; r.receiveShadow = true; hz.group.add(r); }
+      const sl = new THREE.Mesh(new THREE.BoxGeometry(1.25, 0.06, 0.22), wood); sl.position.set(mid.x, 0.04, mid.z); sl.rotation.y = ang; sl.receiveShadow = true; hz.group.add(sl);
+    }
+  }
   const car = new THREE.Group(); hz.car = car; hz.group.add(car);
   if (H.kind === 'train') { // a runaway toy steam engine with a nightmare at the controls
     const red = Mat.paint(0xc8323a, 0.4), blk = Mat.paint(0x1c1d20, 0.5), gold = Mat.brass();

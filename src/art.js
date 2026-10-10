@@ -400,8 +400,8 @@ export function loadBlahajModel() {
 // The model's teeth are 16 flat cards (their cut-out texture was lost). Each card
 // becomes a real little tooth: a flattened cone rooted on the gum edge of its card,
 // pointing out of the mouth (down from the top jaw, up from the bottom one), and
-// knocked crooked by up to 45 degrees in its own direction, so the smile is
-// different tooth by tooth but the same every time.
+// leaning forward or back by up to 45 degrees, so the smile is crooked tooth
+// by tooth but the same every time.
 function proceduralTeeth(geo) {
   const pos = geo.attributes.position, idx = geo.index ? geo.index.array : [...Array(pos.count).keys()];
   const parent = [...Array(pos.count).keys()], find = (a) => (parent[a] === a ? a : (parent[a] = find(parent[a])));
@@ -420,10 +420,9 @@ function proceduralTeeth(geo) {
     const w = vs[0].distanceTo(vs[1]);
     const n = new THREE.Vector3().subVectors(vs[1], vs[0]).cross(new THREE.Vector3().subVectors(tipMid, vs[0])).normalize();
     n.addScaledVector(dir, -n.dot(dir)).normalize();
-    // crooked: tilt about a random axis across the tooth, up to 45 degrees
-    const a0 = rnd() * Math.PI * 2;
-    const ax = new THREE.Vector3().crossVectors(dir, n).multiplyScalar(Math.cos(a0)).addScaledVector(n, Math.sin(a0)).normalize();
-    const tilt = (0.15 + 0.85 * rnd()) * (Math.PI / 4);
+    // crooked: each leans forward or back (out of the mouth or in), up to 45 degrees, never sideways
+    const ax = new THREE.Vector3().crossVectors(dir, n).normalize();
+    const tilt = (rnd() * 2 - 1) * (Math.PI / 4);
     const q = new THREE.Quaternion().setFromAxisAngle(ax, tilt);
     const y = dir.clone().applyQuaternion(q), z = n.clone().applyQuaternion(q), x = new THREE.Vector3().crossVectors(y, z).normalize();
     const g = new THREE.ConeGeometry(w * 0.5, h, 8, 1); g.translate(0, h / 2, 0); g.scale(1, 1, 0.55);
@@ -527,7 +526,7 @@ export function createBlahaj() {
   // pool-noodle flex: two damped springs driven by how hard the body accelerates.
   // The ends lag behind (inertia) and wobble back. Free fall doesn't bend it.
   const noodle = { v: 0, vVel: 0, h: 0, hVel: 0, lastV: new THREE.Vector3(), primed: false };
-  const NOODLE = { k: 26, damp: 1.6, gainV: 1.25, gainH: 1.15, max: 2.1, gravity: 32 }; // floppy as a loaf of bread
+  const NOODLE = { k: 60, damp: 2.4, gainV: 0.62, gainH: 0.62, max: 1.3, gravity: 32 };
   // the fins are floppy too: each one is a loose, under-damped spring that lags the body and wobbles back
   const fins = { L: 0, Lv: 0, R: 0, Rv: 0, d: 0, dv: 0, tl: 0, tlv: 0, lastYaw: null };
   const spring = (x, v, target, force, k, damp, max, dt) => {
@@ -548,8 +547,7 @@ export function createBlahaj() {
     const ay = accel.y + (st.grounded ? 0 : NOODLE.gravity);
     const yaw = root.rotation.y;
     const aRight = accel.x * Math.cos(yaw) - accel.z * Math.sin(yaw);
-    const swayTarget = Math.sin(rig.t * 3.1) * 0.32 * st.speed; // a waddle from side to side
-    if (st.grounded && st.speed > 0.05) noodle.vVel += Math.sin(rig.t * 9.5) * st.speed * 9 * step; // and a jiggle with every step
+    const swayTarget = Math.sin(rig.t * 3.1) * 0.12 * st.speed;
     noodle.vVel += (-ay * NOODLE.gainV - NOODLE.k * noodle.v - NOODLE.damp * noodle.vVel) * step;
     noodle.hVel += (-aRight * NOODLE.gainH - NOODLE.k * (noodle.h - swayTarget) - NOODLE.damp * noodle.hVel) * step;
     noodle.v = THREE.MathUtils.clamp(noodle.v + noodle.vVel * step, -NOODLE.max, NOODLE.max);
@@ -566,10 +564,10 @@ export function createBlahaj() {
     fins.lastYaw = yaw;
     const turn = THREE.MathUtils.clamp(yawRate, -12, 12) * Math.hypot(vNow.x, vNow.z) * 0.6 - aRight; // sideways "g-force" on the fins
     const pecRest = st.glide ? 0.4 + Math.sin(rig.t * 13) * 0.16 : st.grounded ? Math.sin(rig.t * 3) * 0.03 : 0.12;
-    [fins.L, fins.Lv] = spring(fins.L, fins.Lv, pecRest, -ay * 0.45 - turn * 0.12, 34, 1.7, 1.3, step);
-    [fins.R, fins.Rv] = spring(fins.R, fins.Rv, pecRest, -ay * 0.45 + turn * 0.12, 34, 1.7, 1.3, step);
-    [fins.d, fins.dv] = spring(fins.d, fins.dv, Math.sin(rig.t * 2.3) * 0.08, turn * 1.6 - ay * 0.2, 20, 1.4, 2.2, step);
-    [fins.tl, fins.tlv] = spring(fins.tl, fins.tlv, 0, -ay * 0.28 + turn * 0.45, 24, 1.6, 1.15, step);
+    [fins.L, fins.Lv] = spring(fins.L, fins.Lv, pecRest, -ay * 0.3 - turn * 0.08, 60, 2.6, 1.1, step);
+    [fins.R, fins.Rv] = spring(fins.R, fins.Rv, pecRest, -ay * 0.3 + turn * 0.08, 60, 2.6, 1.1, step);
+    [fins.d, fins.dv] = spring(fins.d, fins.dv, Math.sin(rig.t * 2.3) * 0.08, turn * 1.1 - ay * 0.12, 34, 2.0, 1.9, step);
+    [fins.tl, fins.tlv] = spring(fins.tl, fins.tlv, 0, -ay * 0.18 + turn * 0.3, 40, 2.4, 0.95, step);
     uni.flapL.value = fins.L; uni.flapR.value = fins.R; uni.dorsal.value = fins.d; uni.tailFlop.value = fins.tl;
     // keep the belly on the floor when the ends droop
     // on the floor, drooping ends can't sink in: the middle humps up instead
@@ -577,9 +575,9 @@ export function createBlahaj() {
     const targetPitch = st.grounded ? 0 : st.pound ? 0.9 : THREE.MathUtils.clamp(-st.vy * 0.04, -0.4, 0.4);
     body.rotation.x += (targetPitch - body.rotation.x) * Math.min(1, dt * 10);
     if (rig.spin > 0) { rig.spin = Math.max(0, rig.spin - dt * 18); body.rotation.z = rig.spin; } else body.rotation.z *= 0.8;
-    const acc = -70 * (rig.squash - 1) - 5 * rig.squashVel; // soft and slow to settle, like a squeezed plush
+    const acc = -130 * (rig.squash - 1) - 8.5 * rig.squashVel;
     rig.squashVel += acc * dt;
-    rig.squash = THREE.MathUtils.clamp(rig.squash + rig.squashVel * dt, 0.55, 1.5);
+    rig.squash += rig.squashVel * dt;
     const s = rig.squash;
     body.scale.set(1 / Math.sqrt(s), s, 1 / Math.sqrt(s));
   };
