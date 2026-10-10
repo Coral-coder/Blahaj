@@ -76,6 +76,7 @@ export const CHAPTERS = [
   // ---------------------------------------------------------------------------
   {
     id: 'downstairs', title: 'Downstairs', music: 1,
+    gloom: 2.8, // how far each floor nightmare's gloom spreads
     hazard: { type: 'lobber', kind: 'cushion', imp: [0.5, 2.3, -9.7], from: [0.5, 3.2, -8.8], every: 4.8, speed: 9, spread: 2.5, bounce: 0.3, friction: 2.5, life: 5, radius: 0.55, dmg: 6, title: 'A nightmare on the sofa is throwing cushions!', hint: 'Keep moving!', msg: 'Flumph! A cushion!' },
     goalText: 'Sneak out to the kitchen',
     intro: 'downstairs', newAbility: ['doubleJump', 'flop'],
@@ -761,6 +762,7 @@ export const CHAPTERS = [
   // ---------------------------------------------------------------------------
   {
     id: 'attic', title: 'The Attic', music: 2,
+    gloom: 2.8, // how far each floor nightmare's gloom spreads
     goalText: 'Defeat the Nightmare Moth Queen — belly-flop her from the rafters!',
     intro: 'attic',
     room: {
@@ -770,7 +772,7 @@ export const CHAPTERS = [
     },
     abilities: { doubleJump: true, flop: true, dash: true, glide: true },
     spawn: [-11.6, 0, 6.4], spawnYaw: 2.21, camYaw: -0.93,
-    drain: 0.8,
+    drain: 0.6,
     props: [
       { type: 'roofSlope', x: 0, z: 0, l: 32, knee: 9, ridge: 14, half: 10 },
       { type: 'tieBeam', x: -10.0, z: 0, top: 8.6, l: 14 }, { type: 'tieBeam', x: -4.0, z: 0, top: 8.6, l: 14 },

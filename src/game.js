@@ -20,7 +20,7 @@ const EPS = 0.001;
 const ZOOM_KEY = 'blahaj-camera-distance';
 function savedZoom() { try { const v = +localStorage.getItem(ZOOM_KEY); if (v >= 5 && v <= 18) return v; } catch (e) { /* storage blocked */ } return 10.5; }
 const angDiff = (a, b) => { let d = b - a; while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2; return d; };
-const COMFORT = { fish: 4, starfish: 25, bunny: 3, stomp: 12, knot: 15, hit: 18, lego: 10, ball: 7, cat: 6, lampMin: 70, respawn: 60, darkDrain: 5.5, risingDrain: 26 };
+const COMFORT = { fish: 4, starfish: 25, bunny: 3, stomp: 12, knot: 15, hit: 18, lego: 10, ball: 7, cat: 6, lampMin: 70, respawn: 60, darkDrain: 5.5, gloomDrain: 4, risingDrain: 26 };
 
 function pathPoint(path, dist) {
   // position along a closed polyline at arc length `dist`
@@ -215,7 +215,7 @@ export class Game {
     for (const e of ch.enemies) {
       if (e.type === 'shadow') {
         const s = createShadow(1); scene.add(s.group);
-        this.enemies.push({ e, s, type: 'shadow', pos: V(...e.path[0]), home: 0, dist: 0, alive: true, deadT: 0, chase: false, hitCool: 0, target: null, pause: Math.random() });
+        this.enemies.push({ e, s, type: 'shadow', pos: V(...e.path[0]), home: 0, dist: 0, alive: true, deadT: 0, chase: false, hitCool: 0, gloom: e.gloom || ch.gloom || 4.2, gloomR: e.gloom || ch.gloom || 4.2, target: null, pause: Math.random() });
         const sh_ = this.enemies[this.enemies.length - 1];
         if (!this.floorFree(sh_.pos.x, sh_.pos.z)) { // spawned somewhere you couldn't reach it: nudge it out onto open floor
           for (let k = 1, done = false; k <= 40 && !done; k++) for (let a = 0; a < 12 && !done; a++) {
@@ -391,6 +391,7 @@ export class Game {
     const onFloor = P.grounded && P.ground && P.ground.kind === 'floor';
     P.inDark = false;
     if (this.darkFloor && (onFloor || P.pos.y < 0.5) && !inSafe(this.safe, P.pos.x, P.pos.z)) { P.inDark = true; drain += COMFORT.darkDrain; }
+    if (this.darkFloor && (onFloor || P.pos.y < 0.5) && this.inGloom(P.pos.x, P.pos.z)) { P.inDark = true; drain += COMFORT.gloomDrain; } // a nightmare's gloom swallows even the light
     if (this.rising && P.pos.y < this.darkLevel + 0.2) { P.inDark = true; drain += COMFORT.risingDrain; }
     this.addComfort(-drain * dt);
     if (this.state !== 'play') return;
@@ -539,7 +540,6 @@ export class Game {
       this.hooks.pop(this.knotsLeft ? `Nightmare broken! ${this.knotsLeft} left` : 'Leo is safe… go to him!');
     } else {
       this.addComfort(COMFORT.stomp); if (!linked) this.hooks.pop('Poof!');
-      if (e.type === 'shadow') this.leaveLight(e.pos);
       // the moths feed on the nightmares down on the floor: poof a moth and half of
       // those go with it; poof the last one on the floor and the moths fade away too
       const ground = this.enemies.filter((x) => x.type === 'shadow' && x.alive && x.doomT === undefined);
@@ -551,7 +551,7 @@ export class Game {
       }
       if (e.type === 'shadow' && this.enemies.some((x) => x.type === 'shadow') && ground.length === 0 && this.shadowsLeft() === 0) {
         moths.forEach((x, i) => { x.doomT = 0.5 + i * 0.35; this.linkSparks(e.pos, x.pos); });
-        this.hooks.toast('All the nightmares are poofed!', moths.length ? 'The moths fade away too — now find the way out' : 'Now find the way out'); Audio.checkpoint();
+        this.hooks.toast('The floor nightmares are poofed — their gloom is gone!', moths.length ? 'The moths fade away too. Now find the way out' : 'Now find the way out'); Audio.checkpoint();
       }
     }
   }
@@ -721,20 +721,10 @@ export class Game {
     }
     return null;
   }
-  // a poofed nightmare leaves a little firefly light behind, and light banishes the dark:
-  // the floor round it is safe from then on, so clearing a room slowly lights it up
-  leaveLight(at) {
-    const r = 2.3, spot = { x: at.x, z: at.z, r, grow: 0 };
-    this.safe.push(spot);
-    const g = new THREE.Group(); g.position.set(at.x, 1.3, at.z);
-    const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: softDotTexture(), color: 0xffe0a0, transparent: true, opacity: 0.85, depthWrite: false, blending: THREE.AdditiveBlending }));
-    glow.scale.setScalar(1.4); g.add(glow);
-    const core = new THREE.Mesh(new THREE.SphereGeometry(0.1, 10, 8), new THREE.MeshBasicMaterial({ color: 0xfff4d0 })); g.add(core);
-    const pool = new THREE.Mesh(new THREE.CircleGeometry(r, 32), new THREE.MeshBasicMaterial({ map: softDotTexture(), color: 0xffd890, transparent: true, opacity: 0.0, depthWrite: false, blending: THREE.AdditiveBlending }));
-    pool.rotation.x = -Math.PI / 2; pool.position.y = -1.22; g.add(pool);
-    this.scene.add(g);
-    (this.fireflies ||= []).push({ g, glow, pool, spot, t: Math.random() * 6, home: at.clone() });
-    this.darkFloor && this.darkFloor.setSafe(this.safe.map((s_) => (s_.grow !== undefined ? Object.assign({}, s_, { r: 0.01 }) : s_)));
+  // inside a floor nightmare's gloom pool?
+  inGloom(x, z) {
+    for (const e of this.enemies) if (e.type === 'shadow' && e.gloomR > 0.3 && Math.hypot(x - e.pos.x, z - e.pos.z) < e.gloomR - 0.4) return true;
+    return false;
   }
   // a little stream of golden sparks from one nightmare to the next, showing they're linked
   linkSparks(from, to) {
@@ -763,7 +753,7 @@ export class Game {
   goalLock() {
     if (this.ch.goal.needsKnots && this.knotsLeft > 0) return ['Break the nightmares first!', 'Jump on them, or belly flop'];
     const sl = this.shadowsLeft();
-    if (sl > 0) return [`${sl} more nightmare${sl > 1 ? 's' : ''} to poof`, 'Jump on them, belly flop or dash through'];
+    if (sl > 0) return [`${sl} more nightmare${sl > 1 ? 's' : ''} on the floor to poof`, 'Only the ones on the floor! Jump on them, belly flop or dash through'];
     const left = collectLeft(this.features);
     if (left > 0) { const c = this.ch.collect, info = ITEMS[c.kind] || ITEMS.key; return [`${left} more ${c.label || info.name} to find`, c.hint || 'Look high and low']; }
     return null;
@@ -783,16 +773,17 @@ export class Game {
     const t = this.clock, P = this.p;
     const c01 = this.comfort / 100;
     updateShadowTime(t);
-    for (const f of this.fireflies || []) { // drift and twinkle; their light spreads out over a second
-      f.t += dt;
-      f.g.position.set(f.home.x + Math.sin(f.t * 0.7) * 0.25, 1.3 + Math.sin(f.t * 1.3) * 0.15, f.home.z + Math.cos(f.t * 0.6) * 0.25);
-      f.glow.material.opacity = 0.7 + Math.sin(f.t * 5) * 0.15;
-      if (f.spot.grow < 1) {
-        f.spot.grow = Math.min(1, f.spot.grow + dt * 0.9);
-        f.pool.material.opacity = 0.16 * f.spot.grow;
-        this.darkFloor && this.darkFloor.setSafe(this.safe.map((s_) => (s_.grow !== undefined ? Object.assign({}, s_, { r: s_.r * (0.05 + 0.95 * s_.grow) }) : s_)));
+    // the gloom pools: follow their nightmare, and drain away once it's poofed
+    if (this.darkFloor) {
+      const pools = [];
+      for (const e of this.enemies) {
+        if (e.type !== 'shadow') continue;
+        const want = e.alive ? e.gloom * (1 + Math.sin(this.clock * 1.3 + e.pause * 9) * 0.06) : 0, was = e.gloomR;
+        e.gloomR += (want - e.gloomR) * Math.min(1, dt * (e.alive ? 2 : 0.9));
+        if (!e.alive && was > 0.3 && Math.random() < 0.7) { const a = Math.random() * Math.PI * 2, r = Math.random() * was; this.sparks.emit({ p: V(e.pos.x + Math.cos(a) * r, 0.15, e.pos.z + Math.sin(a) * r), v: V(0, 1.4, 0), life: 0.8, size: 0.16, color: new THREE.Color(0xb48cff), alpha: 0.7, drag: 0.6 }); }
+        if (e.gloomR > 0.05) pools.push([e.pos.x, e.pos.z, e.gloomR]);
       }
-      f.pool.position.set(f.home.x - f.g.position.x, -f.g.position.y + 0.07, f.home.z - f.g.position.z);
+      this.darkFloor.setGloom(pools);
     }
     for (const e of this.enemies) {
       if (!e.alive) {

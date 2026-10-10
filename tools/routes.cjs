@@ -77,5 +77,5 @@ const ROUTES = {
       ['jump', 7.7, 5.0, 0.6], ['jump', 7.5, 6.4, -1.6], ['walk', 7.6, -1.6], ['snap'], ['jump', -3.6, 4.5, -2.4, { double: true, glide: true, dash: true, hold: 0.35, max: 8 }], ['snap'], ['knots'], ['snap'], ['walk', -5.0, -6.6]],
 };
 // every chapter starts by hunting down the nightmares on the floor (the way out stays shut until they're poofed)
-for (const k in ROUTES) ROUTES[k].unshift(['poof']);
+for (const k in ROUTES) if (k !== 'attic') ROUTES[k].unshift(['poof']); // (in the attic, beating the Moth Queen sends them all packing)
 module.exports = ROUTES;
