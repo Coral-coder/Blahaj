@@ -365,7 +365,11 @@ export class Game {
     for (const m of this.movers) {
       const mv = m.p.move, y0 = m.p.y || 0;
       let x, y = y0, z, heading;
-      if (mv.path3) { m.t = (m.t || 0) + dt; [x, y, z, heading] = pathPoint3(mv, m.t); } // lifts, swings, toy trains
+      if (mv.orbit) { // round and round a centre, smoothly (ceiling fan blades)
+        m.t = (m.t || 0) + dt;
+        const O = mv.orbit, a = (O.phase || 0) - m.t * O.speed;
+        x = O.x + Math.cos(a) * O.r; z = O.z + Math.sin(a) * O.r; heading = Math.atan2(Math.sin(a), -Math.cos(a));
+      } else if (mv.path3) { m.t = (m.t || 0) + dt; [x, y, z, heading] = pathPoint3(mv, m.t); } // lifts, swings, toy trains
       else { m.dist += mv.speed * dt; [x, z, heading] = pathPoint(mv.path, m.dist); }
       const dx = x - m.p.x, dy = y - y0, dz = z - m.p.z;
       for (const s of m.solids) {
@@ -621,7 +625,7 @@ export class Game {
       if (e.doomT !== undefined) { e.doomT -= dt; if (e.doomT <= 0) { this.defeat(e, true); continue; } }
       if (e.type === 'shadow') {
         e.hitCool -= dt;
-        const playerLow = P.pos.y < 1.6;
+        const playerLow = P.pos.y < 0.6; // they only come after you when you're down on the floor
         const near = Math.hypot(P.pos.x - e.pos.x, P.pos.z - e.pos.z);
         e.chase = playerLow && near < 6.5 && !inSafe(this.safe, P.pos.x, P.pos.z);
         // wander the open floor, idling now and then; chase you if you're down there with them
@@ -646,7 +650,8 @@ export class Game {
         if (hd < 1.0 && P.pos.y < 1.9) {
           if (P.pound || (P.vel.y < 0 && P.pos.y > 0.9)) { this.defeat(e); P.vel.y = CFG.stompBounce; P.canDouble = !!this.ab.doubleJump; continue; }
           if (P.dashT > 0) { this.defeat(e); continue; }
-          if (e.hitCool <= 0) { e.hitCool = 1; this.hurt(e.pos, COMFORT.hit, 'A nightmare grabbed you!'); }
+          // it can only grab you down on the floor with it, not up on a stool or a step
+          if (e.hitCool <= 0 && P.pos.y < 0.6) { e.hitCool = 1; this.hurt(e.pos, COMFORT.hit, 'A nightmare grabbed you!'); }
         }
       } else if (e.type === 'knot') {
         const t = this.clock + e.ph;
@@ -783,7 +788,7 @@ export class Game {
         if (e.alive) {
           e.gloomR += (e.gloom * (1 + Math.sin(this.clock * 1.3 + e.pause * 9) * 0.06) - e.gloomR) * Math.min(1, dt * 2);
           const last = e.trail[e.trail.length - 1];
-          if (!last || Math.hypot(e.pos.x - last.x, e.pos.z - last.z) > 1.3) e.trail.push({ x: e.pos.x, z: e.pos.z, r0: e.gloom * 0.62, r: e.gloom * 0.62 });
+          if ((this.ch.trails ?? 1) > 0 && (!last || Math.hypot(e.pos.x - last.x, e.pos.z - last.z) > 1.3)) e.trail.push({ x: e.pos.x, z: e.pos.z, r0: e.gloom * 0.62 * (this.ch.trails ?? 1), r: e.gloom * 0.62 * (this.ch.trails ?? 1) });
           if (e.trail.length > 10) e.trail.shift();
         } else {
           const was = e.gloomR;

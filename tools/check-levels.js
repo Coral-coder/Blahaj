@@ -19,7 +19,9 @@ function nodesFor(ch) {
     const bs = expand(p);
     if (!p.move) return bs;
     // a moving prop counts at every corner of its path
-    const pts = p.move.path3 ? p.move.path3 : p.move.path.map(([x, z]) => [x, p.y || 0, z]);
+    const O = p.move.orbit;
+    const pts = O ? Array.from({ length: 16 }, (_, i) => [O.x + Math.cos((i / 16) * Math.PI * 2) * O.r, p.y || 0, O.z + Math.sin((i / 16) * Math.PI * 2) * O.r])
+      : p.move.path3 ? p.move.path3 : p.move.path.map(([x, z]) => [x, p.y || 0, z]);
     return pts.flatMap(([x, y, z]) => bs.map((b) => {
       const dx = x - p.x, dy = y - (p.y || 0), dz = z - p.z;
       return Object.assign({}, b, { min: [b.min[0] + dx, b.min[1] + dy, b.min[2] + dz], max: [b.max[0] + dx, b.max[1] + dy, b.max[2] + dz] });

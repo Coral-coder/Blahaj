@@ -629,11 +629,13 @@ export function ending(game, hooks) {
       const hugL = leo.worldToLocal(pose.com.clone().add(V(0.45, 0.02, 0.3)));
       ikL = DOWN.clone().lerp(hugL, sm(t, 8.8, 10.6)); ikWL = 1; poleL = poleL.clone().lerp(V(0.35, 0.4, 0.85).normalize(), sm(t, 8.8, 10.6));
     }
-    const grabL = t >= 5.0 && t < 8.8;
+    // he keeps hold of the blanket's edge all the way down into the hug, so it comes down over his arm
+    // (the arm never passes through it), and only lets go once he's holding Blåhaj
+    const grabL = t >= 5.0 && t < 10.4;
     leo.update(dt, {
       cover: grabL ? null : t < 5 ? 0.55 : 0.84, roll, curl, shiver: 0,
       ik: sn.ik, ikW: sm(t, 5.6, 7.0), pole: sn.pole, // his lower arm slides under Blåhaj as he comes in
-      ikL, ikWL, poleL, grabL, grabR: false,
+      ikL, ikWL, poleL, grabL, grabR: false, armOverL: false,
       blahaj: onTopOf(leo, pose),
     });
     const rest = restOnBed(leo, b.x, b.z, heldQ, true);

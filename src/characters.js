@@ -426,7 +426,9 @@ export function createLeo(bed) {
     // each arm always reaches for something: by default the hand rests tucked on
     // his chest under the covers; state.ik / state.ikL (bed-local) pull it elsewhere
     const arms = [
-      [armR, V(0.35 - 0.55 * rp + 0.45 * rn, 0.62, -l / 2 + 3.35), TUCK_POLE, state.ik, state.ikW, state.pole || POLE],
+      // his right arm: tucked on his chest on his back; rolled over to face the wall it lies in front of
+      // his chest with the hand on the mattress and the elbow down by his hip (not stuck out behind him)
+      [armR, V(0.35 - 1.25 * rp + 0.45 * rn, 0.62 - 0.12 * rp, -l / 2 + 3.35), TUCK_POLE.clone().lerp(V(-0.25, -0.5, 1).normalize(), rp).normalize(), state.ik, state.ikW, state.pole || POLE],
       // the free (top) arm: on his back it rests on his chest; rolled toward the room it lies along his side
       // with the hand on the mattress in front of his tummy, elbow up over his hip
       [armL, V(-0.35 - 0.2 * rp, 0.62, -l / 2 + 3.35).lerp(V(0.75, 0.32, -l / 2 + 4.0), rn), V(-1 + 0.8 * rn, -0.3 + 1.2 * rn, 0.5).normalize(), state.ikL, state.ikWL, state.poleL || POLE_L],

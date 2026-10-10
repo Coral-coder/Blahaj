@@ -119,7 +119,11 @@ export const Audio = {
       if (this.dream !== undefined) this.music.setDream(this.dream);
     },
 
-    stopMusic() { if (this.music) this.music.stop(); },
+    stopMusic() {
+      if (this.music) this.music.stop();
+      if (this.droneGain) this.droneGain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.3); // and the nightmare hum with it
+      this.dream = 1;
+    },
     // how far through the level you are (0..1) and whether the way out is open: the music builds with it
     setProgress(p, unlocked) { if (this.music) this.music.setProgress(p, unlocked); },
   };

@@ -8,7 +8,7 @@
 
 const EPS = 1e-9;
 
-export function createCloth({ nx, nz, width, length, thickness = 0.07, iterations = 6, gravity = 22, damping = 0.985, friction = 0.55, bend = 0.35 }) {
+export function createCloth({ nx, nz, width, length, thickness = 0.07, iterations = 6, gravity = 22, damping = 0.985, friction = 0.55, staticFriction = 0.9, bend = 0.35 }) {
   const N = nx * nz;
   const P = new Float32Array(N * 3), Q = new Float32Array(N * 3), W = new Float32Array(N).fill(1);
   const dx = width / (nx - 1), dz = length / (nz - 1);
@@ -138,14 +138,16 @@ export function createCloth({ nx, nz, width, length, thickness = 0.07, iteration
         const c = cols[j];
         if (c.bb && (x < c.bb[0] || x > c.bb[3] || y < c.bb[1] || y > c.bb[4] || z < c.bb[2] || z > c.bb[5])) continue;
         if (!collide(c, x, y, z, c.m !== undefined ? c.m : thickness)) continue;
+        const depth = Math.hypot(out[3] - x, out[4] - y, out[5] - z); // how hard it's pressed into the surface
         x = out[3]; y = out[4]; z = out[5];
-        if (final) { // friction: hold back sliding along the surface
+        if (final) { // friction (Coulomb): stick if the slide is small next to how hard it's pressed, else drag
           contact[p] = 1;
           const vx = x - Q[p * 3], vy = y - Q[p * 3 + 1], vz = z - Q[p * 3 + 2];
           const vn = vx * out[0] + vy * out[1] + vz * out[2];
           const tx = vx - vn * out[0], ty = vy - vn * out[1], tz = vz - vn * out[2];
-          const f = c.mu !== undefined ? c.mu : friction;
-          x -= tx * f; y -= ty * f; z -= tz * f;
+          const f = c.mu !== undefined ? c.mu : friction, slide = Math.hypot(tx, ty, tz);
+          const k = slide <= (c.mus !== undefined ? c.mus : staticFriction) * depth + 1e-5 ? 1 : f; // static: it doesn't move at all
+          x -= tx * k; y -= ty * k; z -= tz * k;
         }
       }
       P[p * 3] = x; P[p * 3 + 1] = y; P[p * 3 + 2] = z;

@@ -21,7 +21,6 @@ const WALLSHELF = { type: 'wallShelf', x: 7.7, z: 0.55, rot: 3, w: 1.7, d: 1, y:
 const WARDROBE = { type: 'wardrobe', x: -6.9, z: 6.6, rot: 1 };
 
 // the ceiling fan in Mum and Dad's room: blades go round this circle
-const FAN = [[3.0, 8.6, 4.0], [2.77, 8.6, 2.85], [2.12, 8.6, 1.88], [1.15, 8.6, 1.23], [0.0, 8.6, 1.0], [-1.15, 8.6, 1.23], [-2.12, 8.6, 1.88], [-2.77, 8.6, 2.85], [-3.0, 8.6, 4.0], [-2.77, 8.6, 5.15], [-2.12, 8.6, 6.12], [-1.15, 8.6, 6.77], [-0.0, 8.6, 7.0], [1.15, 8.6, 6.77], [2.12, 8.6, 6.12], [2.77, 8.6, 5.15]];
 
 export const CHAPTERS = [
   // ---------------------------------------------------------------------------
@@ -76,8 +75,8 @@ export const CHAPTERS = [
   // ---------------------------------------------------------------------------
   {
     id: 'downstairs', title: 'Downstairs', music: 1,
-    gloom: 2.8, // how far each floor nightmare's gloom spreads
-    hazard: { type: 'lobber', kind: 'cushion', imp: [0.5, 2.3, -9.7], from: [0.5, 3.2, -8.8], every: 4.8, speed: 9, spread: 2.5, bounce: 0.3, friction: 2.5, life: 5, radius: 0.55, dmg: 6, title: 'A nightmare on the sofa is throwing cushions!', hint: 'Keep moving!', msg: 'Flumph! A cushion!' },
+    gloom: 2.8, trails: 0, // small pools and no trails yet: the gloom is new here
+    hazard: { type: 'lobber', kind: 'cushion', imp: [0.5, 2.3, -9.7], from: [0.5, 3.2, -8.8], every: 5.5, speed: 9, spread: 2.5, bounce: 0.3, friction: 2.5, life: 5, radius: 0.55, dmg: 6, title: 'A nightmare on the sofa is throwing cushions!', hint: 'Keep moving!', msg: 'Flumph! A cushion!' },
     goalText: 'Sneak out to the kitchen',
     intro: 'downstairs', newAbility: ['doubleJump', 'flop'],
     room: {
@@ -87,7 +86,7 @@ export const CHAPTERS = [
     },
     abilities: { doubleJump: true, flop: true },
     spawn: [-8.6, 0.5, -5.6], spawnYaw: 0, camYaw: 1.35,
-    drain: 0.75,
+    drain: 0.6,
     props: [
       { type: 'dogBed', x: -8.6, z: -5.6 },
       { type: 'fireplace', x: -12.1, z: 0.5, rot: 1 },
@@ -664,10 +663,10 @@ export const CHAPTERS = [
       { type: 'readingChair', x: 10.6, z: 7.4, rot: 3 },
       { type: 'slippers', x: -4.2, z: 0.8, rot: 0.3 }, { type: 'slippers', x: 4.0, z: 0.6, color: 0x6f8fb8 },
       { type: 'fanHub', x: 0, z: 4.0, top: 9.4, ceiling: 12 },
-      { type: 'fanBlade', x: 3.0, y: 8.6, z: 4.0, move: { path3: FAN, loop: true, linear: true, speed: 1.6, phase: 0.0 } },
-      { type: 'fanBlade', x: 3.0, y: 8.6, z: 4.0, move: { path3: FAN, loop: true, linear: true, speed: 1.6, phase: 2.95 } },
-      { type: 'fanBlade', x: 3.0, y: 8.6, z: 4.0, move: { path3: FAN, loop: true, linear: true, speed: 1.6, phase: 5.89 } },
-      { type: 'fanBlade', x: 3.0, y: 8.6, z: 4.0, move: { path3: FAN, loop: true, linear: true, speed: 1.6, phase: 8.84 } },
+      { type: 'fanBlade', x: 3.0, y: 8.6, z: 4.0, move: { orbit: { x: 0, z: 4.0, r: 3.0, speed: 0.53, phase: 0.0 } } },
+      { type: 'fanBlade', x: 3.0, y: 8.6, z: 4.0, move: { orbit: { x: 0, z: 4.0, r: 3.0, speed: 0.53, phase: 1.5708 } } },
+      { type: 'fanBlade', x: 3.0, y: 8.6, z: 4.0, move: { orbit: { x: 0, z: 4.0, r: 3.0, speed: 0.53, phase: 3.1416 } } },
+      { type: 'fanBlade', x: 3.0, y: 8.6, z: 4.0, move: { orbit: { x: 0, z: 4.0, r: 3.0, speed: 0.53, phase: 4.7124 } } },
     ],
     wind: [{ x: 2.3, z: -8.8, r: 1.3, y0: 3.6, y1: 11.0, color: 0xdfe9ff }], // Dad's snores (they really are that loud)
     safe: [

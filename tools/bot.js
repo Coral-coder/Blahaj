@@ -126,10 +126,11 @@ window.__bot = {
     const nextStep = (tx, tz) => {
       const si = cx(P.pos.x), sj = cz(P.pos.z), gi = cx(tx), gj = cz(tz);
       const prev = new Int32Array(NX * NZ).fill(-1), q = [si * NZ + sj]; prev[q[0]] = q[0];
-      let found = -1;
+      let found = -1, near = -1;
       for (let h = 0; h < q.length; h++) {
         const k = q[h], i = (k / NZ) | 0, j = k % NZ;
         if (Math.abs(i - gi) <= 1 && Math.abs(j - gj) <= 1) { found = k; break; }
+        if (near < 0 && Math.abs(i - gi) <= 3 && Math.abs(j - gj) <= 3) near = k; // closest we can get if the goal is up on something
         for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]]) {
           const a = i + di, b = j + dj; if (a < 0 || b < 0 || a >= NX || b >= NZ) continue;
           const n = a * NZ + b; if (prev[n] !== -1 || !isFree(a, b)) continue;
@@ -137,6 +138,7 @@ window.__bot = {
           prev[n] = k; q.push(n);
         }
       }
+      if (found < 0) found = near;
       if (found < 0) return [tx, tz];
       let k = found, steps = 0; const path = [];
       while (prev[k] !== k && steps++ < 4000) { path.push(k); k = prev[k]; }
@@ -159,13 +161,18 @@ window.__bot = {
       if (!left().length) return true; // nothing on the floor here
       const x0 = P.pos.x, z0 = P.pos.z, y0 = P.pos.y;
       const back = () => { // then find our way back to where the hunt started
+        let bestD = 1e9, still = 0;
         for (let t = 0; t < 15 && hd(x0, z0) > (y0 > 0.3 ? 1.6 : 0.4); t += step) {
           if (g.state !== 'play') return 'state:' + g.state;
-          const [wx, wz] = nextStep(x0, z0); face(wx, wz); tick(['KeyW']);
+          const [wx, wz] = nextStep(x0, z0); face(wx, wz);
+          const d = hd(x0, z0); if (d < bestD - 0.05) { bestD = d; still = 0; } else still += step;
+          if (still > 0.8 && P.grounded) { tick(['KeyW', 'Space'], ['Space']); still = 0; bestD = 1e9; continue; } // stuck on something: hop it
+          tick(['KeyW']);
         }
         stop();
         if (y0 > 0.3) jump(x0, y0, z0, { double: !!g.ab.doubleJump });
-        return hd(x0, z0) < 1.2 ? true : 'back ' + where();
+        if (hd(x0, z0) > 1.2) log.push('  (could not get right back to the start; carrying on from ' + where() + ')');
+        return true;
       };
       let lastD = 1e9, stuckT = 0;
       for (let t = 0; t < (o.max || 60); t += step) {

@@ -310,11 +310,11 @@ function frame(now) {
   if (mode === 'play') {
     $('timer').textContent = fmt(game.stats.time);
     updateHud();
-    Audio.setDream(game.comfort / 100);
+    Audio.setDream(game.state === 'won' ? 1 : game.comfort / 100); // once you've won, the hum fades away
     Audio.setProgress(...game.progress());
     beatT -= dt;
     if (game.comfort < 25 && beatT <= 0) { Audio.heartbeat(); beatT = 0.9 + game.comfort / 40; }
-  }
+  } else if (mode !== 'paused') Audio.setDream(1); // cutscene or menu: the nightmare hum fades away
   game.render();
   perf.sample(dt);
 }
