@@ -46,6 +46,41 @@ const GradeShader = {
   }`,
 };
 
+// Paint white (no occlusion) into the denoised AO target over the visible pixels of each root.
+// Meshes opt in with userData.aoMask (a plain material that bends like the real one); the
+// fragment is dropped if it's behind the scene depth the AO was computed from.
+const aoMaskU = { aoDepth: { value: null }, aoRes: { value: new THREE.Vector2(1, 1) } };
+function paintAoMask(renderer, target, ao, camera, roots) {
+  aoMaskU.aoDepth.value = ao.depthTexture; aoMaskU.aoRes.value.set(target.width, target.height);
+  const prevT = renderer.getRenderTarget(), prevAC = renderer.autoClear;
+  renderer.setRenderTarget(target); renderer.autoClear = false;
+  for (const root of roots) {
+    const saved = [];
+    root.traverse((o) => {
+      if (!o.isMesh) return;
+      saved.push([o, o.material, o.visible]);
+      const m = o.userData.aoMask;
+      if (!m || !o.visible) { o.visible = false; return; }
+      if (!m.userData.aoWrapped) {
+        m.userData.aoWrapped = true;
+        const prev = m.onBeforeCompile, key = m.customProgramCacheKey.bind(m);
+        m.onBeforeCompile = (sh, r) => {
+          prev.call(m, sh, r);
+          Object.assign(sh.uniforms, aoMaskU);
+          sh.fragmentShader = 'uniform sampler2D aoDepth;\nuniform vec2 aoRes;\n' + sh.fragmentShader.replace('void main() {', 'void main() {\n  if (gl_FragCoord.z > texture2D(aoDepth, gl_FragCoord.xy / aoRes).x + 2e-5) discard;');
+        };
+        m.customProgramCacheKey = () => key() + '|aoMask';
+      }
+      o.material = m;
+    });
+    const rv = root.visible; root.visible = true;
+    renderer.render(root, camera);
+    root.visible = rv;
+    for (const [o, mat, vis] of saved) { o.material = mat; o.visible = vis; }
+  }
+  renderer.setRenderTarget(prevT); renderer.autoClear = prevAC;
+}
+
 export class Renderer {
   constructor(canvas) {
     this.r = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance', stencil: false });
@@ -86,9 +121,19 @@ export class Renderer {
       const ao = new GTAOPass(scene, camera, w, h);
       // sprites, particles and other transparent effects must not cast AO
       const baseRender = ao.render.bind(ao);
+      // Objects marked noAO (Blåhaj) cast no AO, so they don't leave a dark halo on the floor.
+      // But then their pixels would pick up the AO of whatever is behind them and look
+      // see-through, so once the AO is computed we paint "no occlusion" wherever they're visible.
+      const baseRenderPass = ao._renderPass.bind(ao);
+      let maskRoots = [];
+      ao._renderPass = (renderer, mat, target, ...rest) => {
+        baseRenderPass(renderer, mat, target, ...rest);
+        if (mat === ao.pdMaterial && maskRoots.length) paintAoMask(renderer, target, ao, camera, maskRoots);
+      };
       ao.render = (...args) => {
         const hidden = [];
-        scene.traverseVisible((o) => { if (o.userData.noAO || o.isSprite || o.isPoints || (o.material && o.material.transparent)) hidden.push(o); });
+        maskRoots = [];
+        scene.traverseVisible((o) => { if (o.userData.noAO) maskRoots.push(o); if (o.userData.noAO || o.isSprite || o.isPoints || (o.material && o.material.transparent)) hidden.push(o); });
         hidden.forEach((o) => (o.visible = false));
         baseRender(...args);
         hidden.forEach((o) => (o.visible = true));

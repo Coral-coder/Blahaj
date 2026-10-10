@@ -37,6 +37,22 @@ const server = http.createServer((req, res) => {
   const playCines = async () => {
     for (let guard = 0; guard < 200 && (await page.evaluate(() => window.__blahaj.mode)) === 'cine'; guard++) await page.evaluate(() => window.__blahaj.sim(0.5));
   };
+  // ONLY=3,4 plays just those chapters (1-based), straight from the chapter menu, and prints each log
+  if (process.env.ONLY) {
+    for (const n of process.env.ONLY.split(',').map(Number)) {
+      const ch = n - 1;
+      await page.evaluate((ch) => window.__blahaj.startChapter(ch, false), ch);
+      await page.waitForFunction((ch) => window.__blahaj.game && window.__blahaj.game.index === ch && ['cine', 'play'].includes(window.__blahaj.mode), ch, { timeout: 180000 });
+      await page.evaluate(() => { window.__blahaj.debug.noRender = true; });
+      await playCines();
+      const r = await page.evaluate((route) => window.__bot.run(route), ROUTES[ch].filter((w) => w[0] !== 'snap'));
+      console.log(`${r.ok ? 'PASS' : 'FAIL'} chapter ${n} (lowest comfort ${Math.round(r.minComfort)})`);
+      console.log(r.log.join('\n'));
+      if (!r.ok) failures++;
+    }
+    console.log(errors.length ? errors.join('\n') : 'no page errors');
+    await browser.close(); server.close(); process.exit(failures ? 1 : 0);
+  }
   await page.click('#btnStart');
   for (let ch = 0; ch < ROUTES.length && !failures; ch++) {
     await page.waitForFunction((ch) => window.__blahaj.game && window.__blahaj.game.index === ch && ['cine', 'play'].includes(window.__blahaj.mode), ch, { timeout: 180000 });
