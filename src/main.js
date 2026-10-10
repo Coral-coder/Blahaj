@@ -44,7 +44,7 @@ function touchButtons(ch) {
     const el = $(id); if (!el) continue;
     el.style.display = ab[k] ? '' : 'none';
     el.classList.toggle('fresh', !!ab[k] && fresh.includes(k));
-    if (fresh.includes(k)) setTimeout(() => el.classList.remove('fresh'), 12000);
+    clearTimeout(el.freshT); if (fresh.includes(k)) el.freshT = setTimeout(() => el.classList.remove('fresh'), 12000);
   }
 }
 
