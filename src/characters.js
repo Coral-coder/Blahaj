@@ -653,32 +653,44 @@ export function createDog() {
   const body = new THREE.Group(); body.position.y = 2.7; g.add(body);
   const torso = part(new THREE.CapsuleGeometry(0.85, 2.6, 10, 20), fur, body, 0, 0, 0); torso.rotation.x = Math.PI / 2;
   part(new THREE.SphereGeometry(0.95, 24, 16), light, body, 0, -0.1, 1.35).scale.set(0.95, 1, 0.8);
-  // neck + head
-  const neck = new THREE.Group(); neck.position.set(0, 0.55, 1.75); body.add(neck);
-  const neckM = part(new THREE.CapsuleGeometry(0.55, 0.9, 8, 16), fur, neck, 0, 0.5, 0.2); neckM.rotation.x = -0.6;
-  const head = new THREE.Group(); head.position.set(0, 1.25, 0.55); neck.add(head);
+  part(new THREE.SphereGeometry(0.9, 22, 16), fur, body, 0, 0.05, -1.3).scale.set(1, 0.95, 1); // rump
+  // neck: a thick tapered column from the shoulders up into the back of the skull,
+  // rounded off at both ends so it flows into the body and head, with a pale chest ruff
+  const neck = new THREE.Group(); neck.position.set(0, 0.45, 1.6); body.add(neck);
+  const NECK_TO = new THREE.Vector3(0, 1.3, 0.62), neckLen = NECK_TO.length();
+  const neckM = part(new THREE.CylinderGeometry(0.5, 0.74, neckLen, 20, 1, true), fur, neck, 0, 0, 0);
+  neckM.position.copy(NECK_TO).multiplyScalar(0.5); neckM.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), NECK_TO.clone().normalize());
+  part(new THREE.SphereGeometry(0.74, 20, 14), fur, neck, 0, 0, 0).scale.set(1, 0.9, 1.05);
+  part(new THREE.SphereGeometry(0.62, 18, 12), light, neck, 0, 0.05, 0.42).scale.set(1.05, 1.25, 0.75); // chest ruff
+  const head = new THREE.Group(); head.position.copy(NECK_TO); neck.add(head);
+  part(new THREE.SphereGeometry(0.52, 18, 12), fur, head, 0, -0.08, -0.32); // where the neck meets the skull
   part(new THREE.SphereGeometry(0.7, 28, 20), fur, head, 0, 0, 0).scale.set(0.95, 0.9, 1);
-  const muzzle = part(new THREE.CapsuleGeometry(0.34, 0.55, 8, 14), light, head, 0, -0.25, 0.7); muzzle.rotation.x = Math.PI / 2;
-  part(new THREE.SphereGeometry(0.17, 14, 10), nose, head, 0, -0.12, 1.22).scale.set(1.2, 0.8, 0.9);
+  const muzzle = part(new THREE.CylinderGeometry(0.27, 0.37, 0.8, 18), light, head, 0, -0.25, 0.68); muzzle.rotation.x = Math.PI / 2;
+  part(new THREE.SphereGeometry(0.27, 16, 12), light, head, 0, -0.25, 1.08).scale.set(1, 0.95, 0.8); // rounded snout end
+  part(new THREE.SphereGeometry(0.17, 14, 10), nose, head, 0, -0.14, 1.27).scale.set(1.2, 0.8, 0.9);
   const jaw = new THREE.Group(); jaw.position.set(0, -0.45, 0.45); head.add(jaw);
   const jawM = part(new THREE.CapsuleGeometry(0.24, 0.45, 6, 12), light, jaw, 0, -0.05, 0.3); jawM.rotation.x = Math.PI / 2;
   const tongue = part(new THREE.CapsuleGeometry(0.13, 0.3, 6, 10), new THREE.MeshPhysicalMaterial({ color: 0xe36d7a, roughness: 0.35, clearcoat: 0.6 }), jaw, 0, -0.12, 0.55); tongue.rotation.x = Math.PI / 2 + 0.5;
-  const eyes = [];
+  const eyes = [], ears = [];
   for (const s of [-1, 1]) {
     eyes.push(part(new THREE.SphereGeometry(0.1, 14, 10), Mat.eye(), head, s * 0.3, 0.18, 0.55));
+    part(new THREE.SphereGeometry(0.12, 10, 8), fur, head, s * 0.3, 0.3, 0.5).scale.set(1.2, 0.5, 0.8); // brows
     const ear = new THREE.Group(); ear.position.set(s * 0.55, 0.25, -0.05); head.add(ear);
     const em = part(new THREE.SphereGeometry(0.42, 16, 12), fur, ear, s * 0.08, -0.45, 0); em.scale.set(0.35, 1, 0.75);
-    ear.rotation.z = s * 0.2;
+    ear.rotation.z = s * 0.2; ears.push(ear);
   }
-  // legs: hips/shoulders pivot, two segments each
+  // legs: hips/shoulders pivot, two segments each; sturdier upper legs, thigh muscle on the back legs
   const legs = [];
   for (const [x, z] of [[-0.5, 1.2], [0.5, 1.2], [-0.5, -1.25], [0.5, -1.25]]) {
+    const front = z > 0;
     const hip = new THREE.Group(); hip.position.set(x, -0.35, z); body.add(hip);
-    const up = part(new THREE.CapsuleGeometry(0.28, 0.9, 6, 12), fur, hip, 0, -0.6, 0);
+    const up = part(new THREE.CapsuleGeometry(front ? 0.3 : 0.33, 0.85, 6, 12), fur, hip, 0, -0.6, 0);
+    if (!front) part(new THREE.SphereGeometry(0.55, 16, 12), fur, hip, x * 0.1, -0.15, -0.05).scale.set(0.8, 1.1, 1.05); // thigh
+    else part(new THREE.SphereGeometry(0.3, 12, 10), light, hip, 0, -0.65, -0.2).scale.set(0.7, 1.4, 0.6); // feathering
     const knee = new THREE.Group(); knee.position.set(0, -1.15, 0); hip.add(knee);
-    part(new THREE.CapsuleGeometry(0.2, 0.75, 6, 12), fur, knee, 0, -0.5, 0);
-    part(new THREE.SphereGeometry(0.26, 14, 10), light, knee, 0, -1.0, 0.1).scale.set(1, 0.6, 1.3);
-    legs.push({ hip, knee, front: z > 0, up });
+    part(new THREE.CapsuleGeometry(0.21, 0.75, 6, 12), fur, knee, 0, -0.5, 0);
+    part(new THREE.SphereGeometry(0.27, 14, 10), light, knee, 0, -1.0, 0.1).scale.set(1, 0.6, 1.3);
+    legs.push({ hip, knee, front, up, low: x < 0 });
   }
   // tail: sticks out behind him (along -z) from the top of his rump, with a
   // slight upward curl at the tip. rotation.x lifts it; rotation.y wags it side
@@ -692,9 +704,18 @@ export function createDog() {
   const TAIL = { // pose -> [lift, sideways, wag amount, wag speed]
     stand: [0.35, 0, 0.55, 9], walk: [0.22, 0, 0.45, 9], carry: [0.4, 0, 0.6, 10], pickup: [0.35, 0, 0.5, 9],
     bow: [0.7, 0, 0.75, 14], shake: [0.7, 0, 0.7, 14], toss: [0.75, 0, 0.6, 12], yawn: [0.25, 0, 0.15, 3],
-    rear: [-0.2, 0, 0.3, 8], sleep: [-0.55, 1.6, 0.06, 1.2],
+    rear: [-0.2, 0, 0.3, 8], sleep: [-0.15, 0.35, 0.04, 1.0],
   };
   const zzz = new THREE.Group(); g.add(zzz);
+  // lying down, keyframed: [progress, body height, pitch, roll, front hip, front knee, rear hip, rear knee,
+  //   lower legs out, upper legs out, neck pitch, neck tilt]
+  const LIE = [
+    [0.00, 2.7, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.05, 0.0],
+    [0.22, 2.25, -0.42, 0.0, 0.42, 0.0, -1.3, 2.25, 0.0, 0.0, -0.15, 0.0],  // sits back on his haunches
+    [0.5, 1.0, 0.0, 0.0, -1.45, 0.15, -1.2, 2.3, 0.0, 0.0, 0.25, 0.0],      // walks his paws out: a sphinx
+    [0.66, 1.0, 0.0, 0.0, -1.45, 0.15, -1.2, 2.3, 0.0, 0.0, 0.45, 0.0],     // a last look round
+    [1.0, 0.95, 0.0, 1.25, -0.2, 0.55, 0.4, 0.6, 0.32, 0.05, 1.2, 0.25],    // and flops onto his side
+  ];
   const dog = {
     group: g, body, head, neck, jaw, tail, legs, mouthPoint: new THREE.Object3D(),
     pose: 'stand', t: 0,
@@ -706,6 +727,12 @@ export function createDog() {
       dog.tailSide = (dog.tailSide || 0) + (side - (dog.tailSide || 0)) * ease;
       tail.rotation.y = dog.tailSide + Math.sin(t * wagHz) * wag;
       tailTip.rotation.y = Math.sin(t * wagHz - 0.9) * wag * 0.5; // the tip follows through
+      if (pose !== 'sleep') { // getting up: undo the roll and the sprawl
+        dog.sleepK = 0;
+        body.rotation.z += (0 - body.rotation.z) * ease; neck.rotation.z += (0 - neck.rotation.z) * ease;
+        legs.forEach((L) => (L.hip.rotation.z += (0 - L.hip.rotation.z) * ease));
+        torso.scale.set(1, 1, 1);
+      }
       if (pose === 'walk' || pose === 'stand' || pose === 'carry' || pose === 'pickup') {
         body.position.y = 2.7 + (speed > 0 ? Math.abs(Math.sin(t * 7)) * 0.08 : 0);
         body.rotation.x += (0 - body.rotation.x) * Math.min(1, dt * 6);
@@ -738,14 +765,33 @@ export function createDog() {
         legs.forEach((L) => { L.hip.rotation.x = L.front ? 0.9 : 0.95; L.knee.rotation.x = L.front ? -0.6 : -0.3; });
         neck.rotation.x = 0.9; jaw.rotation.x = 0.45;
       } else if (pose === 'sleep') {
-        body.position.y = 1.05 + Math.sin(t * 1.4) * 0.04;
-        body.rotation.set(0, 0, 0.08);
+        // lying down like a real dog: sit, walk the front paws out into a sphinx, look round,
+        // then flop over onto his side with a sigh. dt 0 (placed asleep) skips straight to the end.
+        dog.sleepK = dt === 0 ? 1 : Math.min(1, (dog.sleepK || 0) + dt / 2.8);
+        const k = dog.sleepK;
+        let i = 0; while (i < LIE.length - 2 && k > LIE[i + 1][0]) i++;
+        const A = LIE[i], Bk = LIE[i + 1], u = Math.min(1, Math.max(0, (k - A[0]) / (Bk[0] - A[0]))), e = u * u * (3 - 2 * u);
+        const v = (j) => A[j] + (Bk[j] - A[j]) * e;
+        const settled = k >= 1, br = settled ? Math.sin(t * 1.3) : 0; // slow sleepy breathing
+        body.position.y = v(1) + br * 0.025;
+        body.rotation.set(v(2), 0, v(3));
+        torso.scale.set(1 + br * 0.03, 1, 1 + br * 0.03);
         legs.forEach((L) => {
-          if (L.front) { L.hip.rotation.x = -1.45; L.knee.rotation.x = 0.15; }
-          else { L.hip.rotation.x = -1.2; L.knee.rotation.x = 2.3; }
+          L.hip.rotation.x = L.front ? v(4) : v(6);
+          L.knee.rotation.x = L.front ? v(5) : v(7);
+          L.hip.rotation.z = L.low ? v(8) : v(9);
         });
-        neck.rotation.x = 1.0; jaw.rotation.x = 0.0; tongue.visible = false;
-        eyes.forEach((e) => (e.scale.y = 0.12));
+        neck.rotation.x = v(10) + br * 0.02; neck.rotation.z = v(11); neck.rotation.y *= 0.9;
+        jaw.rotation.x = k > 0.8 && k < 0.95 ? 0.18 : 0.0; // the big sigh as he flops over
+        tongue.visible = false;
+        const shut = k > 0.82;
+        eyes.forEach((ey) => (ey.scale.y = shut ? 0.12 : 1));
+        if (settled) { // the odd ear twitch in a dream
+          dog.twitch = (dog.twitch ?? 3) - dt;
+          if (dog.twitch < 0) { dog.twitch = 3 + Math.random() * 5; dog.twitchT = 0.35; }
+          dog.twitchT = Math.max(0, (dog.twitchT || 0) - dt);
+          ears[1].rotation.x = Math.sin(dog.twitchT * 40) * 0.25 * (dog.twitchT > 0 ? 1 : 0);
+        }
       }
     },
   };
