@@ -23,7 +23,9 @@ export const Audio = {
       this.master.connect(lim).connect(this.ctx.destination);
       this.musicGain = this.ctx.createGain();
       this.musicGain.gain.value = 0.55;
-      this.musicGain.connect(this.master);
+      // the game's music -> duck (the music box hushes it) -> music volume (the slider) -> master
+      this.musicDuck = this.ctx.createGain(); this.musicVolume = this.ctx.createGain(); this.musicVolume.gain.value = this.vol ?? 1;
+      this.musicGain.connect(this.musicDuck).connect(this.musicVolume).connect(this.master);
       try { localStorage.getItem('blahaj-muted') === '1' && this.setMuted(true); } catch (e) {}
     },
 
@@ -38,6 +40,9 @@ export const Audio = {
     },
 
     toggleMute() { this.setMuted(!this.muted); return this.muted; },
+    // music volume, 0..1 (the music box's slider; remembered)
+    setMusicVolume(v) { this.vol = v; if (this.musicVolume) this.musicVolume.gain.setTargetAtTime(v, this.ctx.currentTime, 0.05); },
+    duckMusic(on) { if (this.musicDuck) this.musicDuck.gain.setTargetAtTime(on ? 0 : 1, this.ctx.currentTime, 0.4); },
 
     // --- primitive: a short enveloped oscillator -------------------------
     tone(freq, { type = 'sine', dur = 0.15, vol = 0.3, slide = 0, delay = 0, attack = 0.005 } = {}) {
@@ -123,6 +128,7 @@ export const Audio = {
     startMusic(theme = 'edge') {
       if (!this.ctx) return;
       if (!this.music) this.music = createMusic(this.ctx, this.musicGain);
+      this.music.setIntensity(0, 0);
       this.music.start(theme);
       if (this.dream !== undefined) this.music.setDream(this.dream);
     },

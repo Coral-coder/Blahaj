@@ -53,7 +53,7 @@ const THEMES = {
   attic:     { key: -4, bpm: 70, mode: 'dorian', chain: 'moody', start: 'i', lead: 'celesta', color: 'strings', amb: 'wind', goof: 0.4 },
   bed:       { key: 0, bpm: 64, mode: 'major', chain: 'dreamy', start: 'I', lead: 'musicbox', color: 'harp', amb: 'bubbles', goof: 0.6 },
 };
-const THEME_LIST = Object.keys(THEMES);
+export const THEME_LIST = Object.keys(THEMES);
 
 // 16-step rhythms, lazy to chatty
 const RHYTHMS = [
@@ -87,15 +87,15 @@ export function createMusic(ctx, out) {
   echoIn.connect(echo); echo.connect(echoLp).connect(fb).connect(echo); echoLp.connect(bus);
 
   const S = { th: THEMES.edge, step: 0, next: 0, chord: 'I', motif: null, theme: null, phrase: 0, density: 1, dream: 1, timer: null,
-    progress: 0, stage: 0, unlocked: false, lift: 0, tension: 0, energy: 0, eWant: 0, threat: 0, tWant: 0, accents: [] };
+    progress: 0, stage: 0, unlocked: false, lift: 0, tension: 0, energy: 0, eWant: 0, threat: 0, tWant: 0, accents: [], tempoMul: 1, manualStage: null };
   const keyOff = () => S.th.key + S.lift;
   const hz = (semi) => 261.63 * Math.pow(2, (semi + keyOff()) / 12) * (1 + (1 - S.dream) * (rnd() - 0.5) * 0.05);
-  const stepDur = () => 60 / (S.th.bpm * (1 + S.stage * 0.025 + S.energy * 0.14)) / 4 * (S.dream < 0.4 ? 1.08 : 1); // the action pushes the tempo
+  const stepDur = () => 60 / (S.th.bpm * S.tempoMul * (1 + S.stage * 0.025 + S.energy * 0.14)) / 4 * (S.dream < 0.4 ? 1.08 : 1); // the action pushes the tempo
   const dark = () => S.threat > 0.5; // under threat: the theme turns minor
 
   // --- instruments -----------------------------------------------------------------
   const env = (g, t, a, peak, d) => { g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(peak, t + a); g.gain.exponentialRampToValueAtTime(0.0008, t + a + d); };
-  function osc(type, f, t, end, dest) { const o = ctx.createOscillator(); o.type = type; o.frequency.setValueAtTime(f, t); o.connect(dest); o.start(t); o.stop(end + 0.05); return o; }
+  function osc(type, f, t, end, dest) { const o = ctx.createOscillator(); o.type = type; o.frequency.setValueAtTime(Math.min(f, 18000), t); o.connect(dest); o.start(t); o.stop(end + 0.05); return o; }
   function voice(dest, pan = 0) { // a gain into the bus, optionally panned
     const g = ctx.createGain();
     if (pan && ctx.createStereoPanner) { const p = ctx.createStereoPanner(); p.pan.value = pan; g.connect(p).connect(dest); } else g.connect(dest);
@@ -343,7 +343,8 @@ export function createMusic(ctx, out) {
       const tr = mkRng(Array.from(id).reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) >>> 0, 7)); // the leitmotif is the same every time you play the chapter
       S.theme = makeMotif(tr); S.motif = null;
       S.step = 0; S.chord = S.th.start; S.phrase = 0; S.stage = 0; S.pendingStage = 0; S.progress = 0; S.unlocked = false; S.lift = 0;
-      S.energy = S.eWant = 0; S.threat = S.tWant = 0; S.accents.length = 0;
+      S.energy = S.eWant; S.threat = S.tWant; S.accents.length = 0; // (the music box starts a theme already at its settings; the game resets them itself)
+      if (S.manualStage !== null) S.stage = S.pendingStage;
       S.next = ctx.currentTime + 0.15;
       const tick = () => { while (S.next < ctx.currentTime + 0.5) { scheduleStep(S.next, S.step++); S.next += stepDur(); } };
       tick(); S.timer = setInterval(tick, 120);
@@ -351,6 +352,7 @@ export function createMusic(ctx, out) {
     stop() { if (S.timer) clearInterval(S.timer); S.timer = null; },
     // how far through the level you are (0..1), and whether the way out is open
     setProgress(p, unlocked = false) {
+      if (S.manualStage !== null) return; // the music box has the layers
       S.progress = Math.max(S.progress, p);
       const want = unlocked ? 5 : Math.min(4, 1 + Math.floor(S.progress * 3.6 + (S.step > 64 ? 0.4 : 0)));
       S.pendingStage = Math.max(S.pendingStage ?? 0, S.step < 32 ? Math.min(want, 1) : want);
@@ -364,6 +366,9 @@ export function createMusic(ctx, out) {
       water.frequency.setTargetAtTime(700 + S.dream * 1400 + E * 1100, t, 0.6);
     },
     accent(kind) { if (S.timer && S.accents.length < 3) S.accents.push(kind); },
+    // the music box's own knobs: tempo (a multiplier) and how many layers play (0..5, or null to follow the game)
+    setTempo(m) { S.tempoMul = Math.max(0.5, Math.min(1.6, m)); },
+    setLayers(n) { S.manualStage = n; if (n !== null) S.pendingStage = Math.max(0, Math.min(5, Math.round(n))); },
     // 1 = sweet dream, 0 = nightmare: the water gets murky and the tuning wobbles
     setDream(d) {
       S.dream = d;

@@ -9,6 +9,7 @@ import { loadBlahajModel } from './art.js';
 import { ITEMS } from './features.js';
 import { CINES, restingHug } from './cinematics.js';
 import { pilot, routeFor, STEP } from './autopilot.js';
+import { createMusicBox } from './musicbox.js';
 
 const $ = (id) => document.getElementById(id);
 // The self-playing build (branch claude/blahaj-autoplay) flips this on: Begin
@@ -75,7 +76,7 @@ const input = new Input($('game'));
 let game = null, mode = 'title', current = 0, story = false;
 
 function show(id) {
-  ['title', 'how', 'chapters', 'pause', 'complete', 'ending'].forEach((s) => $(s).classList.toggle('hidden', s !== id));
+  ['title', 'how', 'chapters', 'pause', 'complete', 'ending', 'musicbox'].forEach((s) => $(s).classList.toggle('hidden', s !== id));
   $('hud').classList.toggle('hidden', !(id === null && mode === 'play'));
   $('touch').classList.toggle('off', !(id === null && mode === 'play'));
 }
@@ -261,6 +262,34 @@ function cycleQuality() {
   document.querySelectorAll('.qbtn').forEach((b) => (b.textContent = qualityLabel()));
 }
 
+// -------------------------------------------------------------- music box --
+const box = createMusicBox({ titles: Object.fromEntries(CHAPTERS.map((c, i) => [c.id, `<small>Chapter ${i + 1}</small>${c.title}`])), onChange: syncBox });
+let boxFrom = 'title';
+const SLIDERS = { mbEnergy: 'energy', mbMood: 'mood', mbTempo: 'tempo', mbWater: 'water' };
+function syncBox() { // the sliders show where the music is (in Auto you can watch them drift)
+  $('mbTheme').innerHTML = box.title;
+  for (const id in SLIDERS) if (document.activeElement !== $(id)) $(id).value = Math.round(box.params[SLIDERS[id]] * 100);
+  if (document.activeElement !== $('mbLayers')) $('mbLayers').value = box.params.layers;
+  $('mbAuto').classList.toggle('on', box.auto); $('mbAuto').textContent = box.auto ? '✨ Auto: on' : '✨ Auto';
+}
+function openBox(from) {
+  boxFrom = from;
+  $('mbVol').value = Math.round((save.musicVol ?? 1) * 100);
+  box.open(game && from === 'pause' ? CHAPTERS[current].id : 'edge');
+  syncBox(); show('musicbox');
+}
+function closeBox() { box.close(); show(boxFrom); }
+for (const id in SLIDERS) $(id).oninput = (e) => box.set(SLIDERS[id], e.target.value / 100);
+$('mbLayers').oninput = (e) => box.set('layers', +e.target.value);
+$('mbVol').oninput = (e) => { save.musicVol = e.target.value / 100; Audio.setMusicVolume(save.musicVol); persist(); };
+$('mbPrev').onclick = () => box.step(-1);
+$('mbNext').onclick = () => box.step(1);
+$('mbAuto').onclick = () => box.toggleAuto();
+$('mbBack').onclick = () => { Audio.click(); closeBox(); };
+$('btnMusic').onclick = () => { Audio.init(); Audio.click(); openBox('title'); };
+$('btnPauseMusic').onclick = () => { Audio.click(); openBox('pause'); };
+Audio.vol = save.musicVol ?? 1; // the music volume you chose, for when the sound starts up
+
 // ----------------------------------------------------------------- wiring --
 $('btnStart').onclick = () => { Audio.init(); Audio.click(); story = true; startChapter(AUTOPLAY || !save.completed[0] ? 0 : Math.max(0, CHAPTERS.findIndex((c, i) => !save.completed[i])), true); };
 $('btnChapters').onclick = () => { Audio.init(); Audio.click(); buildChapterList(); show('chapters'); };
@@ -278,6 +307,7 @@ document.querySelectorAll('.qbtn').forEach((b) => { b.textContent = qualityLabel
 
 addEventListener('keydown', (e) => {
   idleT = 0;
+  if (!$('musicbox').classList.contains('hidden') && e.code !== 'KeyM') { if (e.code === 'Escape') closeBox(); return; } // in the music box: Escape leaves it, M still mutes
   if (mode === 'demo') { e.preventDefault(); endDemo(e.code === 'Space' || e.code === 'Enter'); return; } // space starts the game; any other key, back to the title
   if (e.code === 'KeyM') { Audio.init(); const m = Audio.toggleMute(); hooks.toast(m ? '🔇 Sound off' : '🔊 Sound on'); }
   if (mode === 'cine' && (e.code === 'Enter' || e.code === 'Escape')) { skipCine(); return; }
@@ -435,7 +465,7 @@ loading(true);
 loadBlahajModel().then(() => { startTitle(); requestAnimationFrame(frame); });
 
 window.__blahaj = {
-  get game() { return game; }, get mode() { return mode; }, save, debug, CHAPTERS, auto, startDemo, ATTRACT,
+  get game() { return game; }, get mode() { return mode; }, save, debug, CHAPTERS, auto, startDemo, ATTRACT, box,
   startChapter, skipCine, startTitle,
   // the playtest: play a whole route right now, stepping the game as fast as it will go
   runRoute(route) { const it = pilot(game, route); for (;;) { const r = it.next(); if (r.done) return { ...r.value, mode }; this.sim(STEP); } },
