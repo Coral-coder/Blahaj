@@ -5,7 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Blåhaj: Back to Bed</title>
 <meta name="description" content="A story platformer: a plush shark tumbles off a sleeping child's bed and must climb back before the nightmares reach him.">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦈</text></svg>">
+<link rel="icon" href="favicon.ico" sizes="48x48">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,800&family=Nunito:wght@600;700;800;900&family=Press+Start+2P&display=swap" rel="stylesheet">
 <style>
@@ -36,6 +38,19 @@
   #title .credit { font-size: 12px; opacity: .75; margin-top: 14px; }
   #title .credit a { color: #d9def5; }
 
+  /* the music box */
+  .mb { max-width: 620px; }
+  .mbTheme { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 6px 0 14px; }
+  .mbTheme .btn { margin: 0; }
+  #mbTheme { min-width: 220px; text-align: center; font-family: Fraunces, Georgia, serif; font-weight: 800; font-size: 22px; color: #fff4dc; }
+  #mbTheme small { display: block; font-family: Nunito, sans-serif; font-size: 12px; letter-spacing: 3px; text-transform: uppercase; color: var(--gold); }
+  .mbSliders { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 22px; margin: 4px 0 18px; text-align: left; }
+  @media (max-width: 560px) { .mbSliders { grid-template-columns: 1fr; } #mbTheme { min-width: 0; font-size: 19px; } }
+  .mbSliders label { display: flex; flex-direction: column; gap: 4px; font-weight: 900; font-size: 15px; }
+  .mbSliders label em { font-style: normal; font-weight: 700; font-size: 12px; color: var(--muted); margin-left: 6px; }
+  .mbSliders input[type=range] { width: 100%; accent-color: var(--gold); height: 22px; cursor: pointer; }
+  #mbAuto.on { background: linear-gradient(180deg, #d7c2ff, #9a6bff); color: #160b33; box-shadow: 0 0 26px rgba(154,107,255,.7); animation: mbGlow 2.4s ease-in-out infinite; }
+  @keyframes mbGlow { 50% { box-shadow: 0 0 40px rgba(154,107,255,.95); } }
   .chapters { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 10px; margin: 10px 0 16px; }
   #chapters .card { max-width: 1060px; max-height: calc(100vh - 40px); overflow-y: auto; }
   .chap { font: inherit; text-align: left; color: var(--ink); background: rgba(255,255,255,.06); border: 1px solid var(--edge); border-radius: 16px; padding: 14px; cursor: pointer; display: flex; flex-direction: column; gap: 4px; transition: transform .12s, background .12s; }
@@ -142,6 +157,7 @@
       <button class="btn" id="btnStart">▶ Begin</button>
       <button class="btn ghost" id="btnChapters">Chapters</button>
       <button class="btn ghost" id="btnHow">How to play</button>
+      <button class="btn ghost" id="btnMusic">🎵 Music</button>
       <button class="btn ghost small qbtn">Graphics</button>
       <div class="credit">Blåhaj 3D model: <a href="https://sketchfab.com/3d-models/blahaj-ce981de49111488c81ea646067abe1ec" target="_blank" rel="noopener">“Blahaj”</a> by <a href="https://sketchfab.com/Kaine_G" target="_blank" rel="noopener">Kaine_G</a>, <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a> (animated and re-materialled) · <kbd>M</kbd> sound</div>
     </div>
@@ -160,10 +176,27 @@
     <div class="card"><h2>Chapters</h2><div class="chapters" id="chapterGrid"></div><button class="btn ghost" id="btnChaptersBack">Back</button> <button class="btn ghost small qbtn">Graphics</button></div>
   </div>
 
+  <div id="musicbox" class="screen hidden">
+    <div class="card mb">
+      <h2>🎵 The Music Box</h2>
+      <p style="margin-top:-6px">Play with Blåhaj’s dream music, or press <b>Auto</b> and let it dream up its own, drifting from tune to tune.</p>
+      <div class="mbTheme"><button class="btn ghost small" id="mbPrev" aria-label="Previous theme">◀</button><div id="mbTheme"></div><button class="btn ghost small" id="mbNext" aria-label="Next theme">▶</button></div>
+      <div class="mbSliders">
+        <label>Volume<input type="range" id="mbVol" min="0" max="100"></label>
+        <label><span>Energy<em>calm ↔ wild</em></span><input type="range" id="mbEnergy" min="0" max="100"></label>
+        <label><span>Mood<em>bright ↔ dark</em></span><input type="range" id="mbMood" min="0" max="100"></label>
+        <label><span>Tempo<em>slow ↔ quick</em></span><input type="range" id="mbTempo" min="0" max="100"></label>
+        <label><span>Layers<em>sparse ↔ full</em></span><input type="range" id="mbLayers" min="0" max="5" step="1"></label>
+        <label><span>Water<em>clear ↔ deep</em></span><input type="range" id="mbWater" min="0" max="100"></label>
+      </div>
+      <button class="btn" id="mbAuto">✨ Auto</button><button class="btn ghost" id="mbBack">Back</button>
+    </div>
+  </div>
+
   <div id="pause" class="screen hidden">
     <div class="card" style="max-width:420px"><h2>Paused</h2><p>Leo is still asleep. Take a breath.</p>
       <div class="controls" id="pauseControls" style="grid-template-columns:1fr;text-align:left;font-size:14px"></div>
-      <button class="btn" id="btnResume">Resume</button><button class="btn ghost" id="btnRestart">Restart chapter</button><button class="btn ghost" id="btnQuit">Title</button><br><button class="btn ghost small qbtn">Graphics</button></div>
+      <button class="btn" id="btnResume">Resume</button><button class="btn ghost" id="btnRestart">Restart chapter</button><button class="btn ghost" id="btnQuit">Title</button><br><button class="btn ghost small qbtn">Graphics</button> <button class="btn ghost small" id="btnPauseMusic">🎵 Music</button></div>
   </div>
   <div id="complete" class="screen hidden"></div>
   <div id="ending" class="screen hidden">

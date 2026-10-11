@@ -4,6 +4,8 @@ import * as THREE from 'three';
 import { Audio } from './audio.js';
 import { createDog } from './characters.js';
 import { createTumble, BLAHAJ_COM, blahajSpheres } from './tumble.js';
+import { createMoth } from './features.js';
+import { softDotTexture } from './textures.js';
 
 const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 const ease = (t) => (t < 0 ? 0 : t > 1 ? 1 : t * t * (3 - 2 * t));
@@ -663,4 +665,96 @@ export function ending(game, hooks) {
   return c;
 }
 
-export const CINES = { prologue, dog: dogSnatch, downstairs, kitchen: kitchenIntro, laundry: laundryIntro, backyard: backyardIntro, garage: garageIntro, basement: basementIntro, hallway: hallwayIntro, bathroom: bathroomIntro, parents: parentsIntro, playroom: playroomIntro, attic: atticIntro, stairs: stairsIntro, bed: bedIntro, ending };
+// After the Moth Queen's third stomp: she tumbles out of the air (her crown pops off
+// and clatters to the floor), bursts in a flash of light, and what's left is just
+// a little pale moth. It flutters up to the round window and away to the moon, and
+// the camera turns to the door to Leo's room.
+export function queenFalls(game, hooks) {
+  const Q = game.enemies.find((e) => e.type === 'boss'), P = game.p, R = game.ch.room;
+  const c = base(hooks, [
+    [0.3, 'The Moth Queen tumbles out of the air…'], [2.9, '…and her nightmare bursts like a soap bubble.'],
+    [4.7, 'Underneath, she was only a little moth. Scared of the dark, like everyone.'], [7.2, 'Up she flutters, to the moonlight, and away into the night.'],
+    [10.0, 'Through that door is Leo’s room. Nearly home, Blåhaj!'],
+  ], 13.0);
+  hooks.letterbox(true); hooks.fade(false);
+  const cl = THREE.MathUtils.clamp;
+  const inRoom = (v, m = 1.4) => v.set(cl(v.x, R.x0 + m, R.x1 - m), cl(v.y, 0.8, R.h - 1.5), cl(v.z, R.z0 + m, R.z1 - m));
+  const q0 = Q.pos.clone(), land = new THREE.Vector3(cl(q0.x, -9, 9), 0.75, cl(q0.z, -5.5, 5.5));
+  const win = new THREE.Vector3(R.x1 - 0.5, 8.0, 2.6), away = new THREE.Vector3(R.x1 + 4, 9.0, 2.6), door = new THREE.Vector3(R.x1, 3.2, -6.0);
+  const blah = P.pos.clone();
+  const side = new THREE.Vector3(-(land.z - blah.z), 0, land.x - blah.x); if (side.lengthSq() < 0.01) side.set(1, 0, 0); side.normalize();
+  const mid = blah.clone().lerp(q0, 0.5);
+  const fall = q0.clone().lerp(land, 0.5);
+  const cam1a = inRoom(fall.clone().addScaledVector(side, 11).add(new THREE.Vector3(0, 3.5, 0))), cam1b = inRoom(fall.clone().addScaledVector(side, 9).add(new THREE.Vector3(0, 2.2, 0)));
+  const cam2a = inRoom(land.clone().addScaledVector(side, 4.2).add(new THREE.Vector3(0, 1.8, 0))), cam2b = inRoom(land.clone().addScaledVector(side, 3.2).add(new THREE.Vector3(0, 1.2, 0)));
+  const cam3a = inRoom(land.clone().lerp(win, 0.25).add(new THREE.Vector3(-4.5, -1.0, 4.5))), cam3b = inRoom(new THREE.Vector3(win.x - 7.5, 6.8, win.z + 3.5));
+  // the way home: down low on the attic floor, looking at the door (under the rafters)
+  const cam4a = inRoom(new THREE.Vector3(door.x - 13, 3.6, door.z + 7.5)), cam4b = inRoom(new THREE.Vector3(door.x - 10, 2.8, door.z + 5.0));
+  const little = createMoth(0.5, true); little.group.visible = false; game.scene.add(little.group);
+  // the warm light from Leo's room, spilling through the doorway (it stays, to guide you there)
+  const homeGlow = new THREE.Sprite(new THREE.SpriteMaterial({ map: softDotTexture(), color: 0xffc77a, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending }));
+  homeGlow.position.set(door.x - 0.4, 3.0, door.z); homeGlow.scale.set(4.5, 7, 1); game.scene.add(homeGlow);
+  const homeLight = new THREE.PointLight(0xffb866, 0, 9, 1.6); homeLight.position.set(door.x - 1.0, 3.0, door.z); game.scene.add(homeLight);
+  const crown = Q.crown, crownV = new THREE.Vector3(-side.x * 1.6, 5.0, -side.z * 1.6); let crownFree = false, crownRest = false, burst = false;
+  const ctrl = new THREE.Vector3((land.x + win.x) / 2, 10.5, (land.z + win.z) / 2);
+  const bez = (a, b, cc, k) => a.clone().multiplyScalar((1 - k) * (1 - k)).addScaledVector(cc, 2 * (1 - k) * k).addScaledVector(b, k * k);
+  const dropCrown = () => { if (!crownFree) { game.scene.attach(crown); crownFree = true; } };
+  const settleCrown = () => { dropCrown(); crown.position.y = 0.25; crown.rotation.set(0.25, crown.rotation.y, 0.12); crownRest = true; };
+  const finish = () => {
+    Q.s.group.visible = false; Q.cineOwned = false; Q.deadT = 99; homeGlow.material.opacity = 0.55; homeLight.intensity = 6;
+    game.scene.remove(little.group); if (!crownRest) settleCrown(); // her crown stays where it fell: a trophy
+    hooks.subtitle(null); hooks.letterbox(false); game.updateCamera(1, true);
+  };
+  c.finish = () => { c.t = c.length; finish(); };
+  c.update = (dt) => {
+    const t = (c.t += dt), clk = game.clock;
+    c.subtitles(t);
+    game.rig.update(dt, { speed: 0, grounded: true, vx: 0, vy: 0, vz: 0 });
+    // the tumble: spinning, sinking faster and faster, shedding shadow
+    if (t < 2.8) {
+      const k = t / 2.8, kk = k * k;
+      Q.pos.lerpVectors(q0, land, kk); Q.pos.x += Math.sin(t * 4) * 0.4 * (1 - k);
+      Q.s.group.position.copy(Q.pos); Q.s.group.rotation.set(Math.sin(t * 5) * 0.6, Q.heading + t * 3.2, Math.sin(t * 3.7) * 0.5);
+      Q.s.flash = 0.7 * (1 - k); Q.s.update(dt, clk);
+      if (Math.random() < 0.6) game.puffs.emit({ p: Q.pos.clone().add(new THREE.Vector3((Math.random() - 0.5) * 2, 0, (Math.random() - 0.5) * 2)), v: new THREE.Vector3(0, 1.4, 0), life: 1.1, size: 0.9, color: new THREE.Color(0x1a0a2a), alpha: 0.6, drag: 1 });
+      if (t > 0.5) dropCrown();
+      Q.s.fade = k;
+      camShot(game, cam1a, cam1b, q0.clone().lerp(Q.pos, 0.6), Q.pos, seg(t, 0, 2.8), 54);
+    } else if (!burst) { // the nightmare bursts: a flash of light, and there's the little moth
+      burst = true;
+      game.sparks.burst(Q.pos.clone(), 90, { color: new THREE.Color(0xfff1c8), speed: 9, life: 1.3, size: 0.45 });
+      game.puffs.burst(Q.pos.clone(), 40, { color: new THREE.Color(0x2a1340), speed: 6, life: 1.2, size: 0.9, alpha: 0.7 });
+      Q.s.group.visible = false; little.group.visible = true; little.group.position.copy(land);
+      Audio.unlock(); Audio.accent('triumph'); game.cam.shake = 0.3;
+    }
+    // her crown: up, over, and down with a clatter
+    if (crownFree && !crownRest) {
+      crownV.y -= 16 * dt; crown.position.addScaledVector(crownV, dt); crown.rotation.x += dt * 5; crown.rotation.z += dt * 3;
+      if (crown.position.y < 0.25 && crownV.y < 0) { if (Math.abs(crownV.y) > 2) { crownV.y *= -0.4; crownV.x *= 0.5; crownV.z *= 0.5; Audio.tone(1400, { type: 'triangle', dur: 0.12, vol: 0.06 }); } else settleCrown(); }
+    }
+    if (burst) {
+      little.update(dt, clk * (t < 5.6 ? 0.35 : 1));
+      if (t < 5.6) { // it sits a moment, dazed, slowly fanning its wings, then grows into itself
+        little.group.scale.setScalar(0.5 * Math.min(1, 0.3 + (t - 2.8) * 1.4));
+        little.group.position.set(land.x, land.y + Math.sin(t * 2) * 0.05, land.z); little.group.rotation.set(0, Math.atan2(win.x - land.x, win.z - land.z), 0);
+        camShot(game, cam2a, cam2b, land.clone().add(new THREE.Vector3(0, 0.1, 0)), land, seg(t, 2.8, 5.6), 46);
+      } else if (t < 9.8) { // up to the moonlight and out through the round window
+        const k = Math.min(1, (t - 5.6) / 3.3), p = k < 1 ? bez(land, win, ctrl, k * k * (3 - 2 * k)) : win.clone().lerp(away, Math.min(1, (t - 8.9) / 0.9));
+        p.y += Math.sin(t * 9) * 0.12;
+        const prev = little.group.position.clone(); little.group.position.copy(p);
+        const mv = p.clone().sub(prev); if (mv.lengthSq() > 1e-6) little.group.rotation.set(-Math.atan2(mv.y, Math.hypot(mv.x, mv.z)) * 0.5, Math.atan2(mv.x, mv.z), 0);
+        if (t > 8.9) little.group.scale.setScalar(0.5 * Math.max(0.01, 1 - (t - 8.9) / 0.9));
+        if (Math.random() < 0.3) game.sparks.emit({ p: p.clone(), v: new THREE.Vector3(0, -0.3, 0), life: 0.8, size: 0.14, color: new THREE.Color(0xfff1c8), alpha: 0.8, drag: 1 });
+        camShot(game, cam3a, cam3b, land.clone().lerp(p, 0.8), p, seg(t, 5.6, 9.8), 50);
+      } else { // and a look at the way home
+        little.group.visible = false;
+        const k = Math.min(1, (t - 9.8) / 1.2); homeGlow.material.opacity = 0.55 * k; homeLight.intensity = 6 * k;
+        camShot(game, cam4a, cam4b, door.clone().add(new THREE.Vector3(-2, -0.6, 2)), door, seg(t, 9.8, 13.0), 54);
+      }
+    }
+    if (t >= c.length) { c.done = true; finish(); }
+  };
+  return c;
+}
+
+export const CINES = { prologue, queenFalls, dog: dogSnatch, downstairs, kitchen: kitchenIntro, laundry: laundryIntro, backyard: backyardIntro, garage: garageIntro, basement: basementIntro, hallway: hallwayIntro, bathroom: bathroomIntro, parents: parentsIntro, playroom: playroomIntro, attic: atticIntro, stairs: stairsIntro, bed: bedIntro, ending };
