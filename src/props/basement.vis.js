@@ -69,10 +69,10 @@ export const BASEMENT = {
     box(g, w, 0.3, d, Mat.woodBoard(), 0, h - 0.3, 0, 0.03, 0.6);
     box(g, w - 0.1, 0.04, d - 0.1, baize, 0, h, 0, 0.0, 0.6);
     for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) box(g, 0.3, h - 0.3, 0.3, Mat.woodBoard(), sx * (w / 2 - 0.3), 0, sz * (d / 2 - 0.3), 0.03, 1);
-    // the oval of track the train follows
+    // the oval of track the train follows (track: false when the runaway train hazard lays its own)
     const tr = p.track || [-3.8, -2.0, 3.8, 2.0]; // x0 z0 x1 z1 relative
     const rail = Mat.steel(), sleeper = Mat.woodDark();
-    for (const [x0, z0, x1, z1] of [[tr[0], tr[1], tr[2], tr[1]], [tr[2], tr[1], tr[2], tr[3]], [tr[2], tr[3], tr[0], tr[3]], [tr[0], tr[3], tr[0], tr[1]]]) {
+    if (p.track !== false) for (const [x0, z0, x1, z1] of [[tr[0], tr[1], tr[2], tr[1]], [tr[2], tr[1], tr[2], tr[3]], [tr[2], tr[3], tr[0], tr[3]], [tr[0], tr[3], tr[0], tr[1]]]) {
       const len = Math.hypot(x1 - x0, z1 - z0), ax = (x1 - x0) / len, az = (z1 - z0) / len;
       for (let k = 0; k < len; k += 0.5) { const sl = box(g, 1.3, 0.06, 0.2, sleeper, x0 + ax * k, h + 0.04, z0 + az * k, 0.01, 1); sl.rotation.y = Math.atan2(ax, az) + Math.PI / 2; }
       for (const s of [-0.45, 0.45]) { const r = box(g, 0.06, 0.08, len, rail, 0, 0, 0, 0.0, 1); r.position.set((x0 + x1) / 2 - az * s, h + 0.1, (z0 + z1) / 2 + ax * s); r.rotation.y = Math.atan2(ax, az); }
@@ -87,9 +87,12 @@ export const BASEMENT = {
     const flat = box(g, 3.0, 0.2, 2.2, rock, 0, h + mh - 0.2, 0, 0.1, 1); void flat; // a flat little summit you can stand on
     const snow = box(g, 2.6, 0.12, 1.8, new THREE.MeshStandardMaterial({ color: 0xf6f8fb, roughness: 0.9 }), 0, h + mh - 0.02, 0, 0.06, 1); void snow;
     const tunnel = new THREE.Mesh(new THREE.CircleGeometry(0.55, 16, 0, Math.PI), new THREE.MeshBasicMaterial({ color: 0x0c0a0a })); tunnel.position.set(-1.62, h + 0.02, 0); tunnel.rotation.y = -Math.PI / 2; g.add(tunnel);
-    // tiny trees and a house
-    for (let i = 0; i < 6; i++) { const x = -w / 2 + 0.8 + hashf(i, 5) * (w - 1.6), z = (i % 2 ? 1 : -1) * (d / 2 - 0.5); const t = sh(new THREE.Mesh(new THREE.ConeGeometry(0.3, 0.9, 8), Mat.paint(0x2f6b3a, 0.8))); t.position.set(x, h + 0.45, z); g.add(t); }
-    box(g, 0.9, 0.6, 0.7, Mat.paint(0xe5484d, 0.6), w / 2 - 0.7, h, 0, 0.04, 1);
+    // tiny trees and a house, tucked into the corners where the train never goes
+    for (const [sx, sz, k] of [[1, 1, 0], [1, -1, 1], [-1, 1, 2], [1, 1, 3], [-1, 1, 4]]) {
+      const t = sh(new THREE.Mesh(new THREE.ConeGeometry(0.28 - k * 0.02, 0.9 - (k > 2 ? 0.25 : 0), 8), Mat.paint(0x2f6b3a, 0.8)));
+      t.position.set(sx * (w / 2 - 0.5 - (k > 2 ? 0.45 : 0)), h + 0.45, sz * (d / 2 - 0.35 - (k > 2 ? 0.05 : 0))); g.add(t);
+    }
+    box(g, 0.7, 0.5, 0.5, Mat.paint(0xe5484d, 0.6), -w / 2 + 0.5, h, -d / 2 + 0.4, 0.04, 1);
     return g;
   },
   toyTrain() {

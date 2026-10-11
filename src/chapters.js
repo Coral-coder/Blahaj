@@ -410,7 +410,7 @@ export const CHAPTERS = [
   // ---------------------------------------------------------------------------
   {
     id: 'basement', title: 'Down in the Basement', music: 1,
-    hazard: { type: 'roamer', kind: 'train', squoval: { x: -7.3, z: 0.4, rx: 2.4, rz: 3.6, n: 4 }, track: true, speed: 4.6, radius: 1.1, top: 1.6, title: 'A runaway toy train, with a nightmare driving!', hint: 'Jump over it, or bounce off its roof', msg: 'Choo-choo! Run over by the train!' },
+    hazard: { type: 'roamer', kind: 'train', squoval: { x: 5.0, z: 1.4, rx: 3.8, rz: 2.15, n: 4 }, y: 3.0, track: true, speed: 3.6, radius: 0.9, top: 1.4, scale: 1.1, title: 'A runaway toy train, with a nightmare driving!', hint: 'Jump over it, or bounce off its roof', msg: 'Choo-choo! Run over by the train!' },
     goalText: 'Find four light bulbs, then ride the dumbwaiter up',
     intro: 'basement',
     room: {
@@ -426,8 +426,7 @@ export const CHAPTERS = [
       { type: 'furnace', x: -2.0, z: -9.8, riser: 3.3 },
       { type: 'duct', x: 2.6, z: -9.0, w: 13.6, y0: 9.8, ceiling: 14 },
       { type: 'waterHeater', x: 11.6, z: -9.6 },
-      { type: 'trainTable', x: 5.0, z: 1.4, mountain: 3.0 },
-      { type: 'toyTrain', x: 1.2, y: 3.0, z: -0.6, move: { path3: [[1.2, 3.0, -0.6], [8.8, 3.0, -0.6], [8.8, 3.0, 3.4], [1.2, 3.0, 3.4]], loop: true, linear: true, speed: 1.6 } },
+      { type: 'trainTable', x: 5.0, z: 1.4, mountain: 3.0, track: false }, // the runaway train (the hazard) lays its squoval of track on it
       { type: 'cardboardBox', x: -1.4, z: 2.0, w: 2.4, d: 2.4, h: 1.8, label: 'TRAINS' },
       { type: 'utilityShelf', x: 13.1, z: -3.2, rot: 3, shelves: [2.6, 5.1, 7.6] },
       { type: 'paintCans', x: 13.2, z: -4.6, rot: 3, y0: 2.6, n: 4, seed: 1 },
