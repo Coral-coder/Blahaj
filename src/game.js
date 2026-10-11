@@ -789,10 +789,12 @@ export class Game {
     for (const e of hostiles) { const d = e.pos.distanceTo(P.pos); if (d < near) near = d; if (e.chase) chase = true; if (e.type === 'boss') boss = e; }
     const hz = this.hazard, hzOn = hz && !hz.calm;
     if (hzOn && hz.car) near = Math.min(near, hz.car.position.distanceTo(P.pos));
+    // only danger that's actually near counts: a nightmare somewhere in the room doesn't darken the
+    // music (the engine already plays lively while any remain). Close by, or chasing you, brings the
+    // heroic adventure chords; right on top of you, or very low comfort, turns it minor.
     const prox = Math.max(0, Math.min(1, 1 - (near - 2) / 10));
-    let threat = hostiles.length ? 0.3 + Math.min(0.2, hostiles.length * 0.04) : hzOn ? 0.25 : 0;
-    threat = Math.max(threat, prox * 0.85) + (chase ? 0.3 : 0) + (1 - this.comfort / 100) * 0.3;
-    if (boss) threat = Math.max(threat, 0.72 + (boss.maxHp - boss.hp) * 0.12);
+    let threat = prox * 0.72 + (chase ? 0.25 : 0) + Math.max(0, 30 - this.comfort) / 30 * 0.35;
+    if (boss) threat = Math.max(threat, 0.6 + (boss.maxHp - boss.hp) * 0.12); // the Queen: adventure, then minor once she's furious
     const act = Math.min(1, Math.hypot(P.vel.x, P.vel.z) / CFG.run) * 0.16 + (P.grounded ? 0 : 0.08) + (P.dashT > 0 ? 0.12 : 0);
     return [Math.min(1, threat * 0.75 + act + this.musicPulse), Math.min(1, threat)];
   }
