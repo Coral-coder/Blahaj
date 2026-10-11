@@ -103,7 +103,7 @@ const V = {
     knob(g, 0, 2.0, 1.1);
     // alarm clock with glowing digits
     const clock = box(g, 0.8, 0.5, 0.35, Mat.plastic(0x2b2f3a), 0.45, 2.7, 0.35, 0.08, 1);
-    const digits = new THREE.Mesh(new THREE.PlaneGeometry(0.62, 0.3), new THREE.MeshBasicMaterial({ map: textTexture(['2:13'], { w: 256, h: 128, font: '700 88px monospace', color: '#ff6b4a' }), transparent: true }));
+    const digits = new THREE.Mesh(new THREE.PlaneGeometry(0.62, 0.3), new THREE.MeshBasicMaterial({ map: textTexture(['3:21'], { w: 256, h: 128, font: '700 88px monospace', color: '#ff6b4a' }), transparent: true }));
     digits.position.set(0.45, 2.95, 0.53); g.add(digits);
     box(g, 0.9, 0.18, 1.2, Mat.book(0x3f6aa3), -0.3, 2.7, -0.3, 0.02, 2);
     return g;

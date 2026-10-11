@@ -45,7 +45,7 @@ export const KITCHEN = {
       knobBar(g, sx, h - 1.15, d / 2 + 0.2, 2.2);
       for (let i = 0; i < 4; i++) cyl(g, 0.12, 0.12, 0.12, Mat.steel(), sx - 0.9 + i * 0.6, h - 0.6, d / 2 + 0.1, 12).rotation.x = Math.PI / 2;
       // a clock glowing on the oven
-      const clock = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 0.25), new THREE.MeshBasicMaterial({ map: textTexture(['2:13'], { w: 128, h: 64, font: '700 44px monospace', color: '#4dd0ff' }), transparent: true }));
+      const clock = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 0.25), new THREE.MeshBasicMaterial({ map: textTexture(['3:21'], { w: 128, h: 64, font: '700 44px monospace', color: '#4dd0ff' }), transparent: true }));
       clock.position.set(sx, h - 0.6, d / 2 + 0.13); g.add(clock);
     }
     return g;
