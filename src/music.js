@@ -1,124 +1,263 @@
-// Generative background music: mellow, underwater, a little goofy, and it grows
-// as you play. Every chapter has its own theme: key, tempo, mode, a leitmotif
-// (a short tune that keeps coming back, varied), its own instruments and a bit
-// of ambience. The music starts sparse and builds in stages as you make
-// progress through the level (setProgress 0..1); when the way out opens the key
-// lifts and the theme sings out in full. Chords wander a weighted chain, the
-// melody answers and varies itself, and everything plays through a slowly
-// swaying low-pass ("under water") into a big generated reverb. The dream level
-// murks the water and detunes it as the nightmares close in.
+// Blåhaj music engine (v3): generative, but written the way a songwriter would.
 //
-// On top of that the music plays to the action (setIntensity: energy, threat).
-// Energy is how hard the game is going right now: nightmares near or chasing,
-// the room's runaway nightmare, the Moth Queen, Blåhaj zooming about, poofs
-// and hits. It drives the rhythm section: a pulsing bass, hats, kick and
-// snare, 16th-note arpeggios and offbeat stabs, fills and crashes, a push in
-// tempo and a brighter, punchier mix. Threat darkens the harmony: the theme
-// turns to its minor and the chords borrow from a tense chain. When the room
-// is clear and Blåhaj takes it easy, it all eases back to the calm theme.
+// FORM. Every theme plays a 32-bar AABA song, then round again:
+//   A  - an 8-bar period. Antecedent (bars 1-4) asks a question and ends on a
+//        half cadence (on V); the consequent (bars 5-8) starts the same way and
+//        answers with a perfect authentic cadence (ii/IV - V7 - I, melody home on
+//        the tonic).
+//   A' - the same tune again, a little more ornamented.
+//   B  - the bridge: new harmony (subdominant and relative-minor colours), a
+//        smoother tune, ending on V7 so the return feels inevitable.
+//   A  - home again; the last time round it can close with a plagal "amen" (IV - I).
+//
+// HARMONY. Chords are scale-degree triads (and V7) chosen from functional
+// templates: tonic -> pre-dominant -> dominant -> tonic. Minor keys borrow the
+// raised leading tone for V and vii°. The pad moves to whichever voicing of the
+// next chord is closest (smooth voice leading); the bass takes the roots.
+//
+// RHYTHM. Everything sits on a grid in the theme's meter (4/4, 3/4 or 6/8). The
+// melody is built from a one-bar rhythmic motif that repeats (bars 1, 3, 5, 7)
+// with an answering bar between, and long notes at cadences. Bass, arpeggio
+// (Alberti / broken chords) and drums are fixed patterns that repeat every bar;
+// fills happen only in the last bar of a phrase, crashes only on its downbeat.
+//
+// MELODY. Strong beats take chord tones, weak beats step between them (passing
+// and neighbour notes from the scale). Each phrase arches up and comes back down
+// to its cadence note: scale degree 2 or 5 over the half cadence, 1 over the
+// authentic cadence (approached by step from 2 or 7).
+//
+// The game steers it: setProgress (layers build as you play), setIntensity
+// (energy -> rhythmic density and drums; threat -> the parallel minor, switched
+// at phrase boundaries), accent (a quantized musical hit), setDream (the water).
 
-// --- scales and chords ---------------------------------------------------------
-const MODES = {
-  major: [0, 2, 4, 7, 9], lydian: [0, 2, 4, 6, 7, 9, 11], dorian: [0, 2, 3, 5, 7, 9, 10],
-  mixo: [0, 2, 4, 5, 7, 9, 10], minor: [0, 3, 5, 7, 10], wholetone: [0, 2, 4, 6, 8, 10],
+// --- theory ---------------------------------------------------------------------
+const SCALES = { major: [0, 2, 4, 5, 7, 9, 11], minor: [0, 2, 3, 5, 7, 8, 10] };
+const NOTE = ['C', 'C♯', 'D', 'E♭', 'E', 'F', 'F♯', 'G', 'A♭', 'A', 'B♭', 'B'];
+// roman numeral -> [scale-degree root (0-6), seventh?]; quality comes from the scale
+const ROMAN = { I: [0], ii: [1], iii: [2], IV: [3], V: [4], V7: [4, 1], vi: [5], 'vii°': [6] };
+const MINOR_NAME = { I: 'i', ii: 'ii°', iii: 'III', IV: 'iv', V: 'V', V7: 'V7', vi: 'VI', 'vii°': 'vii°' };
+
+// phrase templates, one entry per bar; two chords in a bar split it in half
+const ANTECEDENT = [ // ends on a half cadence (V)
+  [['I'], ['IV'], ['ii'], ['V']], [['I'], ['vi'], ['IV'], ['V']],
+  [['I'], ['V'], ['vi'], ['V']], [['I'], ['ii'], ['I'], ['V']],
+];
+const CONSEQUENT = [ // ends on a perfect authentic cadence (V7 - I)
+  [['I'], ['vi'], ['ii', 'V7'], ['I']], [['I'], ['IV'], ['ii', 'V7'], ['I']],
+  [['I'], ['iii'], ['IV', 'V7'], ['I']], [['vi'], ['IV'], ['ii', 'V7'], ['I']],
+];
+const BRIDGE = [ // eight bars away from home, ending on the dominant
+  [['IV'], ['I'], ['IV'], ['I'], ['vi'], ['ii'], ['IV'], ['V7']],
+  [['vi'], ['iii'], ['IV'], ['I'], ['ii'], ['vi'], ['IV'], ['V']],
+  [['IV'], ['V'], ['iii'], ['vi'], ['ii'], ['V'], ['I'], ['V7']],
+];
+const AMEN = [['I'], ['IV'], ['IV'], ['I']]; // a plagal tag to finish
+
+// meters: beats per bar, grid steps per beat (16ths; 6/8 counts dotted-quarter beats)
+const METERS = {
+  '4/4': { beats: 4, spb: 4, strong: [0, 8], medium: [4, 12] },
+  '3/4': { beats: 3, spb: 4, strong: [0], medium: [4, 8] },
+  '6/8': { beats: 2, spb: 6, strong: [0], medium: [6] },
 };
-const CHORDS = {
-  I: [0, 4, 7, 11, 14], IV: [5, 9, 12, 16, 19], vi: [9, 12, 16, 19, 23], ii: [2, 5, 9, 12, 16],
-  iii: [4, 7, 11, 14, 19], V: [7, 12, 14, 17, 21], bVII: [10, 14, 17, 21, 24], II: [2, 6, 9, 13, 16],
-  i: [0, 3, 7, 10, 14], iv: [5, 8, 12, 15, 19], bVI: [8, 12, 15, 19, 22], bIII: [3, 7, 10, 14, 17],
-};
-const CHAINS = {
-  happy: { I: { IV: 4, vi: 3, ii: 2, iii: 1, bVII: 1 }, IV: { I: 3, V: 2, ii: 2, vi: 1, bVII: 1 }, vi: { IV: 3, ii: 3, V: 1, iii: 1 }, ii: { V: 4, IV: 1, I: 1 }, iii: { vi: 3, IV: 2 }, V: { I: 5, vi: 2, IV: 1 }, bVII: { IV: 2, I: 3 } },
-  dreamy: { I: { II: 3, IV: 2, iii: 2 }, II: { I: 2, IV: 2, vi: 1 }, IV: { I: 3, iii: 1, II: 1 }, iii: { IV: 2, vi: 2 }, vi: { II: 2, IV: 2 } },
-  moody: { i: { iv: 3, bVI: 3, bVII: 2, bIII: 1 }, iv: { i: 3, bVII: 2, bVI: 1 }, bVI: { bVII: 3, iv: 1, bIII: 1 }, bVII: { i: 3, bIII: 2 }, bIII: { bVI: 2, iv: 2, bVII: 1 } },
-  // nightmares about: borrowed minor colours with a dramatic major V
-  tense: { i: { bVI: 3, iv: 2, bVII: 2, V: 1 }, bVI: { bVII: 3, iv: 1, V: 1 }, bVII: { i: 3, V: 1, bVI: 1 }, iv: { V: 2, i: 2, bVI: 1 }, V: { i: 4, bVI: 1 } },
+// one-bar melodic rhythm cells (1 = a note starts here); 'cad' is the cadence bar
+const CELLS = {
+  '4/4': {
+    a: [[1, 0, 0, 0, 1, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0, 0], [1, 0, 0, 0, 0, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 0], [1, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 1, 0]],
+    b: [[1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0], [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0, 1, 0, 0, 0], [0, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0, 0]],
+    cad: [[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0]],
+    smooth: [[1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0], [1, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0]],
+  },
+  '3/4': {
+    a: [[1, 0, 0, 0, 1, 0, 1, 0, 1, 0, 0, 0], [1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0], [1, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0, 0]],
+    b: [[1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 0], [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0]],
+    cad: [[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]],
+    smooth: [[1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0], [1, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0]],
+  },
+  '6/8': {
+    a: [[1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0], [1, 0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0], [1, 0, 0, 0, 0, 0, 1, 0, 1, 0, 1, 0]],
+    b: [[1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0], [1, 0, 0, 0, 1, 0, 1, 0, 1, 0, 1, 0]],
+    cad: [[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0]],
+    smooth: [[1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0]],
+  },
 };
 
-// --- chapter themes --------------------------------------------------------------
-// lead: who sings the leitmotif; color: extra texture instrument; amb: ambience
+// --- chapter themes ---------------------------------------------------------------
+// key: tonic (semitones from C), mode, meter, tempo, who sings the tune, the
+// accompaniment colour, a little of the room in time with it, and how goofy
 const THEMES = {
-  edge:      { key: 0, bpm: 72, mode: 'major', chain: 'happy', start: 'I', lead: 'kalimba', color: 'musicbox', amb: 'bubbles', goof: 0.9 },
-  downstairs:{ key: -3, bpm: 76, mode: 'mixo', chain: 'happy', start: 'I', lead: 'marimba', color: 'rhodes', amb: 'fire', goof: 1 },
-  kitchen:   { key: 2, bpm: 86, mode: 'major', chain: 'happy', start: 'I', lead: 'marimba', color: 'pizz', amb: 'drips', goof: 1.4 },
-  laundry:   { key: -2, bpm: 80, mode: 'mixo', chain: 'happy', start: 'I', lead: 'kalimba', color: 'glock', amb: 'churn', goof: 1.3 },
-  backyard:  { key: 5, bpm: 70, mode: 'lydian', chain: 'dreamy', start: 'I', lead: 'flute', color: 'harp', amb: 'crickets', goof: 0.7 },
-  garage:    { key: -5, bpm: 82, mode: 'dorian', chain: 'moody', start: 'i', lead: 'rhodes', color: 'pizz', amb: 'buzz', goof: 0.9 },
-  basement:  { key: -7, bpm: 66, mode: 'minor', chain: 'moody', start: 'i', lead: 'celesta', color: 'harp', amb: 'chuff', goof: 0.5 },
-  stairs:    { key: 0, bpm: 96, mode: 'major', chain: 'happy', start: 'I', lead: 'marimba', color: 'harp', amb: 'clock', goof: 0.6 },
-  hallway:   { key: 3, bpm: 74, mode: 'lydian', chain: 'dreamy', start: 'I', lead: 'flute', color: 'musicbox', amb: 'clock', goof: 0.8 },
-  bathroom:  { key: 1, bpm: 78, mode: 'major', chain: 'happy', start: 'I', lead: 'kalimba', color: 'glock', amb: 'drips', goof: 1.5 },
-  parents:   { key: -1, bpm: 68, mode: 'major', chain: 'dreamy', start: 'I', lead: 'musicbox', color: 'rhodes', amb: 'snore', goof: 1.1 },
-  playroom:  { key: 4, bpm: 90, mode: 'major', chain: 'happy', start: 'I', lead: 'glock', color: 'pizz', amb: 'toys', goof: 1.6 },
-  attic:     { key: -4, bpm: 70, mode: 'dorian', chain: 'moody', start: 'i', lead: 'celesta', color: 'strings', amb: 'wind', goof: 0.4 },
-  bed:       { key: 0, bpm: 64, mode: 'major', chain: 'dreamy', start: 'I', lead: 'musicbox', color: 'harp', amb: 'bubbles', goof: 0.6 },
+  edge:      { key: 0, mode: 'major', meter: '4/4', bpm: 76, lead: 'kalimba', color: 'musicbox', amb: 'bubbles', goof: 0.8 },
+  downstairs:{ key: -3, mode: 'major', meter: '4/4', bpm: 84, lead: 'marimba', color: 'rhodes', amb: 'fire', goof: 1 },
+  kitchen:   { key: 2, mode: 'major', meter: '4/4', bpm: 96, lead: 'marimba', color: 'pizz', amb: 'drips', goof: 1.3 },
+  laundry:   { key: -2, mode: 'major', meter: '6/8', bpm: 62, lead: 'kalimba', color: 'glock', amb: 'churn', goof: 1.2 },
+  backyard:  { key: 5, mode: 'major', meter: '6/8', bpm: 54, lead: 'flute', color: 'harp', amb: 'crickets', goof: 0.6 },
+  garage:    { key: -5, mode: 'minor', meter: '4/4', bpm: 88, lead: 'rhodes', color: 'pizz', amb: 'buzz', goof: 0.8 },
+  basement:  { key: -7, mode: 'minor', meter: '6/8', bpm: 52, lead: 'celesta', color: 'harp', amb: 'chuff', goof: 0.4 },
+  stairs:    { key: 0, mode: 'major', meter: '4/4', bpm: 104, lead: 'marimba', color: 'harp', amb: 'clock', goof: 0.5 },
+  hallway:   { key: 3, mode: 'major', meter: '3/4', bpm: 96, lead: 'flute', color: 'musicbox', amb: 'clock', goof: 0.7 },
+  bathroom:  { key: 1, mode: 'major', meter: '4/4', bpm: 88, lead: 'kalimba', color: 'glock', amb: 'drips', goof: 1.4 },
+  parents:   { key: -1, mode: 'major', meter: '3/4', bpm: 84, lead: 'musicbox', color: 'rhodes', amb: 'snore', goof: 1 },
+  playroom:  { key: 4, mode: 'major', meter: '4/4', bpm: 100, lead: 'glock', color: 'pizz', amb: 'toys', goof: 1.5 },
+  attic:     { key: -4, mode: 'minor', meter: '4/4', bpm: 78, lead: 'celesta', color: 'strings', amb: 'wind', goof: 0.3 },
+  bed:       { key: 0, mode: 'major', meter: '3/4', bpm: 72, lead: 'musicbox', color: 'harp', amb: 'bubbles', goof: 0.5 },
 };
 export const THEME_LIST = Object.keys(THEMES);
+export { THEMES };
 
-// 16-step rhythms, lazy to chatty
-const RHYTHMS = [
-  [1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0], [1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0],
-  [0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0], [1, 0, 1, 0, 0, 0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0],
-  [1, 0, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0], [0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0],
-];
-const BASS = [[1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0], [1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0], [1, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0]];
-
-const pick = (w, r) => { let s = 0; for (const k in w) s += w[k]; let x = r() * s; for (const k in w) { x -= w[k]; if (x <= 0) return k; } return Object.keys(w)[0]; };
 const mkRng = (seed) => () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+const hashStr = (s) => Array.from(s).reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) >>> 0, 7);
+const pickOf = (arr, r) => arr[Math.floor(r() * arr.length)];
 
 export function createMusic(ctx, out) {
   const rnd = mkRng((Math.random() * 1e9) | 0);
 
   // --- the bus: instruments -> underwater low-pass (swaying) -> dry + reverb -> out
   const bus = ctx.createGain(); bus.gain.value = 1;
-  const water = ctx.createBiquadFilter(); water.type = 'lowpass'; water.frequency.value = 2100; water.Q.value = 0.6;
+  const water = ctx.createBiquadFilter(); water.type = 'lowpass'; water.frequency.value = 2400; water.Q.value = 0.6;
   const sway = ctx.createOscillator(); sway.frequency.value = 0.11;
-  const swayAmt = ctx.createGain(); swayAmt.gain.value = 420; sway.connect(swayAmt).connect(water.frequency); sway.start();
-  const verb = ctx.createConvolver(); verb.buffer = impulse(ctx, 4.2);
-  const wet = ctx.createGain(); wet.gain.value = 0.55;
-  const dry = ctx.createGain(); dry.gain.value = 0.72;
+  const swayAmt = ctx.createGain(); swayAmt.gain.value = 380; sway.connect(swayAmt).connect(water.frequency); sway.start();
+  const verb = ctx.createConvolver(); verb.buffer = impulse(ctx, 3.6);
+  const wet = ctx.createGain(); wet.gain.value = 0.42;
+  const dry = ctx.createGain(); dry.gain.value = 0.8;
   bus.connect(water); water.connect(dry).connect(out); water.connect(verb).connect(wet).connect(out);
-  // drums: their own bus, only a little reverb, so the beat stays tight and punchy
-  const drums = ctx.createGain(); drums.gain.value = 0.9; const drumLp = ctx.createBiquadFilter(); drumLp.type = 'lowpass'; drumLp.frequency.value = 9000;
-  const drumVerb = ctx.createGain(); drumVerb.gain.value = 0.12; drums.connect(drumLp).connect(out); drumLp.connect(drumVerb).connect(verb);
-  // a gentle stereo echo for the lead, so phrases trail off and flow into each other
-  const echoIn = ctx.createGain(); echoIn.gain.value = 0.32;
-  const echo = ctx.createDelay(2); const fb = ctx.createGain(); fb.gain.value = 0.38; const echoLp = ctx.createBiquadFilter(); echoLp.type = 'lowpass'; echoLp.frequency.value = 1600;
+  const drums = ctx.createGain(); drums.gain.value = 0.85; const drumVerb = ctx.createGain(); drumVerb.gain.value = 0.1;
+  drums.connect(out); drums.connect(drumVerb).connect(verb);
+  const echoIn = ctx.createGain(); echoIn.gain.value = 0.25; // a tempo-synced echo for the tune (set per theme)
+  const echo = ctx.createDelay(2); const fb = ctx.createGain(); fb.gain.value = 0.3; const echoLp = ctx.createBiquadFilter(); echoLp.type = 'lowpass'; echoLp.frequency.value = 1700;
   echoIn.connect(echo); echo.connect(echoLp).connect(fb).connect(echo); echoLp.connect(bus);
 
-  const S = { th: THEMES.edge, step: 0, next: 0, chord: 'I', motif: null, theme: null, phrase: 0, density: 1, dream: 1, timer: null,
-    progress: 0, stage: 0, unlocked: false, lift: 0, tension: 0, energy: 0, eWant: 0, threat: 0, tWant: 0, accents: [], tempoMul: 1, manualStage: null };
+  const S = {
+    th: THEMES.edge, id: 'edge', meter: METERS['4/4'], cells: CELLS['4/4'],
+    next: 0, step: 0, timer: null, dream: 1, tempoMul: 1, pendingTempo: 1,
+    stage: 0, pendingStage: 0, manualStage: null, progress: 0, unlocked: false, lift: 0, pendingLift: 0,
+    energy: 0, eWant: 0, threat: 0, tWant: 0, minor: false, accents: [],
+    song: null, loop: 0, voicing: null, info: {},
+  };
+  const stepDur = () => 60 / (S.th.bpm * S.tempoMul) / S.meter.spb;
+  const barSteps = () => S.meter.beats * S.meter.spb;
+  const mode = () => (S.minor ? 'minor' : S.th.mode);
   const keyOff = () => S.th.key + S.lift;
-  const hz = (semi) => 261.63 * Math.pow(2, (semi + keyOff()) / 12) * (1 + (1 - S.dream) * (rnd() - 0.5) * 0.05);
-  const stepDur = () => 60 / (S.th.bpm * S.tempoMul * (1 + S.stage * 0.025 + S.energy * 0.14)) / 4 * (S.dream < 0.4 ? 1.08 : 1); // the action pushes the tempo
-  const dark = () => S.threat > 0.5; // under threat: the theme turns minor
+  const hz = (semi) => 261.63 * Math.pow(2, (semi + keyOff()) / 12) * (1 + (1 - S.dream) * (rnd() - 0.5) * 0.04);
 
-  // --- instruments -----------------------------------------------------------------
+  // --- theory helpers -----------------------------------------------------------------
+  // a scale degree (any integer; 7 = the octave) -> semitones above the tonic
+  function degSemi(d, leading = false) {
+    const sc = SCALES[mode()], n = Math.floor(d / 7), i = ((d % 7) + 7) % 7;
+    let s = sc[i] + 12 * n;
+    if (leading && mode() === 'minor' && i === 6) s += 1; // the raised leading tone
+    return s;
+  }
+  // the chord's tones as scale degrees (root, third, fifth[, seventh])
+  function chordDegs(roman) { const [r, sev] = ROMAN[roman]; const d = [r, r + 2, r + 4]; if (sev) d.push(r + 6); return d; }
+  const isDominant = (roman) => roman === 'V' || roman === 'V7' || roman === 'vii°';
+  const chordSemis = (roman) => chordDegs(roman).map((d) => degSemi(d, isDominant(roman)));
+  function chordName(roman) {
+    const semis = chordSemis(roman), root = ((semis[0] % 12) + 12) % 12, third = semis[1] - semis[0], fifth = semis[2] - semis[0];
+    const q = fifth === 6 ? '°' : third === 3 ? 'm' : '';
+    return NOTE[(root + keyOff() + 1200) % 12] + q + (ROMAN[roman][1] ? '7' : '');
+  }
+  const romanLabel = (roman) => (mode() === 'minor' ? MINOR_NAME[roman] : roman);
+  // smooth voice leading: three upper voices (C4..A5), as close as possible to the last chord
+  function voiceChord(roman) {
+    const pcs = chordSemis(roman).slice(0, 3).map((s) => ((s % 12) + 12) % 12);
+    const opts = [];
+    for (const pcA of pcs) for (const pcB of pcs) for (const pcC of pcs) {
+      if (new Set([pcA, pcB, pcC]).size < 3) continue;
+      for (const oa of [0, 12]) for (const ob of [0, 12]) for (const oc of [0, 12, 24]) {
+        const v = [pcA + oa, pcB + ob, pcC + oc].sort((a, b) => a - b);
+        if (v[0] < 0 || v[2] > 21 || v[2] - v[0] > 14) continue;
+        opts.push(v);
+      }
+    }
+    const prev = S.voicing || [4, 7, 12];
+    let best = opts[0], bd = 1e9;
+    for (const v of opts) { const d = Math.abs(v[0] - prev[0]) + Math.abs(v[1] - prev[1]) + Math.abs(v[2] - prev[2]) + (v[1] - 10) * (v[1] - 10) * 0.02; if (d < bd) { bd = d; best = v; } }
+    S.voicing = best;
+    return best;
+  }
+
+  // --- composing the song -----------------------------------------------------------------
+  // a melody for one phrase (4 bars) over its chords: rhythm from cells, pitches by
+  // chord tones on strong beats, steps between them, arching to the cadence note
+  function composePhrase(chords, rhythm, cadenceNote, r, start, peak) {
+    const bs = barSteps(), M = S.meter, notes = [];
+    let last = start;
+    for (let b = 0; b < 4; b++) {
+      const cell = rhythm[b], bar = chords[b];
+      const onsets = []; for (let i = 0; i < bs; i++) if (cell[i]) onsets.push(i);
+      onsets.forEach((st, k) => {
+        const chordAt = bar.length > 1 && st >= bs / 2 ? bar[1] : bar[0];
+        const prog = (b * bs + st) / (4 * bs); // where we are in the phrase, 0..1
+        const target = prog < 0.55 ? start + (peak - start) * (prog / 0.55) : peak + (cadenceNote - peak) * ((prog - 0.55) / 0.45);
+        const strong = M.strong.includes(st) || M.medium.includes(st);
+        let d;
+        if (b === 3 && k === 0) d = cadenceNote; // land the cadence
+        else if (strong) { // nearest chord tone to where the arch wants us, not too far from the last note
+          const cands = []; for (const c of chordDegs(chordAt)) for (const o of [-7, 0, 7, 14]) cands.push(c + o);
+          d = cands.reduce((a, c) => (Math.abs(c - target) + Math.abs(c - last) * 0.5 < Math.abs(a - target) + Math.abs(a - last) * 0.5 ? c : a), cands[0]);
+        } else d = last + (target > last + 0.5 ? 1 : target < last - 0.5 ? -1 : r() < 0.5 ? 1 : -1); // passing / neighbour step
+        if (b === 3 && k === 1) d = cadenceNote; // a cadence bar's second note stays home
+        // how long it rings: until the next onset (or the end of the bar)
+        const nextSt = onsets[k + 1] ?? bs;
+        notes.push({ step: b * bs + st, len: nextSt - st, deg: d, chord: chordAt, strong });
+        last = d;
+      });
+    }
+    return notes;
+  }
+  // approach the cadence by step: 2 or 7 before 1
+  function compose(id) {
+    const r = mkRng(hashStr(id) * 7 + S.loop * 101);
+    const rTheme = mkRng(hashStr(id)); // the A tune is the theme's own: the same every time
+    const C = S.cells;
+    const ant = pickOf(ANTECEDENT, rTheme), cons = pickOf(CONSEQUENT, rTheme);
+    const cellA = pickOf(C.a, rTheme), cellB = pickOf(C.b, rTheme), cad = pickOf(C.cad, rTheme), cad2 = pickOf(C.cad, rTheme);
+    const start = 7 + Math.floor(rTheme() * 3) * 2; // start on 1, 3 or 5 (an octave up)
+    const peak = start + 3 + Math.floor(rTheme() * 3);
+    const hcNote = rTheme() < 0.5 ? 8 : 4 + 7; // half cadence: scale degree 2 or 5
+    const antMel = composePhrase(ant, [cellA, cellB, cellA, cad], hcNote, rTheme, start, peak);
+    // the consequent starts like the antecedent (a parallel period), then heads home to 1
+    const consMel = composePhrase(cons, [cellA, cellB, pickOf(C.a, rTheme), cad2], 7, rTheme, start, peak - 1);
+    for (let i = 0; i < antMel.length && antMel[i].step < barSteps() * 2; i++) if (consMel[i] && consMel[i].step === antMel[i].step) consMel[i].deg = antMel[i].deg;
+    // the bridge: new chords, smoother rhythm, a different register
+    const br = pickOf(BRIDGE, r), sm = C.smooth;
+    const bA = composePhrase(br.slice(0, 4), [pickOf(sm, r), pickOf(sm, r), pickOf(sm, r), pickOf(sm, r)], 9 + (r() < 0.5 ? 0 : 2), r, start + 2, peak + 1);
+    const bB = composePhrase(br.slice(4), [pickOf(sm, r), pickOf(C.b, r), pickOf(sm, r), cad], 8, r, start + 2, peak);
+    const section = (name, chords, mel, cadence) => ({ name, chords, mel, cadence });
+    const ornament = (mel) => mel.map((n) => n); // A' is the same tune; ornaments are added live (see play())
+    return [
+      section('A', ant, antMel, 'HC'), section('A', cons, consMel, 'PAC'),
+      section("A'", ant, ornament(antMel), 'HC'), section("A'", cons, ornament(consMel), 'PAC'),
+      section('B', br.slice(0, 4), bA, '—'), section('B', br.slice(4), bB, 'HC'),
+      section('A', ant, antMel, 'HC'), section('A', cons, consMel, S.loop % 2 ? 'PAC' : 'PAC'),
+    ];
+  }
+
+  // --- instruments ------------------------------------------------------------------------
   const env = (g, t, a, peak, d) => { g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(peak, t + a); g.gain.exponentialRampToValueAtTime(0.0008, t + a + d); };
   function osc(type, f, t, end, dest) { const o = ctx.createOscillator(); o.type = type; o.frequency.setValueAtTime(Math.min(f, 18000), t); o.connect(dest); o.start(t); o.stop(end + 0.05); return o; }
-  function voice(dest, pan = 0) { // a gain into the bus, optionally panned
+  function voice(dest, pan = 0) {
     const g = ctx.createGain();
     if (pan && ctx.createStereoPanner) { const p = ctx.createStereoPanner(); p.pan.value = pan; g.connect(p).connect(dest); } else g.connect(dest);
     return g;
   }
-  function pad(semis, t, dur, bright = 0) { // warm, slow, a little detuned, with a slow filter swell
+  function pad(semis, t, dur, bright = 0) {
     for (const s of semis) {
-      const g = voice(bus, (rnd() - 0.5) * 0.6), f = ctx.createBiquadFilter(); f.type = 'lowpass';
-      f.frequency.setValueAtTime(600 + bright * 300, t); f.frequency.linearRampToValueAtTime(1100 + bright * 700, t + dur * 0.5); f.frequency.linearRampToValueAtTime(700, t + dur + 1);
-      g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.024, t + dur * 0.35); g.gain.linearRampToValueAtTime(0.018, t + dur * 0.8); g.gain.linearRampToValueAtTime(0, t + dur + 1.4);
+      const g = voice(bus, ((s % 12) / 12 - 0.5) * 0.6), f = ctx.createBiquadFilter(); f.type = 'lowpass';
+      f.frequency.setValueAtTime(700 + bright * 400, t); f.frequency.linearRampToValueAtTime(1100 + bright * 700, t + dur * 0.5); f.frequency.linearRampToValueAtTime(800, t + dur + 0.6);
+      g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.02, t + Math.min(0.4, dur * 0.3)); g.gain.setValueAtTime(0.02, t + dur * 0.85); g.gain.linearRampToValueAtTime(0, t + dur + 0.5);
       f.connect(g);
-      for (const det of [-7, 6]) { const o = osc('triangle', hz(s), t, t + dur + 1.5, f); o.detune.value = det; }
+      for (const det of [-6, 6]) { const o = osc('triangle', hz(s), t, t + dur + 0.6, f); o.detune.value = det; }
     }
   }
-  function strings(semis, t, dur) { // soft bowed swell for the later stages
+  function strings(semis, t, dur) {
     for (const s of semis) {
-      const g = voice(bus, (rnd() - 0.5) * 0.8), f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 1300; f.Q.value = 0.4;
-      g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.012, t + dur * 0.5); g.gain.linearRampToValueAtTime(0, t + dur + 0.8);
+      const g = voice(bus, ((s % 12) / 12 - 0.5) * 0.8), f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 1400; f.Q.value = 0.4;
+      g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.011, t + dur * 0.4); g.gain.setValueAtTime(0.011, t + dur * 0.85); g.gain.linearRampToValueAtTime(0, t + dur + 0.4);
       f.connect(g);
-      for (const det of [-9, 0, 8]) { const o = osc('sawtooth', hz(s), t, t + dur + 0.9, f); o.detune.value = det; }
+      for (const det of [-9, 0, 8]) { const o = osc('sawtooth', hz(s), t, t + dur + 0.5, f); o.detune.value = det; }
     }
   }
-  const PLUCKS = { // [partials [ratio, level, decay]], body decay, peak
+  const PLUCKS = {
     kalimba: [[[1, 1, 0.9], [4.02, 0.25, 0.18]], 0.09],
     marimba: [[[1, 1, 0.55], [3.93, 0.3, 0.08], [9.2, 0.08, 0.03]], 0.1],
     glock: [[[1, 0.8, 1.2], [2.76, 0.35, 0.4], [5.4, 0.18, 0.15]], 0.06],
@@ -129,37 +268,28 @@ export function createMusic(ctx, out) {
     pizz: [[[1, 1, 0.22], [2.0, 0.3, 0.1]], 0.08],
   };
   function pluck(kind, semi, t, vol = 1, opt = {}) {
-    const [parts, peak] = PLUCKS[kind] || PLUCKS.kalimba, f = hz(semi), dest = opt.echo ? echoIn : null;
+    const [parts, peak] = PLUCKS[kind] || PLUCKS.kalimba, f = hz(semi);
     for (const [ratio, lvl, dec] of parts) {
       const g = voice(bus, opt.pan || 0); env(g, t, 0.004, peak * lvl * vol, dec * (opt.long || 1));
-      if (dest) g.connect(dest);
-      const o = osc(kind === 'rhodes' && ratio === 1 ? 'triangle' : 'sine', (opt.scoop && ratio === 1 ? f * 0.89 : f) * ratio, t, t + dec * (opt.long || 1) + 0.2, g);
-      if (opt.scoop && ratio === 1) o.frequency.exponentialRampToValueAtTime(f, t + 0.09); // a goofy little scoop up into the note
+      if (opt.echo) g.connect(echoIn);
+      const o = osc(kind === 'rhodes' && ratio === 1 ? 'triangle' : 'sine', f * ratio, t, t + dec * (opt.long || 1) + 0.2, g);
       if (kind === 'rhodes' && ratio === 1) { const tr = ctx.createOscillator(), ta = ctx.createGain(); tr.frequency.value = 4.5; ta.gain.value = peak * vol * 0.3; tr.connect(ta).connect(g.gain); tr.start(t); tr.stop(t + dec + 0.2); }
     }
   }
-  let fluteO = null, fluteG = null, fluteEnd = 0;
-  function flute(semi, t, dur, vol = 1) { // legato: one voice that glides from note to note, with a breathy vibrato
-    const f = hz(semi + 12);
-    if (!fluteO || t > fluteEnd - 0.02) {
-      fluteG = voice(bus, 0.15); fluteG.connect(echoIn);
-      fluteO = osc('sine', f, t, t + 30, fluteG);
-      const o2 = osc('triangle', f, t, t + 30, fluteG); o2.detune.value = 4; fluteO.partner = o2;
-      const vib = ctx.createOscillator(), va = ctx.createGain(); vib.frequency.value = 5; va.gain.setValueAtTime(0, t); va.gain.linearRampToValueAtTime(f * 0.012, t + 0.6); vib.connect(va); va.connect(fluteO.frequency); va.connect(o2.frequency); vib.start(t); vib.stop(t + 30);
-      fluteO.vib = vib; fluteG.gain.setValueAtTime(0, t);
-    }
-    fluteO.frequency.setTargetAtTime(f, t, 0.04); fluteO.partner.frequency.setTargetAtTime(f, t, 0.04);
-    fluteG.gain.setTargetAtTime(0.05 * vol, t, 0.05);
-    fluteG.gain.setTargetAtTime(0.0, t + dur, 0.12);
-    fluteEnd = t + dur + 0.6;
-    const o = fluteO, gg = fluteG; // stop this voice once it's been quiet a while
-    setTimeout(() => { if (fluteO === o && ctx.currentTime > fluteEnd) { try { o.stop(); o.partner.stop(); o.vib.stop(); } catch (e) { /* stopped */ } fluteO = null; void gg; } }, Math.max(0, (fluteEnd - ctx.currentTime) * 1000 + 800));
+  function flute(semi, t, dur, vol = 1) { // a breathy sine with vibrato that grows into the note
+    const f = hz(semi + 12), g = voice(bus, 0.15); g.connect(echoIn);
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.05 * vol, t + 0.06); g.gain.setValueAtTime(0.05 * vol, t + Math.max(0.07, dur - 0.06)); g.gain.linearRampToValueAtTime(0, t + dur + 0.08);
+    const o = osc('sine', f, t, t + dur + 0.1, g), o2 = osc('triangle', f, t, t + dur + 0.1, g); o2.detune.value = 4;
+    if (dur > 0.3) { const vib = ctx.createOscillator(), va = ctx.createGain(); vib.frequency.value = 5; va.gain.setValueAtTime(0, t); va.gain.linearRampToValueAtTime(f * 0.01, t + Math.min(0.5, dur)); vib.connect(va); va.connect(o.frequency); va.connect(o2.frequency); vib.start(t); vib.stop(t + dur + 0.1); }
   }
-  function boop(semi, t, vol = 1, len = 0.45) { // round, bouncy bass with a little pitch drop
-    const f = hz(semi - 24), g = voice(bus), lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 420 + S.energy * 380;
-    env(g, t, 0.01, 0.19 * vol, len); lp.connect(g);
-    const o = osc('sine', f * 1.5, t, t + 0.6, lp); o.frequency.exponentialRampToValueAtTime(f, t + 0.06);
-    const o2 = osc('triangle', f, t, t + 0.6, lp); o2.detune.value = 3;
+  function lead(semi, t, dur, vol, echo = true) {
+    if (S.th.lead === 'flute') flute(semi, t, dur * 0.95, vol);
+    else pluck(S.th.lead, semi, t, vol, { echo, pan: 0.05, long: Math.min(1.6, 0.7 + dur * 0.8) });
+  }
+  function bass(semi, t, dur, vol = 1) {
+    const f = hz(semi - 24), g = voice(bus), lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 480 + S.energy * 400;
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.17 * vol, t + 0.012); g.gain.exponentialRampToValueAtTime(0.0008, t + Math.max(0.12, dur));
+    lp.connect(g); const o = osc('sine', f, t, t + dur + 0.1, lp); const o2 = osc('triangle', f, t, t + dur + 0.1, lp); o2.detune.value = 3; void o;
   }
   function noiseHit(t, dur, freq, vol, type = 'highpass', pan = 0, dest = bus) {
     const len = Math.max(1, Math.floor(ctx.sampleRate * dur)), buf = ctx.createBuffer(1, len, ctx.sampleRate), d = buf.getChannelData(0);
@@ -167,233 +297,174 @@ export function createMusic(ctx, out) {
     const src = ctx.createBufferSource(); src.buffer = buf; const f = ctx.createBiquadFilter(); f.type = type; f.frequency.value = freq;
     const g = voice(dest, pan); g.gain.value = vol; src.connect(f).connect(g); src.start(t);
   }
-  const shaker = (t, v) => noiseHit(t, 0.06, 6000, 0.05 * v, 'highpass', 0.3);
-  function woodblock(t, v) { const g = voice(bus, -0.3); env(g, t, 0.002, 0.06 * v, 0.06); osc('sine', 820, t, t + 0.1, g); }
-  function softKick(t) { const g = voice(bus); env(g, t, 0.004, 0.16, 0.22); const o = osc('sine', 120, t, t + 0.3, g); o.frequency.exponentialRampToValueAtTime(48, t + 0.15); }
-  // --- the rhythm section the action brings in -----------------------------------
-  function kick(t, v = 1) { const g = voice(drums); env(g, t, 0.002, 0.42 * v, 0.28); const o = osc('sine', 165, t, t + 0.35, g); o.frequency.exponentialRampToValueAtTime(44, t + 0.12); noiseHit(t, 0.012, 2500, 0.05 * v, 'highpass', 0, drums); }
-  function snare(t, v = 1) { noiseHit(t, 0.16, 1700, 0.16 * v, 'bandpass', 0.05, drums); const g = voice(drums); env(g, t, 0.002, 0.09 * v, 0.09); osc('triangle', 196, t, t + 0.12, g); }
-  function hat(t, v = 1, open = false) { noiseHit(t, open ? 0.22 : 0.035, 7500, (open ? 0.06 : 0.07) * v, 'highpass', 0.35, drums); }
-  function tom(t, semi, v = 1) { const g = voice(drums, (semi - 6) / 20); env(g, t, 0.003, 0.22 * v, 0.24); const o = osc('sine', hz(semi - 12), t, t + 0.3, g); o.frequency.exponentialRampToValueAtTime(hz(semi - 17), t + 0.2); }
-  function crash(t, v = 1) { noiseHit(t, 1.6, 5200, 0.07 * v, 'highpass', -0.2, drums); }
-  function stab(semis, t, v = 1) { // a short bright chord on the offbeat
-    for (const s of semis) { const g = voice(bus, (rnd() - 0.5) * 0.7), f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 2400; env(g, t, 0.003, 0.03 * v, 0.14); f.connect(g); for (const det of [-8, 7]) { const o = osc('sawtooth', hz(s), t, t + 0.2, f); o.detune.value = det; } }
-  }
-  function bubbles(t) {
-    const n = 1 + Math.floor(rnd() * 4);
-    for (let i = 0; i < n; i++) {
-      const tt = t + i * (0.06 + rnd() * 0.09), f = 500 + rnd() * 900, g = voice(bus, (rnd() - 0.5) * 1.2);
-      env(g, tt, 0.003, 0.03 + rnd() * 0.03, 0.09);
-      const o = osc('sine', f, tt, tt + 0.12, g); o.frequency.exponentialRampToValueAtTime(f * (1.6 + rnd() * 0.8), tt + 0.09);
-    }
-  }
-  // a bit of the room in the music, in time with it
-  function ambience(t, step, chord) {
-    const a = S.th.amb, p = (rnd() - 0.5) * 1.4, inBar = step % 16, sd = stepDur();
-    if (a === 'bubbles' && rnd() < 0.035) bubbles(t);
-    else if (a === 'drips' && inBar % 2 === 1 && rnd() < 0.14) { // drips, tuned to the chord
-      const f = hz(chord[Math.floor(rnd() * 4)] + 24), g = voice(bus, p); env(g, t, 0.002, 0.05, 0.14);
-      const o = osc('sine', f * 1.5, t, t + 0.18, g); o.frequency.exponentialRampToValueAtTime(f, t + 0.05);
-    } else if (a === 'crickets' && (inBar === 4 || inBar === 12) && rnd() < 0.7) { // chirps on the backbeat
-      const f = hz(chord[2] + 36); for (let i = 0; i < 3; i++) { const g = voice(bus, p), tt = t + i * 0.055; env(g, tt, 0.004, 0.012, 0.03); osc('sine', f, tt, tt + 0.05, g); }
-    } else if (a === 'fire') { // crackles on the off-beats, and a soft whoomph every two bars
-      if (inBar % 2 === 1 && rnd() < 0.35) noiseHit(t + rnd() * sd * 0.3, 0.02 + rnd() * 0.02, 1800 + rnd() * 2500, 0.05, 'bandpass', p);
-      if (step % 32 === 0) { const g = voice(bus); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.02, t + 0.8); g.gain.linearRampToValueAtTime(0, t + 2.4); const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 260; lp.connect(g); noiseHit(t, 0.001, 200, 0, 'lowpass'); osc('sawtooth', hz(chord[0] - 36), t, t + 2.5, lp); }
-    } else if (a === 'clock' && inBar % 4 === 0) { const g = voice(bus, -0.4); env(g, t, 0.001, 0.05, 0.03); osc('sine', inBar % 8 === 0 ? 2300 : 1800, t, t + 0.06, g); } // tick... tock
-    else if (a === 'churn' && inBar % 4 === 0) { noiseHit(t, 0.18, 500, 0.05, 'lowpass', p); if (inBar === 0) { const g = voice(bus); env(g, t, 0.005, 0.1, 0.15); osc('sine', hz(chord[0] - 36), t, t + 0.2, g); } } // the washing machine's rhythm
-    else if (a === 'buzz' && step % 64 === 0) { const g = voice(bus), lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 700; g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.008, t + 1); g.gain.linearRampToValueAtTime(0, t + sd * 64); lp.connect(g); osc('sawtooth', hz(chord[0] - 24), t, t + sd * 64 + 0.1, lp); } // the strip light, humming in key
-    else if (a === 'chuff' && inBar % 2 === 0) noiseHit(t, 0.07, 900, inBar % 4 === 0 ? 0.04 : 0.025, 'bandpass', 0.2); // a toy train chuffing along
-    else if (a === 'snore' && step % 64 === 0) { // Dad's snore, in key (and a bit silly)
-      const g = voice(bus), lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 400; g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.03, t + 0.9); g.gain.linearRampToValueAtTime(0, t + 1.8); lp.connect(g);
-      const o = osc('sawtooth', hz(chord[0] - 24), t, t + 1.9, lp); o.frequency.linearRampToValueAtTime(hz(chord[0] - 22), t + 1.6);
-    } else if (a === 'toys' && inBar >= 12 && rnd() < 0.6) woodblock(t, 0.25); // a wind-up toy's ratchet at the end of the bar
-    else if (a === 'wind' && step % 64 === 0) noiseHit(t, 3.5, 500, 0.02, 'bandpass', p);
-    else if (a === 'hum' && step % 64 === 0) { const g = voice(bus); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.008, t + 1); g.gain.linearRampToValueAtTime(0, t + 5); osc('sine', 120, t, t + 5.2, g); }
-  }
-  function slideWhistle(t, up = true) {
-    const g = voice(bus, 0.2), f0 = hz(up ? 12 : 31), f1 = hz(up ? 31 : 12);
-    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.04, t + 0.05); g.gain.linearRampToValueAtTime(0, t + 0.55);
-    const o = osc('sine', f0, t, t + 0.6, g); o.frequency.exponentialRampToValueAtTime(f1, t + 0.5);
-    const vib = ctx.createOscillator(), va = ctx.createGain(); vib.frequency.value = 7; va.gain.value = 9; vib.connect(va).connect(o.frequency); vib.start(t); vib.stop(t + 0.6);
-  }
-  function boing(t) {
-    const g = voice(bus); env(g, t, 0.005, 0.11, 0.5);
-    const o = osc('sine', hz(-12), t, t + 0.6, g); o.frequency.exponentialRampToValueAtTime(hz(-5), t + 0.08); o.frequency.exponentialRampToValueAtTime(hz(-14), t + 0.5);
-    const w = ctx.createOscillator(), wa = ctx.createGain(); w.frequency.value = 14; wa.gain.value = 18; w.connect(wa).connect(o.frequency); w.start(t); w.stop(t + 0.6);
-  }
-  function chime(t) { // the way out opens: a little rising sparkle
-    [0, 4, 7, 12, 16, 19, 24].forEach((s, i) => pluck('glock', s + 12, t + i * 0.07, 0.8, { pan: (i / 6 - 0.5) }));
+  const kick = (t, v = 1) => { const g = voice(drums); env(g, t, 0.002, 0.4 * v, 0.26); const o = osc('sine', 160, t, t + 0.32, g); o.frequency.exponentialRampToValueAtTime(45, t + 0.11); };
+  const snare = (t, v = 1) => { noiseHit(t, 0.15, 1800, 0.14 * v, 'bandpass', 0.05, drums); const g = voice(drums); env(g, t, 0.002, 0.08 * v, 0.08); osc('triangle', 196, t, t + 0.1, g); };
+  const rim = (t, v = 1) => { const g = voice(drums, -0.2); env(g, t, 0.001, 0.07 * v, 0.04); osc('square', 1700, t, t + 0.05, g); };
+  const hat = (t, v = 1, open = false) => noiseHit(t, open ? 0.2 : 0.03, 7500, (open ? 0.05 : 0.065) * v, 'highpass', 0.3, drums);
+  const shaker = (t, v = 1) => noiseHit(t, 0.05, 6000, 0.04 * v, 'highpass', 0.35, drums);
+  const tom = (t, semi, v = 1) => { const g = voice(drums, semi / 24); env(g, t, 0.003, 0.2 * v, 0.22); const o = osc('sine', hz(semi - 12), t, t + 0.28, g); o.frequency.exponentialRampToValueAtTime(hz(semi - 17), t + 0.2); };
+  const crash = (t, v = 1) => noiseHit(t, 1.5, 5200, 0.06 * v, 'highpass', -0.2, drums);
+
+  // a little of the room, locked to the beat
+  function ambience(t, st, chordSemis) {
+    const a = S.th.amb, bs = barSteps(), beat = S.meter.spb;
+    if (a === 'bubbles' && st % beat === 0 && rnd() < 0.08) { for (let i = 0; i < 3; i++) { const tt = t + i * stepDur(), f = hz(chordSemis[i % 3] + 24), g = voice(bus, (rnd() - 0.5)); env(g, tt, 0.003, 0.025, 0.08); const o = osc('sine', f, tt, tt + 0.1, g); o.frequency.exponentialRampToValueAtTime(f * 1.5, tt + 0.08); } }
+    else if (a === 'drips' && st % (beat / 2) === 0 && st % beat !== 0 && rnd() < 0.12) { const f = hz(chordSemis[Math.floor(rnd() * 3)] + 24), g = voice(bus, rnd() - 0.5); env(g, t, 0.002, 0.04, 0.12); const o = osc('sine', f * 1.5, t, t + 0.15, g); o.frequency.exponentialRampToValueAtTime(f, t + 0.04); }
+    else if (a === 'crickets' && st === bs / 2) { const f = hz(chordSemis[2] + 36); for (let i = 0; i < 3; i++) { const g = voice(bus, 0.4), tt = t + i * stepDur() * 0.5; env(g, tt, 0.004, 0.01, 0.03); osc('sine', f, tt, tt + 0.05, g); } }
+    else if (a === 'fire' && st % 2 === 1 && rnd() < 0.25) noiseHit(t, 0.02, 2200, 0.04, 'bandpass', rnd() - 0.5);
+    else if (a === 'clock' && st % beat === 0) { const g = voice(bus, -0.4); env(g, t, 0.001, 0.035, 0.03); osc('sine', st === 0 ? 2300 : 1800, t, t + 0.05, g); }
+    else if (a === 'churn' && st % beat === 0) noiseHit(t, 0.16, 500, 0.04, 'lowpass', 0.2);
+    else if (a === 'chuff' && st % (beat / 2) === 0) noiseHit(t, 0.06, 900, st % beat === 0 ? 0.035 : 0.02, 'bandpass', 0.2);
+    else if (a === 'wind' && st === 0 && S.info.bar === 1) noiseHit(t, 3.5, 500, 0.018, 'bandpass', 0);
+    else if (a === 'toys' && st === bs - beat && rnd() < 0.5) rim(t, 0.4);
   }
 
-  // --- composition -----------------------------------------------------------------
-  const scale = () => MODES[dark() && ['major', 'lydian', 'mixo'].includes(S.th.mode) ? 'minor' : S.th.mode];
-  const degSemi = (d) => { const sc = scale(), n = sc.length; return sc[((d % n) + n) % n] + 12 * Math.floor(d / n); };
-  function makeMotif(r) { // a 2-bar tune: rhythm + a wandering line
-    const rA = RHYTHMS[Math.floor(r() * RHYTHMS.length)], rB = RHYTHMS[Math.floor(r() * RHYTHMS.length)], n = scale().length;
-    let deg = n + Math.floor(r() * n); const notes = [];
-    for (let i = 0; i < 32; i++) {
-      if (!(i < 16 ? rA[i] : rB[i - 16])) { notes.push(null); continue; }
-      deg = Math.max(2, Math.min(n * 2 + 2, deg + [-2, -1, -1, 0, 1, 1, 2][Math.floor(r() * 7)]));
-      notes.push(deg);
-    }
-    return notes;
-  }
-  const vary = (m) => m.map((d) => (d === null ? (rnd() < 0.08 ? scale().length + 2 : null) : rnd() < 0.3 ? Math.max(2, d + (rnd() < 0.5 ? 1 : -1)) : d));
-  const nearChord = (semi, chord) => { const c = chord.map((x) => ((x % 12) + 12) % 12), pc = ((semi % 12) + 12) % 12; if (c.includes(pc)) return semi; for (const d of [1, -1, 2, -2]) if (c.includes((((semi + d) % 12) + 12) % 12)) return semi + d; return semi; };
-
-  // busier phrasing: fill some rests with repeated or neighbouring notes, more as the energy rises
-  const drive = (m, E) => m.map((d, i) => (d !== null ? d : i % 2 === 0 && rnd() < (E - 0.4) * 0.8 ? (m[(i + 31) % 32] ?? m[(i + 30) % 32] ?? scale().length + 2) : null));
-  function playAccent(k, t, chord) {
-    if (k === 'poof') [0, 2, 4, 7].forEach((d, i) => pluck(S.th.lead === 'flute' ? 'glock' : S.th.lead, chord[i % 4] + 12 + (i === 3 ? 12 : 0), t + i * 0.055, 0.7, { pan: (i / 3 - 0.5) * 0.6 }));
-    else if (k === 'hit') { stab([chord[0] - 12, chord[0] - 11, chord[0] - 6], t, 1.2); kick(t, 0.8); }
-    else if (k === 'boss') { kick(t, 1.2); crash(t, 1.2); stab(chord.slice(0, 4), t, 1.6); [0, 7, 12].forEach((s, i) => boop(chord[0] + s, t + i * 0.08, 1.1, 0.3)); }
-    else if (k === 'rage') { strings([chord[0], chord[0] + 1, chord[0] + 6].map((s) => s + 12), t, 1.6); tom(t, 0, 1.2); tom(t + 0.12, 0, 1); tom(t + 0.24, -2, 1.2); }
-    else if (k === 'triumph') { crash(t, 1); chime(t); [0, 4, 7, 12].forEach((s, i) => pluck('harp', s + 12, t + i * 0.09, 0.9)); }
-  }
-
-  // stages: 0 pad + ambience, 1 + melody, 2 + bass and color, 3 + counter-melody and rolling arpeggios,
-  // 4 + light percussion and strings; unlocked: key lifts a step and the theme plays out in full
-  function scheduleStep(t, step) {
-    const inBar = step % 16, bar = Math.floor(step / 16), sd = stepDur(), st = S.stage, th = S.th;
-    // follow the action: energy rises fast and settles slowly, the darkness likewise
-    S.energy += (S.eWant - S.energy) * (S.eWant > S.energy ? 0.2 : 0.02);
-    S.threat += (S.tWant - S.threat) * (S.tWant > S.threat ? 0.15 : 0.02);
-    const E = S.energy;
-    if (step % 16 === 0 && step % 32 !== 0 && E > 0.6) { // when it's busy the chords move every bar
-      const ch = dark() ? CHAINS.tense : CHAINS[th.chain]; S.chord = pick(ch[S.chord] || ch[dark() ? 'i' : th.start], rnd);
-      pad(CHORDS[S.chord].slice(0, 4).map((s) => s - 12), t, sd * 16, st / 5 + E);
-    }
-    if (step % 32 === 0) {
-      const chain = dark() ? CHAINS.tense : CHAINS[th.chain];
-      if (bar > 0 || dark()) S.chord = pick(chain[S.chord] || chain[dark() ? 'i' : th.start], rnd);
-      if (!dark() && !CHAINS[th.chain][S.chord]) S.chord = th.start; // back to the theme's own chords
-      if (bar % 8 === 0) {
-        S.density = bar === 0 ? 0.6 : [0.55, 1, 0.8, 1, 0.65][Math.floor(rnd() * 5)];
-        if (bar > 0 && rnd() < 0.4 * th.goof) boing(t);
+  // --- playing one grid step -------------------------------------------------------------
+  function scheduleStep(t) {
+    const bs = barSteps(), M = S.meter, beat = M.spb, sd = stepDur();
+    const st = S.step % bs, barN = Math.floor(S.step / bs), phraseIdx = Math.floor(barN / 4) % 8, barInPhrase = barN % 4;
+    // follow the game: energy rises quickly and settles slowly
+    S.energy += (S.eWant - S.energy) * (S.eWant > S.energy ? 0.15 : 0.012);
+    S.threat += (S.tWant - S.threat) * (S.tWant > S.threat ? 0.15 : 0.015);
+    // phrase boundaries: where the song may change key, mode, tempo or density
+    if (st === 0 && barInPhrase === 0) {
+      if (phraseIdx === 0) { // the top of the song: compose it (the A tune is always the theme's own)
+        if (S.pendingLift !== S.lift) { S.lift = S.pendingLift; S.voicing = null; }
+        S.song = compose(S.id); S.loop++;
       }
-      if (S.pendingStage !== undefined && S.pendingStage !== S.stage) { S.stage = S.pendingStage; if (S.stage >= 2) chime(t); }
-      const chordSemis = CHORDS[S.chord].slice(0, 4).map((s) => s - 12);
-      if (E <= 0.6) pad(chordSemis, t, sd * 32, st / 5 + E); else pad(chordSemis, t, sd * 16, st / 5 + E);
-      if (st >= 4 || (th.color === 'strings' && st >= 2)) strings(CHORDS[S.chord].slice(1, 4), t, sd * 32);
-      // phrases: the leitmotif (A), its variations, and free answers (B)
-      const ph = S.phrase++ % 4;
-      S.cur = ph === 0 || (st >= 5 && ph === 2) ? S.theme : ph === 2 ? (S.motif = rnd() < 0.6 ? makeMotif(rnd) : S.motif || makeMotif(rnd)) : vary(S.theme);
-      S.restPhrase = st >= 1 && rnd() < (1 - S.density) * 0.6 * (1 - E);
-      if (E > 0.5) S.cur = drive(S.cur, E); // busier, more rhythmic phrasing when the action is up
-      S.counter = st >= 3 ? vary(S.cur.map((d) => (d === null ? null : d - 2))) : null;
+      const wantMinor = S.th.mode === 'minor' || S.threat > 0.5;
+      if (wantMinor !== S.minor) { S.minor = wantMinor; S.voicing = null; }
+      if (S.pendingStage !== S.stage) S.stage = S.pendingStage;
+      S.tempoMul = S.pendingTempo;
     }
-    const chord = CHORDS[S.chord];
-    // the leitmotif / melody
-    const n = S.cur && S.cur[step % 32];
-    if ((st >= 1 || E > 0.35) && n !== null && n !== undefined && !S.restPhrase) {
-      let semi = degSemi(n); if (inBar % 8 === 0) semi = nearChord(semi, chord);
-      const lead = st >= 5 && th.lead !== 'flute' && rnd() < 0.5 ? 'flute' : th.lead;
-      if (lead === 'flute') { let len = 1; while (len < 6 && S.cur[(step + len) % 32] === null) len++; flute(semi, t, sd * len * 0.95, 0.9 + st * 0.05); }
-      else pluck(lead, semi, t, (0.75 + rnd() * 0.3) * (1 + E * 0.35 * (inBar % 4 === 0 ? 1.4 : 0.6)), { scoop: rnd() < 0.1 * th.goof * (1 - E), echo: E < 0.7, pan: (rnd() - 0.5) * 0.4, long: 1 - E * 0.45 });
-      if (E > 0.75 && inBar % 4 === 0) pluck(lead, semi + 12, t, 0.35, { pan: -0.25 }); // doubled up an octave when it's wild
-      if (st >= 5 && lead !== th.lead) pluck(th.lead, semi + 12, t, 0.45, { pan: 0.3 });
+    const E = S.energy, layer = Math.max(S.stage, E > 0.75 ? 5 : E > 0.5 ? 4 : E > 0.3 ? 3 : E > 0.15 ? 2 : 1);
+    const ph = S.song[phraseIdx], bar = ph.chords[barInPhrase];
+    const chord = bar.length > 1 && st >= bs / 2 ? bar[1] : bar[0];
+    const chordStart = st === 0 || (bar.length > 1 && st === bs / 2);
+    const semis = chordSemis(chord), root = semis[0];
+    const isCadenceBar = barInPhrase === 3, lastPhrase = phraseIdx === 7;
+    S.info = { section: ph.name, phrase: phraseIdx, bar: barInPhrase + 1 + (phraseIdx % 2) * 4, beat: Math.floor(st / beat) + 1, roman: romanLabel(chord), chord: chordName(chord), cadence: isCadenceBar ? ph.cadence : '', key: NOTE[(keyOff() + 1200) % 12] + (mode() === 'minor' ? ' minor' : ' major'), meter: S.th.meter, layer, energy: E };
+
+    // harmony: a pad on each chord change, voiced smoothly
+    if (chordStart) {
+      const len = bar.length > 1 ? bs / 2 : bs, v = voiceChord(chord);
+      pad(v, t, sd * len, layer / 6 + E * 0.5);
+      if (layer >= 5 || (S.th.color === 'strings' && layer >= 3)) strings(v.map((s) => s + 12), t, sd * len);
     }
-    // counter-melody, a sixth below on the color instrument, offset by an eighth
-    if (S.counter && st >= 3 && inBar % 2 === 1) { const c = S.counter[(step + 31) % 32]; if (c !== null && c !== undefined && th.color !== 'strings') pluck(th.color, nearChord(degSemi(c) - 12 + 12, chord), t, 0.5, { pan: -0.35 }); }
-    // rolling arpeggio across two octaves (harp-like), flowing on every eighth in the later stages;
-    // when the action is up it runs in 16ths, staccato, on the lead
-    if (E > 0.55) {
-      const tones = chord.slice(0, 4), k = step % 8, idx = [0, 1, 2, 3, 2, 1, 2, 3][k] , oct = k >= 4 ? 12 : 0;
-      if (rnd() < 0.5 + E * 0.5) pluck(th.lead === 'flute' ? 'harp' : th.lead, tones[idx] + oct, t, 0.22 + (k === 0 ? 0.15 : 0), { pan: (k / 7 - 0.5) * 0.9, long: 0.35 });
-    } else if (st >= 3 && inBar % 2 === 0 && rnd() < 0.85) {
-      const tones = chord.slice(0, 4), k = (step / 2) % 8, oct = k < 4 ? 0 : 12, idx = k < 4 ? k : 7 - k;
-      pluck(th.color === 'strings' || th.color === 'pizz' ? 'harp' : th.color, tones[idx] + oct, t, 0.35, { pan: (k / 7 - 0.5) * 0.8 });
+    // melody (layer 1+): the composed tune, exactly on the grid
+    if (layer >= 1) {
+      for (const n of ph.mel) {
+        if (n.step !== barInPhrase * bs + st) continue;
+        const leading = isDominant(n.chord), semi = degSemi(n.deg, leading);
+        const accent = st === 0 ? 1.15 : M.strong.includes(st) ? 1.05 : 0.85;
+        lead(semi, t, n.len * sd, (0.8 + E * 0.25) * accent);
+        if (layer >= 5 && n.strong) pluck(S.th.color === 'strings' ? 'harp' : S.th.color, semi + 12, t, 0.3, { pan: -0.3 }); // doubled up an octave
+        // A': a grace-note turn into the strong notes (ornament)
+        if (ph.name === "A'" && n.strong && n.len >= beat && rnd() < 0.5) pluck(S.th.lead === 'flute' ? 'harp' : S.th.lead, degSemi(n.deg + 1, leading), t - sd * 0.5, 0.35, { long: 0.3 });
+      }
+      // counter-line (layer 3+): a third below the tune on its long strong notes
+      if (layer >= 3) for (const n of ph.mel) if (n.step === barInPhrase * bs + st && n.strong && n.len >= beat) pluck(S.th.color === 'strings' ? 'celesta' : S.th.color, degSemi(n.deg - 2, isDominant(n.chord)), t, 0.32, { pan: -0.35 });
     }
-    // bass: a driving eighth-note pulse once the action is up, otherwise the lazy bounce
-    if (E > 0.22) {
-      if (inBar % 2 === 0) { const pat = [0, 0, 7, 0, 12, 0, 7, 10], s = chord[0] + (pat[(inBar / 2) | 0] === 10 ? (dark() ? 10 : 7) : pat[(inBar / 2) | 0]); boop(s, t, 0.7 + E * 0.5 + (inBar % 8 === 0 ? 0.25 : 0), 0.18 + (1 - E) * 0.2); }
-      else if (E > 0.8 && rnd() < 0.3) boop(chord[0] + 12, t, 0.5, 0.1);
-    } else if (st >= 2 && S.density > 0.5) { const bp = BASS[Math.floor(bar / 2) % BASS.length]; if (bp[inBar]) boop(inBar === 0 ? chord[0] : rnd() < 0.5 ? chord[0] : chord[2] - 12, t); }
-    // the beat: hats, then kick and snare, then 16ths, ghost notes, fills and crashes
-    if (E > 0.3) {
-      if (inBar % 2 === 0) hat(t, (inBar % 4 === 2 ? 1 : 0.6) * (0.6 + E * 0.6), E > 0.5 && inBar === 14);
-      else if (E > 0.65 && rnd() < E) hat(t, 0.35 + rnd() * 0.2);
+    // bass (layer 2+): roots, fixed per meter; driving eighths when the energy's up
+    if (layer >= 2) {
+      const nextChord = (() => { const nb = ph.chords[barInPhrase + 1]; return nb ? nb[0] : (S.song[(phraseIdx + 1) % 8].chords[0][0]); })();
+      if (S.th.meter === '4/4') {
+        if (E > 0.55) { if (st % 2 === 0) bass(st % 8 === 4 ? root + 12 : root, t, sd * 1.6, st % beat === 0 ? 1 : 0.7); }
+        else if (st === 0 || st === 8) bass(st === 0 ? root : semis[2] - 12, t, sd * 7, 1);
+        else if (st === 12 && E > 0.3 && !isCadenceBar) bass(degSemi(chordDegs(nextChord)[0]) + (degSemi(chordDegs(nextChord)[0]) > root ? -1 : 1), t, sd * 3, 0.7); // walking approach note
+      } else if (S.th.meter === '3/4') { if (st === 0) bass(root, t, sd * 4, 1); }
+      else if (st === 0 || st === 6) bass(st === 0 ? root : semis[2] - 12, t, sd * 5, st === 0 ? 1 : 0.75); // 6/8: the two big beats
     }
-    const fillBar = E > 0.72 && bar % 4 === 3 && inBar >= 12;
-    if (E > 0.45 && !fillBar) {
-      if (inBar === 0 || inBar === 8 || (inBar === 6 && E > 0.6) || (inBar === 11 && rnd() < E * 0.6)) kick(t, 0.7 + E * 0.4);
-      if (inBar === 4 || inBar === 12) snare(t, 0.6 + E * 0.5);
-      else if (E > 0.7 && (inBar === 7 || inBar === 14) && rnd() < 0.5) snare(t, 0.25); // ghost notes
+    // accompaniment (layer 3+): Alberti in 4/4, oom-pah-pah in 3/4, a rocking broken chord in 6/8
+    if (layer >= 3) {
+      const v = S.voicing || [4, 7, 12], col = S.th.color === 'strings' ? 'harp' : S.th.color;
+      if (S.th.meter === '4/4') {
+        const sub = E > 0.6 ? 1 : 2; // eighths, or sixteenths when it's busy
+        if (st % sub === 0) { const k = (st / sub) % 4; pluck(col, [v[0], v[2], v[1], v[2]][k] - 12, t, k === 0 ? 0.32 : 0.24, { pan: -0.2 + k * 0.1, long: 0.6 }); }
+      } else if (S.th.meter === '3/4') {
+        if (st === 4 || st === 8) for (const s of v) pluck(col, s - 12, t, 0.16, { pan: 0.2, long: 0.5 }); // pah-pah
+        if (E > 0.6 && st % 2 === 0 && st !== 0) pluck(col, v[(st / 2) % 3], t, 0.14, { long: 0.4 });
+      } else if (st % 2 === 0) { const k = (st / 2) % 6; pluck(col, [v[0], v[2], v[1] + 12, v[2], v[1], v[2]][k] - 12, t, k % 3 === 0 ? 0.3 : 0.22, { pan: -0.3 + k * 0.1, long: 0.6 }); }
     }
-    if (fillBar) tom(t, [9, 7, 4, 0][inBar - 12], 0.8 + E * 0.3);
-    if (E > 0.72 && bar % 4 === 0 && inBar === 0 && bar > 0) crash(t, 0.6 + E * 0.4);
-    if (E > 0.6 && (inBar === 2 || inBar === 10 || (inBar === 7 && E > 0.8))) stab(chord.slice(1, 4), t, 0.6 + E * 0.5); // offbeat stabs
-    // accents asked for by the game (a poof, a hit, the Queen), on the next step
-    while (S.accents.length) playAccent(S.accents.shift(), t, chord);
-    // percussion: soft and loose (the calm theme's own)
-    if (st >= 4 && E < 0.45) {
-      if (inBar % 2 === 0 && rnd() < 0.7) shaker(t, inBar % 4 === 2 ? 1 : 0.5);
-      if ((inBar === 6 || inBar === 14) && rnd() < 0.7) woodblock(t, 0.8);
-      if (st >= 5 && (inBar === 0 || inBar === 10)) softKick(t);
+    // percussion (layer 4+): patterns per meter; fills only at the end of a phrase
+    if (layer >= 4) {
+      const fill = E > 0.7 && isCadenceBar && phraseIdx % 2 === 1;
+      if (S.th.meter === '4/4') {
+        if (!fill || st < bs / 2) {
+          if (E > 0.45) { if (st === 0 || st === 8 || (E > 0.7 && st === 10)) kick(t, 0.7 + E * 0.4); if (st === 4 || st === 12) snare(t, 0.5 + E * 0.5); }
+          else { if (st === 0) kick(t, 0.5); if (st === 4 || st === 12) rim(t, 0.6); }
+          if (E > 0.7 ? st % 1 === 0 && rnd() < 0.85 : st % 2 === 0) hat(t, st % 4 === 0 ? 0.9 : 0.5, st === 14 && E > 0.5);
+        } else tom(t, [9, 7, 5, 4, 2, 0, -1, -3][st - bs / 2] ?? 0, 0.8 + E * 0.3);
+      } else if (S.th.meter === '3/4') {
+        if (st === 0) kick(t, 0.5 + E * 0.4); if (st === 4 || st === 8) (E > 0.5 ? snare : rim)(t, 0.4 + E * 0.3);
+        if (st % 2 === 0) shaker(t, st % 4 === 0 ? 0.8 : 0.4);
+        if (fill && st >= 8 && st % 2 === 0) tom(t, [5, 2][(st - 8) / 2] ?? 0, 0.8);
+      } else {
+        if (st === 0) kick(t, 0.5 + E * 0.4); if (st === 6) (E > 0.5 ? snare : rim)(t, 0.4 + E * 0.4);
+        if (st % 2 === 0) shaker(t, st % 6 === 0 ? 0.8 : 0.45);
+        if (fill && st >= 6 && st % 2 === 0) tom(t, [7, 4, 0][(st - 6) / 2] ?? 0, 0.8);
+      }
+      if (st === 0 && barInPhrase === 0 && phraseIdx % 2 === 0 && E > 0.7 && S.loop + phraseIdx > 1) crash(t, 0.5 + E * 0.4); // a crash on the downbeat after a fill
     }
-    ambience(t, step, chord);
-    if (inBar === 12 && step % 32 >= 16 && rnd() < 0.06 * th.goof) slideWhistle(t, rnd() < 0.6);
+    // accents asked for by the game land on the next beat
+    if (st % beat === 0) while (S.accents.length) playAccent(S.accents.shift(), t, semis);
+    ambience(t, st, semis);
+  }
+  function playAccent(k, t, semis) {
+    const sd = stepDur();
+    if (k === 'poof') [0, 1, 2].forEach((i) => pluck('glock', semis[i] + 12, t + i * sd, 0.6, { pan: (i - 1) * 0.3 }));
+    else if (k === 'hit') { kick(t, 0.8); pad([semis[0] - 12, semis[0] - 11], t, sd * 3, 1); }
+    else if (k === 'boss') { kick(t, 1.2); crash(t, 1.1); [0, 1, 2].forEach((i) => bass(semis[0] + [0, 7, 12][i], t + i * sd * 2, sd * 2, 1)); }
+    else if (k === 'rage') { [0, 1, 2, 3].forEach((i) => tom(t + i * sd, 6 - i * 2, 1)); }
+    else if (k === 'triumph') { crash(t, 0.8); [0, 4, 7, 12].forEach((s, i) => pluck('harp', s + 12, t + i * sd, 0.8)); }
   }
 
   return {
     start(theme = 'edge') {
       this.stop();
       const id = typeof theme === 'number' ? THEME_LIST[theme % THEME_LIST.length] : theme;
-      S.th = THEMES[id] || THEMES.edge;
-      const tr = mkRng(Array.from(id).reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) >>> 0, 7)); // the leitmotif is the same every time you play the chapter
-      S.theme = makeMotif(tr); S.motif = null;
-      S.step = 0; S.chord = S.th.start; S.phrase = 0; S.stage = 0; S.pendingStage = 0; S.progress = 0; S.unlocked = false; S.lift = 0;
-      S.energy = S.eWant; S.threat = S.tWant; S.accents.length = 0; // (the music box starts a theme already at its settings; the game resets them itself)
-      if (S.manualStage !== null) S.stage = S.pendingStage;
+      S.id = THEMES[id] ? id : 'edge'; S.th = THEMES[S.id]; S.meter = METERS[S.th.meter]; S.cells = CELLS[S.th.meter];
+      S.step = 0; S.loop = 0; S.voicing = null; S.lift = S.pendingLift = 0; S.unlocked = false; S.progress = 0;
+      S.minor = S.th.mode === 'minor'; S.energy = S.eWant; S.threat = S.tWant; S.accents.length = 0;
+      if (S.manualStage === null) S.stage = S.pendingStage = 0; else S.stage = S.pendingStage;
+      S.tempoMul = S.pendingTempo;
+      echo.delayTime.value = Math.min(1.9, (60 / S.th.bpm) * (S.th.meter === '6/8' ? 1.5 : 0.75)); // the echo repeats in time
       S.next = ctx.currentTime + 0.15;
-      const tick = () => { while (S.next < ctx.currentTime + 0.5) { scheduleStep(S.next, S.step++); S.next += stepDur(); } };
-      tick(); S.timer = setInterval(tick, 120);
+      const tick = () => { while (S.next < ctx.currentTime + 0.4) { scheduleStep(S.next); S.step++; S.next += stepDur(); } };
+      tick(); S.timer = setInterval(tick, 100);
     },
     stop() { if (S.timer) clearInterval(S.timer); S.timer = null; },
-    // how far through the level you are (0..1), and whether the way out is open
+    // how far through the level (0..1) and whether the way out is open: layers build, and on unlock it modulates up a step (at the top of the next song)
     setProgress(p, unlocked = false) {
-      if (S.manualStage !== null) return; // the music box has the layers
+      if (S.manualStage !== null) return;
       S.progress = Math.max(S.progress, p);
-      const want = unlocked ? 5 : Math.min(4, 1 + Math.floor(S.progress * 3.6 + (S.step > 64 ? 0.4 : 0)));
-      S.pendingStage = Math.max(S.pendingStage ?? 0, S.step < 32 ? Math.min(want, 1) : want);
-      if (unlocked && !S.unlocked) { S.unlocked = true; S.lift = 2; } // the key lifts a step for the finale
+      const want = unlocked ? 5 : Math.min(4, 1 + Math.floor(S.progress * 3.6));
+      S.pendingStage = Math.max(S.pendingStage, want);
+      if (unlocked && !S.unlocked) { S.unlocked = true; S.pendingLift = 2; }
     },
-    // how intense the game is right now (energy 0..1) and how threatening (0..1)
-    setIntensity(energy, threat = energy) {
-      S.eWant = Math.max(0, Math.min(1, energy)); S.tWant = Math.max(0, Math.min(1, threat));
-      const t = ctx.currentTime, E = S.energy;
-      wet.gain.setTargetAtTime(0.55 - E * 0.22, t, 0.8); dry.gain.setTargetAtTime(0.72 + E * 0.12, t, 0.8); // punchier, less washy when it's busy
-      water.frequency.setTargetAtTime(700 + S.dream * 1400 + E * 1100, t, 0.6);
-    },
+    setIntensity(energy, threat = energy) { S.eWant = Math.max(0, Math.min(1, energy)); S.tWant = Math.max(0, Math.min(1, threat)); const t = ctx.currentTime; wet.gain.setTargetAtTime(0.42 - S.energy * 0.15, t, 0.8); water.frequency.setTargetAtTime(800 + S.dream * 1600 + S.energy * 900, t, 0.6); },
     accent(kind) { if (S.timer && S.accents.length < 3) S.accents.push(kind); },
-    // the music box's own knobs: tempo (a multiplier) and how many layers play (0..5, or null to follow the game)
-    setTempo(m) { S.tempoMul = Math.max(0.5, Math.min(1.6, m)); },
+    setTempo(m) { S.pendingTempo = Math.max(0.5, Math.min(1.6, m)); }, // applied at the next phrase, so the groove never stumbles
     setLayers(n) { S.manualStage = n; if (n !== null) S.pendingStage = Math.max(0, Math.min(5, Math.round(n))); },
-    // 1 = sweet dream, 0 = nightmare: the water gets murky and the tuning wobbles
-    setDream(d) {
-      S.dream = d;
-      const t = ctx.currentTime;
-      water.frequency.setTargetAtTime(700 + d * 1400 + S.energy * 1100, t, 0.6);
-      swayAmt.gain.setTargetAtTime(200 + d * 260, t, 0.6);
-    },
-    // for offline previews/tests: schedule everything up to time T, with progress following fn(t)
+    setDream(d) { S.dream = d; const t = ctx.currentTime; water.frequency.setTargetAtTime(800 + d * 1600 + S.energy * 900, t, 0.6); swayAmt.gain.setTargetAtTime(160 + d * 240, t, 0.6); },
+    info() { return S.info; }, // where the song is: section, bar, beat, chord (and its roman numeral), cadence, key
     renderUntil(T, theme = 'edge', progressAt = null, intensityAt = null) {
       this.start(theme); this.stop();
       S.next = 0.1;
       while (S.next < T) {
         if (progressAt) { const [p, u] = progressAt(S.next); this.setProgress(p, u); }
         if (intensityAt) { const [e, th, acc] = intensityAt(S.next); S.eWant = e; S.tWant = th; if (acc) S.accents.push(acc); }
-        scheduleStep(S.next, S.step++); S.next += stepDur();
+        scheduleStep(S.next); S.step++; S.next += stepDur();
       }
     },
   };
 }
 
-function impulse(ctx, secs) { // a soft, dark hall: decaying noise, a touch longer on the right
+function impulse(ctx, secs) { // a soft, dark hall
   const len = Math.floor(ctx.sampleRate * secs), buf = ctx.createBuffer(2, len, ctx.sampleRate);
   for (let ch = 0; ch < 2; ch++) {
     const d = buf.getChannelData(ch); let lp = 0;
-    for (let i = 0; i < len; i++) { lp = lp * 0.6 + (Math.random() * 2 - 1) * 0.4; d[i] = lp * Math.pow(1 - i / len, 2.6 + ch * 0.2); }
+    for (let i = 0; i < len; i++) { lp = lp * 0.6 + (Math.random() * 2 - 1) * 0.4; d[i] = lp * Math.pow(1 - i / len, 2.8 + ch * 0.2); }
   }
   return buf;
 }
