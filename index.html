@@ -51,6 +51,15 @@
   .mbSliders input[type=range] { width: 100%; accent-color: var(--gold); height: 22px; cursor: pointer; }
   #mbAuto.on { background: linear-gradient(180deg, #d7c2ff, #9a6bff); color: #160b33; box-shadow: 0 0 26px rgba(154,107,255,.7); animation: mbGlow 2.4s ease-in-out infinite; }
   @keyframes mbGlow { 50% { box-shadow: 0 0 40px rgba(154,107,255,.95); } }
+  /* speedrun results */
+  #endResults { margin: 6px 0 18px; text-align: left; }
+  #endResults table { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
+  #endResults th { font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: var(--gold); text-align: left; padding: 4px 6px; }
+  #endResults td { padding: 4px 6px; border-top: 1px solid var(--edge); }
+  #endResults td.n, #endResults th.n { text-align: right; }
+  #endResults tr.total td { font-weight: 900; color: #fff4dc; border-top: 2px solid var(--gold); }
+  #endResults .pb { color: var(--gold); font-weight: 900; }
+  #ending .card { max-height: calc(100vh - 40px); overflow-y: auto; }
   /* extras */
   .extras { display: grid; gap: 12px; margin: 6px 0 18px; }
   .xbtn { font: inherit; text-align: left; color: var(--ink); background: rgba(255,255,255,.06); border: 1px solid var(--edge); border-radius: 18px; padding: 16px 18px 16px 70px; cursor: pointer; position: relative; display: flex; flex-direction: column; gap: 3px; transition: transform .12s, background .12s, opacity .2s, filter .2s; }
@@ -155,7 +164,7 @@
   <div id="hud" class="hidden">
     <div class="hudrow">
       <div class="pill"><div id="chapterName">Chapter</div><div id="objective"></div></div>
-      <div class="right"><div class="pill">🐟 <span id="fish">0</span><span style="opacity:.55;font-size:13px"> / <span id="fishTotal">0</span></span></div><div class="pill" id="stars"></div><div class="pill" id="timer" style="font-size:13px">0:00</div><div class="pill" id="autoBadge" style="font-size:13px">🤖 Autoplay</div></div>
+      <div class="right"><div class="pill">🐟 <span id="fish">0</span><span style="opacity:.55;font-size:13px"> / <span id="fishTotal">0</span></span></div><div class="pill" id="stars"></div><div class="pill" id="timer" style="font-size:13px" title="This chapter">⏱ 0:00.00</div><div class="pill hidden" id="runTimer" style="font-size:13px" title="The whole run (in-game time)">🏁 0:00.00</div><div class="pill" id="autoBadge" style="font-size:13px">🤖 Autoplay</div></div>
     </div>
     <div id="dream"><div id="dreamLabel">Sweet dreams</div><div class="bar"><div id="dreamFill"></div></div></div>
     <div id="combo"></div>
@@ -176,6 +185,7 @@
       <h1><small>Blåhaj</small>Back to Bed</h1>
       <p>Leo’s favourite shark has tumbled off the bed in the middle of the night. Climb back up through a dark house before his dream turns into a nightmare.</p>
       <button class="btn" id="btnStart">▶ Begin</button>
+      <button class="btn ghost hidden" id="btnNewRun" title="Start a fresh run from chapter 1">🏁 New run</button>
       <button class="btn ghost" id="btnChapters">Chapters</button>
       <button class="btn ghost" id="btnHow">How to play</button>
       <button class="btn ghost" id="btnExtras">✨ Extras</button>
@@ -237,6 +247,7 @@
       <h2>Sweet dreams, Leo.</h2>
       <p>Blåhaj made it all the way back: off the edge, downstairs with Biscuit, up the big stairs, and into Leo’s arms just in time.</p>
       <p>Starfish found: <b id="endStars"></b></p>
+      <div id="endResults"></div>
       <button class="btn" id="btnEndTitle">Back to the title</button>
     </div>
   </div>

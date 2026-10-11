@@ -830,7 +830,14 @@ export class Game {
     Audio.win();
     this.hooks.complete(this.result());
   }
-  result() { return { time: this.stats.time, fish: this.stats.fish, fishTotal: this.ch.fish.length, nightmares: this.stats.nightmares, scares: this.stats.scares, stars: this.runStars.slice(), comfort: this.comfort }; }
+  // completion for speedrunners: fish, starfish, nightmares poofed (not the Queen's little helpers) and keys/bulbs, as a %
+  completion() {
+    const nm = this.enemies.filter((e) => !e.minion), F = this.features, col = F && F.collect;
+    const got = this.stats.fish + this.runStars.filter(Boolean).length + nm.filter((e) => !e.alive).length + (col ? F.got : 0);
+    const tot = this.fish.length + this.stars.length + nm.length + (col ? F.items.length : 0);
+    return tot ? Math.round((got / tot) * 100) : 100;
+  }
+  result() { return { pct: this.completion(), time: this.stats.time, fish: this.stats.fish, fishTotal: this.ch.fish.length, nightmares: this.stats.nightmares, scares: this.stats.scares, stars: this.runStars.slice(), comfort: this.comfort }; }
 
   // ---------------------------------------------------------------- visuals --
   visuals(dt) {
