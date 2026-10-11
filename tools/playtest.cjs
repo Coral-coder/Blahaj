@@ -1,8 +1,8 @@
 // End-to-end playtest: loads the real game in headless Chromium and plays the
 // whole story the way a player would, from the title's Begin button through
-// every cutscene and chapter to the ending screen. A bot drives the actual
-// input system (keys, camera, jumps); simulation is stepped deterministically
-// with rendering paused so software GPUs keep up.
+// every cutscene and chapter to the ending screen. The game's own autopilot
+// (src/autopilot.js) drives the actual input system; simulation is stepped
+// deterministically with rendering paused so software GPUs keep up.
 //
 //   npm run build && npm run playtest            (CHROMIUM_PATH=... if needed)
 const { chromium } = require('playwright-core');
@@ -32,7 +32,7 @@ const server = http.createServer((req, res) => {
   await page.addInitScript(() => localStorage.setItem('blahaj-big-adventure-v1', JSON.stringify({ quality: 'low', qualityLocked: true })));
   await page.goto(`http://localhost:${server.address().port}/`, { waitUntil: 'domcontentloaded', timeout: 120000 });
   await page.waitForFunction(() => window.__blahaj && window.__blahaj.game && window.__blahaj.mode === 'title', null, { timeout: 180000 });
-  await page.addScriptTag({ content: fs.readFileSync(path.join(__dirname, 'bot.js'), 'utf8') });
+  await page.evaluate(() => { window.__blahaj.auto.on = false; }); // the playtest drives the autopilot itself, flat out
   let failures = 0;
   const playCines = async () => {
     for (let guard = 0; guard < 200 && (await page.evaluate(() => window.__blahaj.mode)) === 'cine'; guard++) await page.evaluate(() => window.__blahaj.sim(0.5));
@@ -45,7 +45,7 @@ const server = http.createServer((req, res) => {
       await page.waitForFunction((ch) => window.__blahaj.game && window.__blahaj.game.index === ch && ['cine', 'play'].includes(window.__blahaj.mode), ch, { timeout: 180000 });
       await page.evaluate(() => { window.__blahaj.debug.noRender = true; });
       await playCines();
-      const r = await page.evaluate((route) => window.__bot.run(route), ROUTES[ch].filter((w) => w[0] !== 'snap'));
+      const r = await page.evaluate((route) => window.__blahaj.runRoute(route), ROUTES[ch].filter((w) => w[0] !== 'snap'));
       console.log(`${r.ok ? 'PASS' : 'FAIL'} chapter ${n} (lowest comfort ${Math.round(r.minComfort)})`);
       console.log(r.log.join('\n'));
       if (!r.ok) failures++;
@@ -58,7 +58,7 @@ const server = http.createServer((req, res) => {
     await page.waitForFunction((ch) => window.__blahaj.game && window.__blahaj.game.index === ch && ['cine', 'play'].includes(window.__blahaj.mode), ch, { timeout: 180000 });
     await page.evaluate(() => { window.__blahaj.debug.noRender = true; });
     await playCines();
-    const r = await page.evaluate((route) => window.__bot.run(route), ROUTES[ch].filter((w) => w[0] !== 'snap'));
+    const r = await page.evaluate((route) => window.__blahaj.runRoute(route), ROUTES[ch].filter((w) => w[0] !== 'snap'));
     console.log(`${r.ok ? 'PASS' : 'FAIL'} chapter ${ch + 1} (lowest comfort ${Math.round(r.minComfort)})`);
     if (!r.ok) { failures++; console.log(r.log.join('\n')); break; }
     await page.waitForTimeout(600);

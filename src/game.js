@@ -413,8 +413,9 @@ export class Game {
 
     // --- input relative to camera
     const mv = inp.move();
-    const fwd = V(-Math.sin(this.cam.yaw), 0, -Math.cos(this.cam.yaw));
-    const right = V(Math.cos(this.cam.yaw), 0, -Math.sin(this.cam.yaw));
+    const yaw = this.steerYaw ?? this.cam.yaw; // the autopilot steers on its own heading, leaving the camera free
+    const fwd = V(-Math.sin(yaw), 0, -Math.cos(yaw));
+    const right = V(Math.cos(yaw), 0, -Math.sin(yaw));
     const wish = fwd.multiplyScalar(mv.y).add(right.multiplyScalar(mv.x));
     const wishLen = Math.min(1, wish.length());
     const E = this.edge;

@@ -8,6 +8,7 @@ import { Game } from './game.js';
 import { loadBlahajModel } from './art.js';
 import { ITEMS } from './features.js';
 import { CINES, restingHug } from './cinematics.js';
+import { pilot, routeFor, STEP } from './autopilot.js';
 
 const $ = (id) => document.getElementById(id);
 const SAVE_KEY = 'blahaj-big-adventure-v1';
@@ -251,7 +252,7 @@ function cycleQuality() {
 }
 
 // ----------------------------------------------------------------- wiring --
-$('btnStart').onclick = () => { Audio.init(); Audio.click(); story = true; startChapter(save.completed[0] ? CHAPTERS.findIndex((c, i) => !save.completed[i]) : 0, true); };
+$('btnStart').onclick = () => { Audio.init(); Audio.click(); story = true; startChapter(0, true); }; // autoplay: always the whole story
 $('btnChapters').onclick = () => { Audio.init(); Audio.click(); buildChapterList(); show('chapters'); };
 $('btnHow').onclick = () => { Audio.init(); Audio.click(); $('howControls').innerHTML = controlsHtml(learnedAbilities()); show('how'); };
 $('btnHowBack').onclick = () => { Audio.click(); show('title'); };
@@ -263,7 +264,6 @@ $('btnEndTitle').onclick = () => { Audio.click(); startTitle(); };
 $('skip').onclick = skipCine;
 $('tPause').onclick = () => pause(true);
 document.querySelectorAll('.qbtn').forEach((b) => { b.textContent = qualityLabel(); b.onclick = () => { Audio.click(); cycleQuality(); }; });
-if ($('btnStart').textContent && save.completed[0]) $('btnStart').textContent = '▶ Continue';
 
 addEventListener('keydown', (e) => {
   if (e.code === 'KeyM') { Audio.init(); const m = Audio.toggleMute(); hooks.toast(m ? '🔇 Sound off' : '🔊 Sound on'); }
@@ -297,6 +297,37 @@ const perf = {
   },
 };
 
+// --------------------------------------------------------------- autoplay --
+// This build plays itself: once a chapter starts, the autopilot drives Blåhaj
+// through it with the same routes the playtest uses. The game runs in fixed
+// 1/60 s steps so her jumps land exactly as tuned. If a run goes wrong she takes
+// the chapter again from the top; after three misses she hands you the controls.
+const auto = { on: true, game: null, gen: null, idx: -1, tries: 0, check: 0, acc: 0 };
+function autoStep() {
+  if (!auto.on || mode !== 'play' || !game) return;
+  if (auto.game !== game) {
+    if (game.state !== 'play') return;
+    if (auto.idx !== current) { auto.idx = current; auto.tries = 0; }
+    auto.game = game; auto.gen = pilot(game, routeFor(game.ch)); auto.check = 0;
+    $('autoBadge').textContent = '🤖 Autoplay';
+  }
+  if (auto.check > 0 && --auto.check === 0 && game.state === 'play') autoMiss('route ended without winning');
+  if (!auto.gen) return;
+  const r = auto.gen.next();
+  if (!r.done) return;
+  auto.gen = null; input.keys.clear();
+  if (!r.value.ok) autoMiss(r.value.log.join('\n'));
+  else if (game.state === 'play') auto.check = 180; // should be through the door any moment
+}
+function autoMiss(why) {
+  console.log(`[autoplay] chapter ${current + 1} attempt ${auto.tries + 1} missed:\n${why}`);
+  auto.gen = null; input.keys.clear();
+  if (++auto.tries < 3) { hooks.toast('Whoops!', 'Blåhaj takes another run at it'); setTimeout(() => startChapter(current, false), 1200); return; }
+  game.steerYaw = null;
+  $('autoBadge').textContent = '🎮 Your turn';
+  hooks.toast('Your turn!', 'Blåhaj needs a hand with this one', 4500);
+}
+
 // ------------------------------------------------------------------- loop --
 const debug = { noRender: false, freeze: false };
 let last = performance.now(), beatT = 0;
@@ -309,7 +340,18 @@ function frame(now) {
   input.pollPad();
   if (input.pressed.has('pad-pause')) { if (mode === 'play') pause(true); else if (mode === 'paused') pause(false); }
   if (!game) { input.endFrame(); return; }
-  if (mode !== 'paused') game.update(dt); else input.endFrame();
+  if (mode === 'paused') input.endFrame();
+  else if (auto.on) { // fixed steps, snapped to the display's frames so motion stays smooth
+    auto.acc += dt;
+    const n = Math.min(4, Math.round(auto.acc / STEP));
+    auto.acc = THREE.MathUtils.clamp(auto.acc - n * STEP, -STEP, STEP);
+    for (let i = 0; i < n && game; i++) {
+      if (i) input.pollPad();
+      autoStep();
+      game.update(STEP);
+      if (mode === 'cine' && game.cine && game.cine.done) endCine();
+    }
+  } else game.update(dt);
   if (mode === 'cine' && game.cine && game.cine.done) endCine();
   if (mode === 'play') {
     $('timer').textContent = fmt(game.stats.time);
@@ -328,8 +370,10 @@ loading(true);
 loadBlahajModel().then(() => { startTitle(); requestAnimationFrame(frame); });
 
 window.__blahaj = {
-  get game() { return game; }, get mode() { return mode; }, save, debug, CHAPTERS,
+  get game() { return game; }, get mode() { return mode; }, save, debug, CHAPTERS, auto,
   startChapter, skipCine, startTitle,
+  // the playtest: play a whole route right now, stepping the game as fast as it will go
+  runRoute(route) { const it = pilot(game, route); for (;;) { const r = it.next(); if (r.done) return { ...r.value, mode }; this.sim(STEP); } },
   sim(seconds, step = 1 / 60) { for (let t = 0; t < seconds; t += step) { input.pollPad(); if (game) { game.update(step); if (mode === 'cine' && game.cine && game.cine.done) endCine(); } } },
 };
 void THREE;
