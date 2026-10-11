@@ -3,7 +3,7 @@
 //   lobber  - flings things that bounce and roll across the floor (cushions, oranges, tyres, ducks)
 //   sweeper - an arm or spray that turns round a point, or a pendulum that swings, low over the floor
 //   rings   - waves that ripple out across the floor: hop over them
-//   roamer  - something that zooms round a loop on the floor (a toy train, a wind-up car)
+//   roamer  - something that zooms round a loop on the floor or a tabletop (a toy train, a wind-up car)
 // The nightmare behind it lunges when it acts, and once every floor nightmare in the
 // room is poofed it gives up and poofs away too. Described in chapters.js as ch.hazard.
 import * as THREE from 'three';
@@ -171,13 +171,14 @@ export function updateHazard(game, dt) {
     if (!hz.calm) {
       hz.dist += (H.speed || 4) * dt;
       const [x, z, hd] = loopPoint(hz.loop, hz.dist);
-      hz.car.position.set(x, 0, z); hz.car.rotation.y = hd;
+      const y0 = H.y || 0, top = y0 + (H.top || 1.2); // y: it runs on a tabletop
+      hz.car.position.set(x, y0, z); hz.car.rotation.y = hd;
       if (hz.carTick) hz.carTick(hz.clock);
       const d = Math.hypot(P.pos.x - x, P.pos.z - z);
       if (hz.clock > 1.5) announce();
-      if (d < (H.radius || 1.2) + 0.3 && P.pos.y < (H.top || 1.2)) {
-        if (P.vel.y < 0 && P.pos.y > (H.top || 1.2) - 0.6) bonk(hz.car.position); // landed on it: that's a bounce on its driver
-        else hit(V(x, 0, z), H.msg);
+      if (d < (H.radius || 1.2) + 0.3 && P.pos.y < top && P.pos.y > y0 - 0.4) {
+        if (P.vel.y < 0 && P.pos.y > top - 0.6) bonk(hz.car.position); // landed on it: that's a bounce on its driver
+        else hit(V(x, y0, z), H.msg);
       }
     }
   }
@@ -247,11 +248,11 @@ function buildRoamer(hz, H) {
   for (let i = 0; i < loop.length; i++) { const a = loop[i], b = loop[(i + 1) % loop.length], l = a.distanceTo(b); segs.push({ a, b, l, s: L }); L += l; }
   hz.loop = { segs, L }; hz.dist = 0;
   if (H.track) { // toy track under it: two rails on sleepers, following the loop
-    const rail = Mat.steel(), wood = Mat.paint(0x6a4a2e, 0.8);
+    const rail = Mat.steel(), wood = Mat.paint(0x6a4a2e, 0.8), y0 = H.y || 0;
     for (const sg of segs) {
       const mid = sg.a.clone().add(sg.b).multiplyScalar(0.5), ang = Math.atan2(sg.b.x - sg.a.x, sg.b.z - sg.a.z);
-      for (const off of [-0.45, 0.45]) { const r = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, sg.l + 0.06), rail); r.position.set(mid.x + Math.cos(ang) * off, 0.1, mid.z - Math.sin(ang) * off); r.rotation.y = ang; r.receiveShadow = true; hz.group.add(r); }
-      const sl = new THREE.Mesh(new THREE.BoxGeometry(1.25, 0.06, 0.22), wood); sl.position.set(mid.x, 0.04, mid.z); sl.rotation.y = ang; sl.receiveShadow = true; hz.group.add(sl);
+      for (const off of [-0.45, 0.45]) { const r = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, sg.l + 0.06), rail); r.position.set(mid.x + Math.cos(ang) * off, y0 + 0.1, mid.z - Math.sin(ang) * off); r.rotation.y = ang; r.receiveShadow = true; hz.group.add(r); }
+      const sl = new THREE.Mesh(new THREE.BoxGeometry(1.25, 0.06, 0.22), wood); sl.position.set(mid.x, y0 + 0.04, mid.z); sl.rotation.y = ang; sl.receiveShadow = true; hz.group.add(sl);
     }
   }
   const car = new THREE.Group(); hz.car = car; hz.group.add(car);
@@ -266,7 +267,7 @@ function buildRoamer(hz, H) {
     for (const s of [-1, 1]) for (const z of [-0.7, 0, 0.6]) { const w = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.12, 14), blk); w.rotation.z = Math.PI / 2; w.position.set(s * 0.5, 0.28, z); car.add(w); wheels.push(w); }
     const driver = createShadow(0.38); driver.group.position.set(0, 1.0, -0.75); car.add(driver.group); hz.driver = driver;
     const lamp = new THREE.Sprite(new THREE.SpriteMaterial({ map: softDotTexture(), color: 0xffe0a0, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })); lamp.scale.setScalar(1.1); lamp.position.set(0, 0.85, 1.15); car.add(lamp);
-    car.scale.setScalar(1.45);
+    car.scale.setScalar(H.scale || 1.45);
     hz.carTick = (t) => { wheels.forEach((w) => (w.rotation.x = t * 9)); driver.update(1 / 60, t); };
   } else { // a wind-up toy car, key turning, a nightmare grinning on the bonnet
     const body = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.5, 1.7), Mat.plastic(0x3f8fd8)); body.position.y = 0.45; body.castShadow = true; car.add(body);
