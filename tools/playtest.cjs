@@ -11,7 +11,7 @@ const http = require('http'), fs = require('fs'), path = require('path');
 const ROUTES = Object.values(require('./routes.cjs'));
 
 const ROOT = path.join(__dirname, '..');
-const types = { '.js': 'text/javascript', '.html': 'text/html' };
+const types = { '.js': 'text/javascript', '.html': 'text/html', '.png': 'image/png', '.svg': 'image/svg+xml', '.ico': 'image/x-icon' };
 const server = http.createServer((req, res) => {
   let u = decodeURIComponent(req.url.split('?')[0]);
   if (u === '/') u = '/index.html';
