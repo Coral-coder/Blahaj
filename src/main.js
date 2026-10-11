@@ -69,6 +69,8 @@ const save = loadSave();
 const persist = () => { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) { /* ignore */ } };
 const unlocked = (i) => i === 0 || !!save.completed[i - 1];
 const fmt = (t) => (Number.isFinite(t) ? `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}` : '–');
+// speedrun clock: m:ss.cc (and h:mm:ss.cc past an hour)
+const fmtT = (t) => { if (!Number.isFinite(t)) return '–'; const h = Math.floor(t / 3600), m = Math.floor((t % 3600) / 60), ss = (t % 60).toFixed(2).padStart(5, '0'); return h ? `${h}:${String(m).padStart(2, '0')}:${ss}` : `${m}:${ss}`; };
 
 const renderer = new Renderer($('game'));
 renderer.setQuality(save.quality);
@@ -143,6 +145,8 @@ function startTitle() {
 }
 
 function startChapter(i, withIntro) {
+  // restarting a chapter mid-run: the time you spent still counts on the run clock
+  if (runOn() && game && current === i && game.state !== 'won' && game.stats.time > 0) { save.run.extra = save.run.extra || Array(CHAPTERS.length).fill(0); save.run.extra[i] += game.stats.time; persist(); }
   loading(true, `Chapter ${i + 1}: ${CHAPTERS[i].title}`);
   Audio.init(); Audio.resume();
   setTimeout(() => {
@@ -214,6 +218,14 @@ function updateHud() {
   $('stars').innerHTML = game.stars.map((st) => `<span class="${st.taken || save.stars[current][st.i] ? '' : 'off'}">⭐</span>`).join('');
 }
 
+// ---------------------------------------------------------------- speedrun --
+// Every chapter has its own stopwatch (in-game time: cutscenes and loading don't count) and a
+// completion %; a story run from chapter 1 adds a run stopwatch and splits, saved as it goes.
+function newRun() { save.run = { times: Array(CHAPTERS.length).fill(null), pcts: Array(CHAPTERS.length).fill(null) }; persist(); }
+const runOn = () => story && !!save.run && !auto.watching;
+const runTotal = () => (save.run ? save.run.times.reduce((a, t) => a + (t || 0), 0) + (save.run.extra || []).reduce((a, t) => a + (t || 0), 0) : 0); // (restarts count)
+const fullRun = () => !!save.run && save.run.times.every((t) => t !== null);
+
 function onComplete(r) {
   if (mode === 'demo') return; // the attract-mode demo never counts
   const i = current, ch = CHAPTERS[i];
@@ -221,8 +233,13 @@ function onComplete(r) {
     save.completed[i] = true;
     r.stars.forEach((t, k) => { if (t) save.stars[i][k] = true; });
     save.bestFish = save.bestFish || []; save.bestFish[i] = Math.max(save.bestFish[i] || 0, r.fish);
-    save.best[i] = save.best[i] ? Math.min(save.best[i], r.time) : r.time;
+    const prevBest = save.best[i], pb = !prevBest || r.time < prevBest;
+    save.best[i] = prevBest ? Math.min(prevBest, r.time) : r.time;
+    save.pcts = save.pcts || []; save.pcts[i] = Math.max(save.pcts[i] || 0, r.pct);
+    if (runOn()) { save.run.times[i] = r.time; save.run.pcts[i] = r.pct; }
     persist();
+    // the split
+    hooks.toast(`⏱ ${fmtT(r.time)} · ${r.pct}%${runOn() ? ` · 🏁 ${fmtT(runTotal())}` : ''}`, pb ? (prevBest ? `New best! (was ${fmtT(prevBest)})` : `Chapter ${i + 1} done`) : `Best ${fmtT(prevBest)}`, 4200);
   }
   const after = () => {
     if (ch.outro === 'ending') { Audio.stopMusic(); Audio.stopRoom(); mode = 'menu'; showEnding(r); return; }
@@ -235,6 +252,21 @@ function onComplete(r) {
 function showEnding() {
   const total = save.stars.reduce((a, t) => a + t.filter(Boolean).length, 0);
   $('endStars').textContent = `${total} / ${CHAPTERS.length * 3}`;
+  // the results: this run's splits (or your bests), every chapter's %, and the totals
+  const run = runOn() && save.run, pcts = save.pcts || [];
+  const rows = CHAPTERS.map((c, i) => {
+    const t = run ? run.times[i] : save.best[i], p = run ? run.pcts[i] : pcts[i];
+    return `<tr><td>${i + 1}. ${c.title}</td><td class="n">${fmtT(t ?? NaN)}</td><td class="n">${fmtT(save.best[i] ?? NaN)}</td><td class="n">${p ?? '–'}${p != null ? '%' : ''}</td></tr>`;
+  }).join('');
+  const usePcts = CHAPTERS.map((c, i) => (run ? run.pcts[i] : pcts[i]) || 0), cum = Math.round(usePcts.reduce((a, b) => a + b, 0) / CHAPTERS.length);
+  let totalCell = '–', note = '';
+  if (run && fullRun()) {
+    const tot = runTotal(), prev = save.bestRun, pb = !prev || tot < prev;
+    if (pb) { save.bestRun = tot; persist(); }
+    totalCell = fmtT(tot); note = pb ? `<p class="pb">🏁 New personal best${prev ? ` (was ${fmtT(prev)})` : ''}!</p>` : `<p>Personal best: <b>${fmtT(prev)}</b></p>`;
+  } else if (!run) totalCell = fmtT(save.best.reduce((a, t) => a + (t || 0), 0));
+  $('endResults').innerHTML = `${note}<table><thead><tr><th>${run ? 'This run' : 'Your bests'}</th><th class="n">Time</th><th class="n">Best</th><th class="n">%</th></tr></thead><tbody>${rows}</tbody>
+    <tfoot><tr class="total"><td>Total${run ? '' : ' (sum of bests)'}</td><td class="n">${totalCell}</td><td class="n">${save.bestRun ? fmtT(save.bestRun) : '–'}</td><td class="n">${cum}%</td></tr></tfoot></table>`;
   hooks.fade(false);
   show('ending');
 }
@@ -247,7 +279,7 @@ function buildChapterList() {
     const d = document.createElement('button');
     d.className = 'chap' + (open ? '' : ' locked');
     const td = save.stars[i].map((t) => `<span class="${t ? '' : 'off'}">⭐</span>`).join('') + (save.completed[i] ? ` <span style="font-size:13px">🐟 ${(save.bestFish || [])[i] || 0}/${ch.fish.length}</span>` : '');
-    d.innerHTML = `<span class="num">Chapter ${i + 1}</span><span class="name">${ch.title}</span><span class="goal">${open ? ch.goalText : '🔒 Finish the chapter before'}</span><span class="td">${td}</span><span class="meta">${save.completed[i] ? '⏱ best ' + fmt(save.best[i]) : ''}</span>`;
+    d.innerHTML = `<span class="num">Chapter ${i + 1}</span><span class="name">${ch.title}</span><span class="goal">${open ? ch.goalText : '🔒 Finish the chapter before'}</span><span class="td">${td}</span><span class="meta">${save.completed[i] ? `⏱ best ${fmtT(save.best[i])} · ${(save.pcts || [])[i] ?? 0}%` : ''}</span>`;
     if (open) d.onclick = () => { Audio.init(); Audio.click(); story = false; startChapter(i, true); };
     grid.appendChild(d);
   });
@@ -332,7 +364,14 @@ function watch(on) {
 Audio.vol = save.musicVol ?? 1; // the music volume you chose, for when the sound starts up
 
 // ----------------------------------------------------------------- wiring --
-$('btnStart').onclick = () => { Audio.init(); Audio.click(); story = true; startChapter(AUTOPLAY || !save.completed[0] ? 0 : Math.max(0, CHAPTERS.findIndex((c, i) => !save.completed[i])), true); };
+$('btnStart').onclick = () => {
+  Audio.init(); Audio.click(); story = true;
+  const i = AUTOPLAY || !save.completed[0] ? 0 : Math.max(0, CHAPTERS.findIndex((c, k) => !save.completed[k]));
+  if (i === 0 || !save.run) newRun(); // from the top, a fresh run; continuing carries on the saved one
+  startChapter(i, true);
+};
+$('btnNewRun').onclick = () => { Audio.init(); Audio.click(); story = true; newRun(); startChapter(0, true); };
+$('btnNewRun').classList.toggle('hidden', !save.completed[0] || AUTOPLAY);
 $('btnChapters').onclick = () => { Audio.init(); Audio.click(); buildChapterList(); show('chapters'); };
 $('btnHow').onclick = () => { Audio.init(); Audio.click(); $('howControls').innerHTML = controlsHtml(learnedAbilities()); show('how'); };
 $('btnHowBack').onclick = () => { Audio.click(); show('title'); };
@@ -490,7 +529,9 @@ function frame(now) {
   } else game.update(dt);
   if (mode === 'cine' && game.cine && game.cine.done) endCine();
   if (mode === 'play') {
-    $('timer').textContent = fmt(game.stats.time);
+    $('timer').textContent = `⏱ ${fmtT(game.stats.time)}`;
+    $('runTimer').classList.toggle('hidden', !runOn());
+    if (runOn()) $('runTimer').textContent = `🏁 ${fmtT(runTotal() + game.stats.time)}`;
     updateHud();
     Audio.setDream(game.state === 'won' ? 1 : game.comfort / 100); // once you've won, the hum fades away
     Audio.setProgress(...game.progress());
@@ -507,7 +548,7 @@ loading(true);
 loadBlahajModel().then(() => { startTitle(); requestAnimationFrame(frame); });
 
 window.__blahaj = {
-  get game() { return game; }, get mode() { return mode; }, save, debug, CHAPTERS, auto, startDemo, ATTRACT, box,
+  get game() { return game; }, get mode() { return mode; }, save, debug, CHAPTERS, auto, startDemo, ATTRACT, box, showEnding,
   startChapter, skipCine, startTitle,
   // the playtest: play a whole route right now, stepping the game as fast as it will go
   runRoute(route) { const it = pilot(game, route); for (;;) { const r = it.next(); if (r.done) return { ...r.value, mode }; this.sim(STEP); } },
