@@ -11,10 +11,11 @@ const fs = require('fs'), path = require('path');
   const b64 = await p.evaluate(async ([theme, secs]) => {
     const { createMusic } = window.__engine, SR = 32000, ctx = new OfflineAudioContext(2, SR * secs, SR), g = ctx.createGain(); g.gain.value = 0.3; g.connect(ctx.destination);
     const m = createMusic(ctx, g);
-    // calm -> exploring -> action -> boss -> cleared (and the way out opens two-thirds in)
-    const E = (t) => { const k = t / secs; return k < 0.2 ? 0.1 : k < 0.4 ? 0.35 : k < 0.6 ? 0.65 : k < 0.8 ? 0.92 : 0.15; };
-    const T = (t) => { const k = t / secs; return k >= 0.6 && k < 0.8 ? 0.8 : 0; };
-    m.renderUntil(secs - 3, theme, (t) => [Math.min(1, t / secs * 1.4), t > secs * 0.7], (t) => [E(t), T(t), null]);
+    // a level: hunting the nightmares -> danger about (adventure chords) -> close danger (minor)
+    // -> the last nightmare poofed at 65%: awake and upbeat for the rest
+    const E = (t) => { const k = t / secs; return k < 0.2 ? 0.15 : k < 0.4 ? 0.45 : k < 0.55 ? 0.8 : k < 0.65 ? 0.35 : 0.2; };
+    const T = (t) => { const k = t / secs; return k < 0.2 ? 0.3 : k < 0.4 ? 0.6 : k < 0.55 ? 0.9 : 0.1; };
+    m.renderUntil(secs - 3, theme, (t) => [Math.min(1, t / secs * 1.3), t > secs * 0.65], (t) => [E(t), T(t), null]);
     const buf = await ctx.startRendering(), L = buf.getChannelData(0), R = buf.getChannelData(1), n = L.length;
     let peak = 0.01; for (let i = 0; i < n; i++) peak = Math.max(peak, Math.abs(L[i]), Math.abs(R[i]));
     const pcm = new Int16Array(n * 2); for (let i = 0; i < n; i++) { pcm[i * 2] = (L[i] / peak) * 0.9 * 32767; pcm[i * 2 + 1] = (R[i] / peak) * 0.9 * 32767; }

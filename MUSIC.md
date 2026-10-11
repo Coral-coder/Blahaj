@@ -35,12 +35,30 @@ downbeat after.
 neighbour notes). Each phrase arches up and back down to its cadence note: scale
 degree 2 or 5 over the half cadence, 1 over the authentic cadence.
 
+## Hunt and awake
+
+While the room still has nightmares (**hunt**) the theme plays as a lively
+adventure from the first bar: an adventure bass (root, a push on the *and* of 2,
+the fifth, a step into the next chord), a light beat with a kick that pushes on
+the *and* of 3, syncopated tune rhythms. When the last one is poofed (**awake**)
+it modulates up a whole step at the next phrase with a little fanfare, minor
+themes brighten to major, and the full groove plays (pumping bass, backbeat,
+open hats on the offbeats), a touch faster. The lullaby colours (music box,
+harp, soft pads) stay underneath: an action-adventure *dream*.
+
+**Danger.** Moderate threat swaps in the borrowed adventure chords (vi → ♭VI,
+iii → ♭VII, ii → IV off the cadences; some phrases cadence ♭VI – ♭VII – I).
+Only real, close danger (threat > 0.8) turns the theme minor.
+
+**Leads.** Ocarina, a soft horn, piano, a dreamy synth lead, flute, marimba
+and (for the lullaby rooms) the music box. No kalimba.
+
 ## How the game steers it
 
 | Call | Musical effect |
 |---|---|
-| `setProgress(p, open)` | layers build (pad → tune → bass → accompaniment → drums → strings); when the way out opens it modulates up a whole step at the top of the next song |
-| `setIntensity(energy, threat)` | energy adds layers and rhythmic density (8ths → 16ths, driving bass, backbeat, fills); threat switches to the parallel minor, only at a phrase boundary |
+| `setProgress(p, open)` | layers build; `open` (the nightmares are gone) wakes it up at the next phrase |
+| `setIntensity(energy, threat)` | energy adds rhythmic density (8ths → 16ths, driving bass, backbeat, fills); threat brings the adventure chords, then minor, at phrase boundaries |
 | `accent(kind)` | poof / hit / boss / rage / triumph, quantized to the next beat |
 | `setTempo(m)` | applied at the next phrase so the groove never stumbles |
 | `setDream(d)` | the underwater filter and a touch of detune as the dream sours |

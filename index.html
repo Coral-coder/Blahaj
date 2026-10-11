@@ -42,7 +42,7 @@
 <body>
 <main id="lab">
   <h1>🎵 Blåhaj Music Lab</h1>
-  <p class="sub">The game's music engine on its own. Every theme is a 32-bar AABA song: each A is a question (ending on a half cadence) and an answer (a perfect authentic cadence home), B is the bridge. Steer it the way the game does and watch where it is.</p>
+  <p class="sub">The game's music engine on its own. Every theme is a 32-bar AABA song: each A is a question (ending on a half cadence) and an answer (a perfect authentic cadence home), B is the bridge. While the room has nightmares it plays as a lively adventure; once they're poofed it wakes up, bright and upbeat. Steer it the way the game does (leave Layers on “follow progress”) and watch where it is.</p>
 
   <div class="panel row">
     <select id="theme" aria-label="Theme"></select>
@@ -71,12 +71,12 @@
     <h2>Steer it like the game</h2>
     <div class="sliders">
       <label><span>Energy<em>calm ↔ action</em></span><input type="range" id="energy" min="0" max="100" value="20"></label>
-      <label><span>Threat<em>major ↔ minor</em></span><input type="range" id="mood" min="0" max="100" value="0"></label>
+      <label><span>Threat<em>calm ↔ adventure chords ↔ minor</em></span><input type="range" id="mood" min="0" max="100" value="0"></label>
       <label><span>Tempo<em>slower ↔ faster</em></span><input type="range" id="tempo" min="0" max="100" value="50"></label>
       <label><span>Water<em>clear ↔ deep</em></span><input type="range" id="water" min="0" max="100" value="20"></label>
       <label><span>Layers<em id="layersOut">follow progress</em></span><input type="range" id="layers" min="-1" max="5" step="1" value="-1"></label>
       <label><span>Level progress<em>when layers follow</em></span><input type="range" id="progress" min="0" max="100" value="30"></label>
-      <label class="check"><input type="checkbox" id="unlock"> Way out open (key lifts a step)</label>
+      <label class="check"><input type="checkbox" id="unlock"> Nightmares poofed: awake (up a step, upbeat)</label>
       <label><span>Volume</span><input type="range" id="vol" min="0" max="100" value="70"></label>
     </div>
   </div>

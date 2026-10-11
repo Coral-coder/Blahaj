@@ -26,31 +26,53 @@
 // to its cadence note: scale degree 2 or 5 over the half cadence, 1 over the
 // authentic cadence (approached by step from 2 or 7).
 //
-// The game steers it: setProgress (layers build as you play), setIntensity
-// (energy -> rhythmic density and drums; threat -> the parallel minor, switched
-// at phrase boundaries), accent (a quantized musical hit), setDream (the water).
+// THE TWO STATES. While the room still has nightmares in it ("hunt"), the theme
+// plays as a lively adventure from the first bar: a moving bass, a light beat,
+// syncopated rhythms, heroic chords. Once they're all poofed and the way out
+// opens ("awake"), it modulates up a step at the next phrase with a little
+// fanfare and plays out bright and upbeat: the full groove, a touch faster.
+// Lullaby colours (music box, harp, soft pads) stay in the accompaniment, so it
+// stays a dream, an action-adventure dream.
+//
+// DANGER. Moderate threat brings in the borrowed "adventure" chords (bVI and
+// bVII, so phrases can cadence bVI - bVII - I); only real, close danger turns the
+// theme to its minor. Both switch at phrase boundaries.
+//
+// The game steers it: setProgress (layers build; unlocked = the nightmares are
+// gone: awake), setIntensity (energy -> rhythmic density and drums; threat ->
+// adventure chords, then minor), accent (a quantized musical hit), setDream.
 
 // --- theory ---------------------------------------------------------------------
 const SCALES = { major: [0, 2, 4, 5, 7, 9, 11], minor: [0, 2, 3, 5, 7, 8, 10] };
 const NOTE = ['C', 'C♯', 'D', 'E♭', 'E', 'F', 'F♯', 'G', 'A♭', 'A', 'B♭', 'B'];
 // roman numeral -> [scale-degree root (0-6), seventh?]; quality comes from the scale
-const ROMAN = { I: [0], ii: [1], iii: [2], IV: [3], V: [4], V7: [4, 1], vi: [5], 'vii°': [6] };
-const MINOR_NAME = { I: 'i', ii: 'ii°', iii: 'III', IV: 'iv', V: 'V', V7: 'V7', vi: 'VI', 'vii°': 'vii°' };
+// roman numeral -> [scale-degree root, seventh?, exact semitones (borrowed / secondary chords)]
+const ROMAN = {
+  I: [0], ii: [1], iii: [2], IV: [3], V: [4], V7: [4, 1], vi: [5], 'vii°': [6],
+  II: [1, 0, [2, 6, 9]],      // V/V: the bright major II that leans into V
+  bVI: [5, 0, [8, 12, 15]],   // borrowed from the parallel minor: the heroic "adventure" chords
+  bVII: [6, 0, [10, 14, 17]],
+};
+const BORROWED = new Set(['bVI', 'bVII']);
+const MINOR_NAME = { I: 'i', ii: 'ii°', iii: 'III', IV: 'iv', V: 'V', V7: 'V7', vi: 'VI', 'vii°': 'vii°', II: 'II', bVI: 'VI', bVII: 'VII' };
 
 // phrase templates, one entry per bar; two chords in a bar split it in half
+// bright, mostly primary chords (I, IV, V, V/V); the minor ones mostly wait for the bridge
 const ANTECEDENT = [ // ends on a half cadence (V)
-  [['I'], ['IV'], ['ii'], ['V']], [['I'], ['vi'], ['IV'], ['V']],
-  [['I'], ['V'], ['vi'], ['V']], [['I'], ['ii'], ['I'], ['V']],
+  [['I'], ['IV'], ['I'], ['V']], [['I'], ['V'], ['IV'], ['V']],
+  [['I'], ['IV'], ['II'], ['V']], [['I'], ['bVII'], ['IV'], ['V']],
 ];
-const CONSEQUENT = [ // ends on a perfect authentic cadence (V7 - I)
-  [['I'], ['vi'], ['ii', 'V7'], ['I']], [['I'], ['IV'], ['ii', 'V7'], ['I']],
-  [['I'], ['iii'], ['IV', 'V7'], ['I']], [['vi'], ['IV'], ['ii', 'V7'], ['I']],
+const CONSEQUENT = [ // ends on a perfect authentic cadence (V7 - I), or the heroic bVI - bVII - I
+  [['I'], ['IV'], ['ii', 'V7'], ['I']], [['I'], ['II'], ['IV', 'V7'], ['I']],
+  [['IV'], ['I'], ['II', 'V7'], ['I']], [['I'], ['IV'], ['bVI', 'bVII'], ['I']],
 ];
 const BRIDGE = [ // eight bars away from home, ending on the dominant
-  [['IV'], ['I'], ['IV'], ['I'], ['vi'], ['ii'], ['IV'], ['V7']],
-  [['vi'], ['iii'], ['IV'], ['I'], ['ii'], ['vi'], ['IV'], ['V']],
   [['IV'], ['V'], ['iii'], ['vi'], ['ii'], ['V'], ['I'], ['V7']],
+  [['bVI'], ['bVII'], ['I'], ['I'], ['bVI'], ['bVII'], ['IV'], ['V7']],
+  [['vi'], ['IV'], ['I'], ['V'], ['vi'], ['IV'], ['II'], ['V7']],
 ];
+// under threat, swap in the adventure colours (only off the cadences)
+const HEROIC = { vi: 'bVI', iii: 'bVII', ii: 'IV' };
 const AMEN = [['I'], ['IV'], ['IV'], ['I']]; // a plagal tag to finish
 
 // meters: beats per bar, grid steps per beat (16ths; 6/8 counts dotted-quarter beats)
@@ -62,13 +84,13 @@ const METERS = {
 // one-bar melodic rhythm cells (1 = a note starts here); 'cad' is the cadence bar
 const CELLS = {
   '4/4': {
-    a: [[1, 0, 0, 0, 1, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0, 0], [1, 0, 0, 0, 0, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 0], [1, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 1, 0]],
-    b: [[1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0], [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0, 1, 0, 0, 0], [0, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0, 0]],
+    a: [[1, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 1, 0], [1, 0, 1, 0, 0, 1, 0, 1, 1, 0, 0, 0, 1, 0, 0, 0], [1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0, 1, 0], [1, 0, 0, 0, 1, 0, 1, 0, 1, 0, 0, 1, 0, 0, 1, 0]],
+    b: [[1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0, 0], [1, 0, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 0], [0, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 1, 0, 0, 1, 0]],
     cad: [[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0]],
     smooth: [[1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0], [1, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0]],
   },
   '3/4': {
-    a: [[1, 0, 0, 0, 1, 0, 1, 0, 1, 0, 0, 0], [1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0], [1, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0, 0]],
+    a: [[1, 0, 0, 0, 1, 0, 1, 0, 1, 0, 0, 0], [1, 0, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0], [1, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0, 0]],
     b: [[1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 0], [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0]],
     cad: [[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]],
     smooth: [[1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0], [1, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0]],
@@ -84,21 +106,21 @@ const CELLS = {
 // --- chapter themes ---------------------------------------------------------------
 // key: tonic (semitones from C), mode, meter, tempo, who sings the tune, the
 // accompaniment colour, a little of the room in time with it, and how goofy
-const THEMES = {
-  edge:      { key: 0, mode: 'major', meter: '4/4', bpm: 76, lead: 'kalimba', color: 'musicbox', amb: 'bubbles', goof: 0.8 },
-  downstairs:{ key: -3, mode: 'major', meter: '4/4', bpm: 84, lead: 'marimba', color: 'rhodes', amb: 'fire', goof: 1 },
-  kitchen:   { key: 2, mode: 'major', meter: '4/4', bpm: 96, lead: 'marimba', color: 'pizz', amb: 'drips', goof: 1.3 },
-  laundry:   { key: -2, mode: 'major', meter: '6/8', bpm: 62, lead: 'kalimba', color: 'glock', amb: 'churn', goof: 1.2 },
-  backyard:  { key: 5, mode: 'major', meter: '6/8', bpm: 54, lead: 'flute', color: 'harp', amb: 'crickets', goof: 0.6 },
-  garage:    { key: -5, mode: 'minor', meter: '4/4', bpm: 88, lead: 'rhodes', color: 'pizz', amb: 'buzz', goof: 0.8 },
-  basement:  { key: -7, mode: 'minor', meter: '6/8', bpm: 52, lead: 'celesta', color: 'harp', amb: 'chuff', goof: 0.4 },
-  stairs:    { key: 0, mode: 'major', meter: '4/4', bpm: 104, lead: 'marimba', color: 'harp', amb: 'clock', goof: 0.5 },
-  hallway:   { key: 3, mode: 'major', meter: '3/4', bpm: 96, lead: 'flute', color: 'musicbox', amb: 'clock', goof: 0.7 },
-  bathroom:  { key: 1, mode: 'major', meter: '4/4', bpm: 88, lead: 'kalimba', color: 'glock', amb: 'drips', goof: 1.4 },
-  parents:   { key: -1, mode: 'major', meter: '3/4', bpm: 84, lead: 'musicbox', color: 'rhodes', amb: 'snore', goof: 1 },
-  playroom:  { key: 4, mode: 'major', meter: '4/4', bpm: 100, lead: 'glock', color: 'pizz', amb: 'toys', goof: 1.5 },
-  attic:     { key: -4, mode: 'minor', meter: '4/4', bpm: 78, lead: 'celesta', color: 'strings', amb: 'wind', goof: 0.3 },
-  bed:       { key: 0, mode: 'major', meter: '3/4', bpm: 72, lead: 'musicbox', color: 'harp', amb: 'bubbles', goof: 0.5 },
+const THEMES = { // leads: ocarina, horn, piano, synth (a soft dreamy lead), flute, marimba, musicbox...
+  edge:      { key: 0, mode: 'major', meter: '4/4', bpm: 96, lead: 'ocarina', color: 'musicbox', amb: 'bubbles', goof: 0.6 },
+  downstairs:{ key: -3, mode: 'major', meter: '4/4', bpm: 100, lead: 'piano', color: 'rhodes', amb: 'fire', goof: 0.8 },
+  kitchen:   { key: 2, mode: 'major', meter: '4/4', bpm: 112, lead: 'marimba', color: 'pizz', amb: 'drips', goof: 1.1 },
+  laundry:   { key: -2, mode: 'major', meter: '6/8', bpm: 72, lead: 'synth', color: 'glock', amb: 'churn', goof: 1 },
+  backyard:  { key: 5, mode: 'major', meter: '6/8', bpm: 66, lead: 'flute', color: 'harp', amb: 'crickets', goof: 0.5 },
+  garage:    { key: -5, mode: 'major', meter: '4/4', bpm: 108, lead: 'horn', color: 'pizz', amb: 'buzz', goof: 0.8 },
+  basement:  { key: -7, mode: 'minor', meter: '6/8', bpm: 66, lead: 'horn', color: 'harp', amb: 'chuff', goof: 0.3 },
+  stairs:    { key: 0, mode: 'major', meter: '4/4', bpm: 120, lead: 'horn', color: 'strings', amb: 'clock', goof: 0.4 },
+  hallway:   { key: 3, mode: 'major', meter: '3/4', bpm: 108, lead: 'ocarina', color: 'musicbox', amb: 'clock', goof: 0.6 },
+  bathroom:  { key: 1, mode: 'major', meter: '4/4', bpm: 104, lead: 'marimba', color: 'glock', amb: 'drips', goof: 1.2 },
+  parents:   { key: -1, mode: 'major', meter: '3/4', bpm: 92, lead: 'piano', color: 'musicbox', amb: 'snore', goof: 0.9 },
+  playroom:  { key: 4, mode: 'major', meter: '4/4', bpm: 116, lead: 'synth', color: 'pizz', amb: 'toys', goof: 1.3 },
+  attic:     { key: -4, mode: 'minor', meter: '4/4', bpm: 100, lead: 'horn', color: 'strings', amb: 'wind', goof: 0.2 },
+  bed:       { key: 0, mode: 'major', meter: '3/4', bpm: 84, lead: 'musicbox', color: 'harp', amb: 'bubbles', goof: 0.4 },
 };
 export const THEME_LIST = Object.keys(THEMES);
 export { THEMES };
@@ -129,14 +151,14 @@ export function createMusic(ctx, out) {
     th: THEMES.edge, id: 'edge', meter: METERS['4/4'], cells: CELLS['4/4'],
     next: 0, step: 0, timer: null, dream: 1, tempoMul: 1, pendingTempo: 1,
     stage: 0, pendingStage: 0, manualStage: null, progress: 0, unlocked: false, lift: 0, pendingLift: 0,
-    energy: 0, eWant: 0, threat: 0, tWant: 0, minor: false, accents: [],
+    energy: 0, eWant: 0, threat: 0, tWant: 0, minor: false, heroic: false, accents: [], awake: false, pendingAwake: false,
     song: null, loop: 0, voicing: null, info: {},
   };
-  const stepDur = () => 60 / (S.th.bpm * S.tempoMul) / S.meter.spb;
+  const stepDur = () => 60 / (S.th.bpm * S.tempoMul * (S.awake ? 1.05 : 1)) / S.meter.spb; // awake: a touch quicker
   const barSteps = () => S.meter.beats * S.meter.spb;
-  const mode = () => (S.minor ? 'minor' : S.th.mode);
+  const mode = () => (S.minor ? 'minor' : 'major'); // S.minor already knows the theme's own mode, the danger and whether you're awake
   const keyOff = () => S.th.key + S.lift;
-  const hz = (semi) => 261.63 * Math.pow(2, (semi + keyOff()) / 12) * (1 + (1 - S.dream) * (rnd() - 0.5) * 0.04);
+  const hz = (semi) => 261.63 * Math.pow(2, (semi + keyOff()) / 12) * (S.dream < 0.3 ? 1 + (0.3 - S.dream) * (rnd() - 0.5) * 0.03 : 1); // in tune; only a deep nightmare wobbles it
 
   // --- theory helpers -----------------------------------------------------------------
   // a scale degree (any integer; 7 = the octave) -> semitones above the tonic
@@ -149,7 +171,16 @@ export function createMusic(ctx, out) {
   // the chord's tones as scale degrees (root, third, fifth[, seventh])
   function chordDegs(roman) { const [r, sev] = ROMAN[roman]; const d = [r, r + 2, r + 4]; if (sev) d.push(r + 6); return d; }
   const isDominant = (roman) => roman === 'V' || roman === 'V7' || roman === 'vii°';
-  const chordSemis = (roman) => chordDegs(roman).map((d) => degSemi(d, isDominant(roman)));
+  const chordSemis = (roman) => ROMAN[roman][2] ? ROMAN[roman][2].slice() : chordDegs(roman).map((d) => degSemi(d, isDominant(roman)));
+  // a melody note against the chord sounding: borrowed chords borrow the minor scale's notes,
+  // V/V raises the 4th, and a strong-beat note that isn't in the chord slides to the nearest chord tone
+  function fitNote(deg, chord, strong) {
+    let s = BORROWED.has(chord) && mode() === 'major' ? (() => { const sc = SCALES.minor, n = Math.floor(deg / 7), i = ((deg % 7) + 7) % 7; return sc[i] + 12 * n; })() : degSemi(deg, isDominant(chord));
+    const pc = ((s % 12) + 12) % 12;
+    if (chord === 'II' && mode() === 'major' && pc === 5) s += 1;
+    if (strong) { const pcs = chordSemis(chord).map((x) => ((x % 12) + 12) % 12), p2 = ((s % 12) + 12) % 12; if (!pcs.includes(p2)) for (const d of [-1, 1, -2, 2]) if (pcs.includes((((p2 + d) % 12) + 12) % 12)) { s += d; break; } }
+    return s;
+  }
   function chordName(roman) {
     const semis = chordSemis(roman), root = ((semis[0] % 12) + 12) % 12, third = semis[1] - semis[0], fifth = semis[2] - semis[0];
     const q = fifth === 6 ? '°' : third === 3 ? 'm' : '';
@@ -202,6 +233,9 @@ export function createMusic(ctx, out) {
         last = d;
       });
     }
+    // the note before the cadence steps into it: from the leading tone below (rising home) or from above
+    const pre = notes.filter((n) => n.step < 3 * bs).pop();
+    if (pre) pre.deg = cadenceNote + (cadenceNote % 7 === 0 && r() < 0.5 ? -1 : 1);
     return notes;
   }
   // approach the cadence by step: 2 or 7 before 1
@@ -266,6 +300,7 @@ export function createMusic(ctx, out) {
     rhodes: [[[1, 1, 1.3], [2.0, 0.25, 0.6], [7.0, 0.06, 0.08]], 0.08],
     harp: [[[1, 1, 1.1], [2.0, 0.35, 0.5], [3.0, 0.12, 0.25]], 0.06],
     pizz: [[[1, 1, 0.22], [2.0, 0.3, 0.1]], 0.08],
+    piano: [[[1, 1, 1.5], [2.0, 0.45, 0.8], [3.0, 0.2, 0.35], [4.0, 0.1, 0.18]], 0.085],
   };
   function pluck(kind, semi, t, vol = 1, opt = {}) {
     const [parts, peak] = PLUCKS[kind] || PLUCKS.kalimba, f = hz(semi);
@@ -282,9 +317,34 @@ export function createMusic(ctx, out) {
     const o = osc('sine', f, t, t + dur + 0.1, g), o2 = osc('triangle', f, t, t + dur + 0.1, g); o2.detune.value = 4;
     if (dur > 0.3) { const vib = ctx.createOscillator(), va = ctx.createGain(); vib.frequency.value = 5; va.gain.setValueAtTime(0, t); va.gain.linearRampToValueAtTime(f * 0.01, t + Math.min(0.5, dur)); vib.connect(va); va.connect(o.frequency); va.connect(o2.frequency); vib.start(t); vib.stop(t + dur + 0.1); }
   }
+  function horn(semi, t, dur, vol = 1) { // a soft heroic horn: two detuned saws, the filter opening as it speaks
+    const f = hz(semi), g = voice(bus, 0.08), lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.Q.value = 1.1;
+    lp.frequency.setValueAtTime(350, t); lp.frequency.linearRampToValueAtTime(1500 + S.energy * 900, t + 0.07); lp.frequency.linearRampToValueAtTime(900, t + dur + 0.1);
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.04 * vol, t + 0.04); g.gain.setValueAtTime(0.034 * vol, t + Math.max(0.05, dur - 0.04)); g.gain.linearRampToValueAtTime(0, t + dur + 0.14);
+    lp.connect(g); g.connect(echoIn);
+    const os = [-7, 7].map((det) => { const o = osc('sawtooth', f, t, t + dur + 0.2, lp); o.detune.value = det; return o; });
+    if (dur > 0.35) { const vib = ctx.createOscillator(), va = ctx.createGain(); vib.frequency.value = 5.2; va.gain.setValueAtTime(0, t); va.gain.linearRampToValueAtTime(f * 0.008, t + Math.min(0.5, dur)); vib.connect(va); os.forEach((o) => va.connect(o.frequency)); vib.start(t); vib.stop(t + dur + 0.2); }
+  }
+  function ocarina(semi, t, dur, vol = 1) { // round and airy, with a breath at the start
+    const f = hz(semi + 12), g = voice(bus, 0.12); g.connect(echoIn);
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.055 * vol, t + 0.03); g.gain.setValueAtTime(0.05 * vol, t + Math.max(0.04, dur - 0.05)); g.gain.linearRampToValueAtTime(0, t + dur + 0.07);
+    const o = osc('sine', f, t, t + dur + 0.1, g), o3 = osc('triangle', f * 2, t, t + dur + 0.1, voice(g)); void o3;
+    noiseHit(t, 0.05, 2500, 0.025 * vol, 'bandpass', 0.12);
+    if (dur > 0.3) { const vib = ctx.createOscillator(), va = ctx.createGain(); vib.frequency.value = 5.5; va.gain.setValueAtTime(0, t); va.gain.linearRampToValueAtTime(f * 0.009, t + Math.min(0.45, dur)); vib.connect(va).connect(o.frequency); vib.start(t); vib.stop(t + dur + 0.1); }
+  }
+  function synthLead(semi, t, dur, vol = 1) { // a soft square-and-triangle dream lead
+    const f = hz(semi + 12), g = voice(bus, -0.05), lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1800 + S.energy * 1200; lp.Q.value = 0.7;
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.028 * vol, t + 0.012); g.gain.setValueAtTime(0.022 * vol, t + Math.max(0.03, dur - 0.04)); g.gain.linearRampToValueAtTime(0, t + dur + 0.08);
+    lp.connect(g); g.connect(echoIn);
+    osc('square', f, t, t + dur + 0.1, lp); const o2 = osc('triangle', f, t, t + dur + 0.1, lp); o2.detune.value = 9;
+  }
   function lead(semi, t, dur, vol, echo = true) {
-    if (S.th.lead === 'flute') flute(semi, t, dur * 0.95, vol);
-    else pluck(S.th.lead, semi, t, vol, { echo, pan: 0.05, long: Math.min(1.6, 0.7 + dur * 0.8) });
+    const L = S.th.lead;
+    if (L === 'flute') flute(semi, t, dur * 0.95, vol);
+    else if (L === 'horn') horn(semi, t, dur * 0.95, vol);
+    else if (L === 'ocarina') ocarina(semi, t, dur * 0.95, vol);
+    else if (L === 'synth') synthLead(semi, t, dur * 0.9, vol);
+    else { pluck(L, semi, t, vol, { echo, pan: 0.05, long: Math.min(1.6, 0.7 + dur * 0.8) }); if (L === 'piano') noiseHit(t, 0.012, 3000, 0.012 * vol, 'highpass', 0.05); }
   }
   function bass(semi, t, dur, vol = 1) {
     const f = hz(semi - 24), g = voice(bus), lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 480 + S.energy * 400;
@@ -328,18 +388,25 @@ export function createMusic(ctx, out) {
     S.threat += (S.tWant - S.threat) * (S.tWant > S.threat ? 0.15 : 0.015);
     // phrase boundaries: where the song may change key, mode, tempo or density
     if (st === 0 && barInPhrase === 0) {
-      if (phraseIdx === 0) { // the top of the song: compose it (the A tune is always the theme's own)
-        if (S.pendingLift !== S.lift) { S.lift = S.pendingLift; S.voicing = null; }
-        S.song = compose(S.id); S.loop++;
+      if (phraseIdx === 0) { S.song = compose(S.id); S.loop++; } // the top of the song: compose it (the A tune is always the theme's own)
+      if (S.pendingAwake !== S.awake) { // the nightmares are gone: up a step, a fanfare, and the bright groove
+        S.awake = S.pendingAwake; S.lift = S.awake ? 2 : 0; S.voicing = null;
+        if (S.awake) S.accents.push('triumph');
       }
-      const wantMinor = S.th.mode === 'minor' || S.threat > 0.5;
+      const wantMinor = (S.th.mode === 'minor' && !S.awake) || S.threat > 0.8; // real, close danger (and a minor theme brightens to major once you're awake)
       if (wantMinor !== S.minor) { S.minor = wantMinor; S.voicing = null; }
+      S.heroic = !S.minor && S.threat > 0.45; // danger about: the adventure chords
       if (S.pendingStage !== S.stage) S.stage = S.pendingStage;
       S.tempoMul = S.pendingTempo;
     }
-    const E = S.energy, layer = Math.max(S.stage, E > 0.75 ? 5 : E > 0.5 ? 4 : E > 0.3 ? 3 : E > 0.15 ? 2 : 1);
+    // following the game: lively from the first bar while there are nightmares, upbeat once they're gone
+    const following = S.manualStage === null, hunt = following && !S.awake;
+    const E = Math.max(S.energy, following ? (S.awake ? 0.58 : 0.42) : 0);
+    const layer = Math.max(S.stage, following ? (S.awake ? 5 : 4) : 0, E > 0.75 ? 5 : E > 0.5 ? 4 : E > 0.3 ? 3 : E > 0.15 ? 2 : 1);
     const ph = S.song[phraseIdx], bar = ph.chords[barInPhrase];
-    const chord = bar.length > 1 && st >= bs / 2 ? bar[1] : bar[0];
+    const isCad = barInPhrase === 3 || (barInPhrase === 2 && bar.length > 1 && st >= bs / 2);
+    const sounding = (c) => (S.heroic && !isCad && HEROIC[c] ? HEROIC[c] : c);
+    const chord = sounding(bar.length > 1 && st >= bs / 2 ? bar[1] : bar[0]);
     const chordStart = st === 0 || (bar.length > 1 && st === bs / 2);
     const semis = chordSemis(chord), root = semis[0];
     const isCadenceBar = barInPhrase === 3, lastPhrase = phraseIdx === 7;
@@ -355,25 +422,28 @@ export function createMusic(ctx, out) {
     if (layer >= 1) {
       for (const n of ph.mel) {
         if (n.step !== barInPhrase * bs + st) continue;
-        const leading = isDominant(n.chord), semi = degSemi(n.deg, leading);
+        const semi = fitNote(n.deg, sounding(n.chord), n.strong);
         const accent = st === 0 ? 1.15 : M.strong.includes(st) ? 1.05 : 0.85;
         lead(semi, t, n.len * sd, (0.8 + E * 0.25) * accent);
         if (layer >= 5 && n.strong) pluck(S.th.color === 'strings' ? 'harp' : S.th.color, semi + 12, t, 0.3, { pan: -0.3 }); // doubled up an octave
         // A': a grace-note turn into the strong notes (ornament)
-        if (ph.name === "A'" && n.strong && n.len >= beat && rnd() < 0.5) pluck(S.th.lead === 'flute' ? 'harp' : S.th.lead, degSemi(n.deg + 1, leading), t - sd * 0.5, 0.35, { long: 0.3 });
+        if (ph.name === "A'" && n.strong && n.len >= beat && rnd() < 0.5) pluck('harp', fitNote(n.deg + 1, sounding(n.chord), false), t - sd * 0.5, 0.3, { long: 0.3 });
       }
       // counter-line (layer 3+): a third below the tune on its long strong notes
-      if (layer >= 3) for (const n of ph.mel) if (n.step === barInPhrase * bs + st && n.strong && n.len >= beat) pluck(S.th.color === 'strings' ? 'celesta' : S.th.color, degSemi(n.deg - 2, isDominant(n.chord)), t, 0.32, { pan: -0.35 });
+      if (layer >= 3) for (const n of ph.mel) if (n.step === barInPhrase * bs + st && n.strong && n.len >= beat) pluck(S.th.color === 'strings' ? 'celesta' : S.th.color, fitNote(n.deg - 2, sounding(n.chord), true), t, 0.3, { pan: -0.35 });
     }
     // bass (layer 2+): roots, fixed per meter; driving eighths when the energy's up
     if (layer >= 2) {
       const nextChord = (() => { const nb = ph.chords[barInPhrase + 1]; return nb ? nb[0] : (S.song[(phraseIdx + 1) % 8].chords[0][0]); })();
       if (S.th.meter === '4/4') {
-        if (E > 0.55) { if (st % 2 === 0) bass(st % 8 === 4 ? root + 12 : root, t, sd * 1.6, st % beat === 0 ? 1 : 0.7); }
-        else if (st === 0 || st === 8) bass(st === 0 ? root : semis[2] - 12, t, sd * 7, 1);
-        else if (st === 12 && E > 0.3 && !isCadenceBar) bass(degSemi(chordDegs(nextChord)[0]) + (degSemi(chordDegs(nextChord)[0]) > root ? -1 : 1), t, sd * 3, 0.7); // walking approach note
-      } else if (S.th.meter === '3/4') { if (st === 0) bass(root, t, sd * 4, 1); }
-      else if (st === 0 || st === 6) bass(st === 0 ? root : semis[2] - 12, t, sd * 5, st === 0 ? 1 : 0.75); // 6/8: the two big beats
+        const nextRoot = chordSemis(sounding(nextChord))[0];
+        if (E > 0.55) { if (st % 2 === 0) bass(st % 8 === 4 ? root + 12 : root, t, sd * 1.6, st % beat === 0 ? 1 : 0.7); } // pumping eighths, bouncing the octave
+        else if (hunt || E > 0.4) { // an adventure bass: root, a push on the 'and' of 2, the fifth, then a step into the next chord
+          if (st === 0) bass(root, t, sd * 5, 1); else if (st === 6) bass(root, t, sd * 2, 0.75); else if (st === 8) bass(semis[2] - 12, t, sd * 4, 0.9);
+          else if (st === 12) bass(isCadenceBar ? semis[2] - 12 : nextRoot + (nextRoot > root ? -1 : 1), t, sd * 3, 0.75);
+        } else if (st === 0 || st === 8) bass(st === 0 ? root : semis[2] - 12, t, sd * 7, 1);
+      } else if (S.th.meter === '3/4') { if (st === 0) bass(root, t, sd * 4, 1); if (E > 0.45 && st === 8) bass(semis[2] - 12, t, sd * 3, 0.7); }
+      else { if (st === 0 || st === 6) bass(st === 0 ? root : semis[2] - 12, t, sd * 5, st === 0 ? 1 : 0.75); if (st === 10 && E > 0.4 && !isCadenceBar) bass(semis[1] - 12, t, sd * 2, 0.6); } // 6/8: the two big beats, and a pickup
     }
     // accompaniment (layer 3+): Alberti in 4/4, oom-pah-pah in 3/4, a rocking broken chord in 6/8
     if (layer >= 3) {
@@ -392,7 +462,8 @@ export function createMusic(ctx, out) {
       if (S.th.meter === '4/4') {
         if (!fill || st < bs / 2) {
           if (E > 0.45) { if (st === 0 || st === 8 || (E > 0.7 && st === 10)) kick(t, 0.7 + E * 0.4); if (st === 4 || st === 12) snare(t, 0.5 + E * 0.5); }
-          else { if (st === 0) kick(t, 0.5); if (st === 4 || st === 12) rim(t, 0.6); }
+          else { if (st === 0 || (hunt && st === 10)) kick(t, 0.55); if (st === 4 || st === 12) rim(t, 0.6); } // hunting: a kick that pushes on the 'and' of 3
+          if (S.awake && following && (st === 6 || st === 14)) hat(t, 0.6, true); // awake: open hats lifting the offbeats
           if (E > 0.7 ? st % 1 === 0 && rnd() < 0.85 : st % 2 === 0) hat(t, st % 4 === 0 ? 0.9 : 0.5, st === 14 && E > 0.5);
         } else tom(t, [9, 7, 5, 4, 2, 0, -1, -3][st - bs / 2] ?? 0, 0.8 + E * 0.3);
       } else if (S.th.meter === '3/4') {
@@ -424,7 +495,7 @@ export function createMusic(ctx, out) {
       this.stop();
       const id = typeof theme === 'number' ? THEME_LIST[theme % THEME_LIST.length] : theme;
       S.id = THEMES[id] ? id : 'edge'; S.th = THEMES[S.id]; S.meter = METERS[S.th.meter]; S.cells = CELLS[S.th.meter];
-      S.step = 0; S.loop = 0; S.voicing = null; S.lift = S.pendingLift = 0; S.unlocked = false; S.progress = 0;
+      S.step = 0; S.loop = 0; S.voicing = null; S.lift = S.pendingLift = 0; S.unlocked = false; S.progress = 0; S.awake = S.pendingAwake = false; S.heroic = false;
       S.minor = S.th.mode === 'minor'; S.energy = S.eWant; S.threat = S.tWant; S.accents.length = 0;
       if (S.manualStage === null) S.stage = S.pendingStage = 0; else S.stage = S.pendingStage;
       S.tempoMul = S.pendingTempo;
@@ -440,13 +511,13 @@ export function createMusic(ctx, out) {
       S.progress = Math.max(S.progress, p);
       const want = unlocked ? 5 : Math.min(4, 1 + Math.floor(S.progress * 3.6));
       S.pendingStage = Math.max(S.pendingStage, want);
-      if (unlocked && !S.unlocked) { S.unlocked = true; S.pendingLift = 2; }
+      if (unlocked && !S.unlocked) { S.unlocked = true; S.pendingAwake = true; } // the nightmares are gone: awake at the next phrase
     },
-    setIntensity(energy, threat = energy) { S.eWant = Math.max(0, Math.min(1, energy)); S.tWant = Math.max(0, Math.min(1, threat)); const t = ctx.currentTime; wet.gain.setTargetAtTime(0.42 - S.energy * 0.15, t, 0.8); water.frequency.setTargetAtTime(800 + S.dream * 1600 + S.energy * 900, t, 0.6); },
+    setIntensity(energy, threat = energy) { S.eWant = Math.max(0, Math.min(1, energy)); S.tWant = Math.max(0, Math.min(1, threat)); const t = ctx.currentTime; wet.gain.setTargetAtTime(0.38 - S.energy * 0.14, t, 0.8); water.frequency.setTargetAtTime(1300 + S.dream * 1500 + S.energy * 1000, t, 0.6); },
     accent(kind) { if (S.timer && S.accents.length < 3) S.accents.push(kind); },
     setTempo(m) { S.pendingTempo = Math.max(0.5, Math.min(1.6, m)); }, // applied at the next phrase, so the groove never stumbles
     setLayers(n) { S.manualStage = n; if (n !== null) S.pendingStage = Math.max(0, Math.min(5, Math.round(n))); },
-    setDream(d) { S.dream = d; const t = ctx.currentTime; water.frequency.setTargetAtTime(800 + d * 1600 + S.energy * 900, t, 0.6); swayAmt.gain.setTargetAtTime(160 + d * 240, t, 0.6); },
+    setDream(d) { S.dream = d; const t = ctx.currentTime; water.frequency.setTargetAtTime(1300 + d * 1500 + S.energy * 1000, t, 0.6); swayAmt.gain.setTargetAtTime(160 + d * 240, t, 0.6); },
     info() { return S.info; }, // where the song is: section, bar, beat, chord (and its roman numeral), cadence, key
     renderUntil(T, theme = 'edge', progressAt = null, intensityAt = null) {
       this.start(theme); this.stop();
