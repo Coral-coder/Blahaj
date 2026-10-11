@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Blåhaj Music Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700;9..144,800&family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  :root { --ink: #eef1ff; --muted: #aab3d6; --panel: rgba(20, 25, 56, 0.72); --edge: rgba(190, 205, 255, 0.2); --gold: #ffd27a; --violet: #9a6bff; --bg: #070915; }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; background: radial-gradient(circle at 50% 0%, #1d2556, var(--bg) 70%) fixed; color: var(--ink); font-family: Nunito, system-ui, sans-serif; }
+  main { max-width: 980px; margin: 0 auto; padding: 28px 16px 60px; }
+  h1 { font-family: Fraunces, Georgia, serif; font-weight: 800; font-size: clamp(30px, 5vw, 44px); margin: 0 0 4px; color: #fff4dc; }
+  .sub { color: var(--muted); font-weight: 700; margin: 0 0 22px; line-height: 1.5; }
+  .panel { background: var(--panel); border: 1px solid var(--edge); border-radius: 18px; padding: 18px; margin-bottom: 16px; }
+  .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  select, button { font: inherit; font-weight: 800; color: var(--ink); background: rgba(255,255,255,.08); border: 1px solid var(--edge); border-radius: 999px; padding: 10px 16px; cursor: pointer; }
+  select { border-radius: 12px; flex: 1 1 280px; min-width: 0; }
+  option { background: #141938; }
+  #play { background: linear-gradient(180deg, #ffe2a2, #f4b860); color: #2a1a05; border: 0; min-width: 110px; }
+  .sliders { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px 22px; }
+  label { display: flex; flex-direction: column; gap: 6px; font-weight: 900; }
+  label em { font-style: normal; font-weight: 700; font-size: 12px; color: var(--muted); margin-left: 6px; }
+  input[type=range] { width: 100%; accent-color: var(--gold); }
+  .check { flex-direction: row; align-items: center; gap: 8px; }
+  .readout { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; }
+  .cell { background: rgba(255,255,255,.05); border-radius: 12px; padding: 10px 12px; }
+  .cell small { display: block; font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: var(--gold); font-weight: 900; }
+  .cell b { font-family: Fraunces, Georgia, serif; font-size: 22px; }
+  #rCad { min-height: 1.4em; color: var(--gold); font-weight: 800; margin-top: 10px; }
+  #map { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  @media (max-width: 640px) { #map { grid-template-columns: repeat(2, 1fr); } }
+  .phrase { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; position: relative; padding-top: 18px; }
+  .phrase span { position: absolute; top: 0; left: 0; font-size: 11px; color: var(--muted); font-weight: 800; }
+  .phrase i { font-style: normal; height: 34px; border-radius: 8px; background: rgba(255,255,255,.06); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 900; color: var(--muted); transition: background .15s; }
+  .phrase i.on { background: var(--violet); color: #fff; box-shadow: 0 0 18px rgba(154,107,255,.7); }
+  .accents button { padding: 8px 14px; }
+  h2 { font-size: 13px; letter-spacing: 3px; text-transform: uppercase; color: var(--gold); margin: 0 0 12px; }
+</style>
+</head>
+<body>
+<main id="lab">
+  <h1>🎵 Blåhaj Music Lab</h1>
+  <p class="sub">The game's music engine on its own. Every theme is a 32-bar AABA song: each A is a question (ending on a half cadence) and an answer (a perfect authentic cadence home), B is the bridge. Steer it the way the game does and watch where it is.</p>
+
+  <div class="panel row">
+    <select id="theme" aria-label="Theme"></select>
+    <button id="play">▶ Play</button>
+    <button id="wav">⬇ Save a minute as WAV</button>
+  </div>
+
+  <div class="panel">
+    <h2>Now playing</h2>
+    <div class="readout">
+      <div class="cell"><small>Key</small><b id="rKey">–</b></div>
+      <div class="cell"><small>Meter</small><b id="rMeter">–</b></div>
+      <div class="cell"><small>Section</small><b id="rSec">–</b></div>
+      <div class="cell"><small>Bar</small><b id="rBar">–</b></div>
+      <div class="cell"><small>Beat</small><b id="rBeat">–</b></div>
+      <div class="cell"><small>Chord</small><b id="rChord">–</b></div>
+      <div class="cell"><small>Function</small><b id="rRoman">–</b></div>
+      <div class="cell"><small>Layers · energy</small><b><span id="rLayer">–</span> · <span id="rEnergy">–</span></b></div>
+    </div>
+    <div id="rCad"></div>
+  </div>
+
+  <div class="panel"><h2>The song</h2><div id="map"></div></div>
+
+  <div class="panel">
+    <h2>Steer it like the game</h2>
+    <div class="sliders">
+      <label><span>Energy<em>calm ↔ action</em></span><input type="range" id="energy" min="0" max="100" value="20"></label>
+      <label><span>Threat<em>major ↔ minor</em></span><input type="range" id="mood" min="0" max="100" value="0"></label>
+      <label><span>Tempo<em>slower ↔ faster</em></span><input type="range" id="tempo" min="0" max="100" value="50"></label>
+      <label><span>Water<em>clear ↔ deep</em></span><input type="range" id="water" min="0" max="100" value="20"></label>
+      <label><span>Layers<em id="layersOut">follow progress</em></span><input type="range" id="layers" min="-1" max="5" step="1" value="-1"></label>
+      <label><span>Level progress<em>when layers follow</em></span><input type="range" id="progress" min="0" max="100" value="30"></label>
+      <label class="check"><input type="checkbox" id="unlock"> Way out open (key lifts a step)</label>
+      <label><span>Volume</span><input type="range" id="vol" min="0" max="100" value="70"></label>
+    </div>
+  </div>
+
+  <div class="panel row accents">
+    <h2 style="margin:0 8px 0 0">Game moments</h2>
+    <button data-accent="poof">Poof</button><button data-accent="hit">Hurt</button><button data-accent="boss">Queen hit</button><button data-accent="rage">Queen rage</button><button data-accent="triumph">Triumph</button>
+  </div>
+</main>
+<script src="dist/lab.js"></script>
+</body>
+</html>

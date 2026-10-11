@@ -1,0 +1,13 @@
+{
+  "name": "blahaj-music-engine",
+  "version": "3.0.0",
+  "private": true,
+  "description": "The generative music engine for Blåhaj: Back to Bed, and a lab to play with it.",
+  "type": "module",
+  "scripts": {
+    "build": "esbuild src/lab.js --bundle --minify --format=iife --target=es2020 --outfile=dist/lab.js",
+    "render": "node tools/render.cjs",
+    "serve": "python3 -m http.server 8080"
+  },
+  "devDependencies": { "esbuild": "^0.28.2", "playwright-core": "^1.56.1" }
+}
