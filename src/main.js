@@ -11,6 +11,9 @@ import { CINES, restingHug } from './cinematics.js';
 import { pilot, routeFor, STEP } from './autopilot.js';
 
 const $ = (id) => document.getElementById(id);
+// The self-playing build (branch claude/blahaj-autoplay) flips this on: Begin
+// then tells the whole story with Blåhaj playing herself.
+const AUTOPLAY = true;
 const SAVE_KEY = 'blahaj-big-adventure-v1';
 const TOUCH = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 const ABILITIES = {
@@ -253,7 +256,7 @@ function cycleQuality() {
 }
 
 // ----------------------------------------------------------------- wiring --
-$('btnStart').onclick = () => { Audio.init(); Audio.click(); story = true; startChapter(0, true); }; // autoplay: always the whole story
+$('btnStart').onclick = () => { Audio.init(); Audio.click(); story = true; startChapter(AUTOPLAY || !save.completed[0] ? 0 : Math.max(0, CHAPTERS.findIndex((c, i) => !save.completed[i])), true); };
 $('btnChapters').onclick = () => { Audio.init(); Audio.click(); buildChapterList(); show('chapters'); };
 $('btnHow').onclick = () => { Audio.init(); Audio.click(); $('howControls').innerHTML = controlsHtml(learnedAbilities()); show('how'); };
 $('btnHowBack').onclick = () => { Audio.click(); show('title'); };
@@ -263,6 +266,7 @@ $('btnRestart').onclick = () => { Audio.click(); startChapter(current, false); }
 $('btnQuit').onclick = () => { Audio.click(); Audio.stopMusic(); startTitle(); };
 $('btnEndTitle').onclick = () => { Audio.click(); startTitle(); };
 $('skip').onclick = skipCine;
+if (!AUTOPLAY && save.completed[0]) $('btnStart').textContent = '▶ Continue';
 $('tPause').onclick = () => pause(true);
 document.querySelectorAll('.qbtn').forEach((b) => { b.textContent = qualityLabel(); b.onclick = () => { Audio.click(); cycleQuality(); }; });
 
@@ -301,11 +305,11 @@ const perf = {
 };
 
 // --------------------------------------------------------------- autoplay --
-// This build plays itself: once a chapter starts, the autopilot drives Blåhaj
-// through it with the same routes the playtest uses. The game runs in fixed
-// 1/60 s steps so her jumps land exactly as tuned. If a run goes wrong she takes
-// the chapter again from the top; after three misses she hands you the controls.
-const AUTOPLAY = true;
+// The autopilot drives Blåhaj with the same routes the playtest uses, stepping
+// the game in fixed 1/60 s updates so her jumps land exactly as tuned. It plays
+// the attract-mode demo; with AUTOPLAY on it plays every chapter you start too.
+// If a run goes wrong she takes the chapter again from the top; after three
+// misses she hands you the controls.
 const auto = { on: AUTOPLAY, game: null, gen: null, idx: -1, tries: 0, check: 0, acc: 0 };
 $('autoBadge').classList.toggle('hidden', !AUTOPLAY);
 function autoStep() {
@@ -315,7 +319,7 @@ function autoStep() {
   if (auto.game !== game) {
     if (game.state !== 'play') return;
     if (auto.idx !== current) { auto.idx = current; auto.tries = 0; }
-    auto.game = game; auto.gen = pilot(game, routeFor(game.ch)); auto.check = 0;
+    auto.game = game; auto.gen = pilot(game, routeFor(game.ch, current)); auto.check = 0;
     $('autoBadge').textContent = '🤖 Autoplay';
   }
   if (auto.check > 0 && --auto.check === 0 && game.state === 'play') autoMiss('route ended without winning');
@@ -352,7 +356,7 @@ function startDemo() {
   setTimeout(() => {
     if (mode !== 'demo') return;
     newGame(i);
-    auto.game = game; auto.gen = pilot(game, routeFor(game.ch)); input.keys.clear();
+    auto.game = game; auto.gen = pilot(game, routeFor(game.ch, i)); input.keys.clear();
     demo = { t: 0, skip: 2 + Math.random() * ATTRACT.skipMax, ready: false }; // fast-forward to a random moment behind the curtain
     $('demoChapter').textContent = `Chapter ${i + 1} · ${CHAPTERS[i].title}`;
     $('demoStart').textContent = input.isTouch ? 'TAP TO START' : 'PRESS SPACE TO START';

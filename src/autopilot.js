@@ -6,7 +6,7 @@
 import ROUTES from '../tools/routes.cjs';
 
 export const STEP = 1 / 60;
-export const routeFor = (ch) => (ROUTES[ch.id] || []).filter((w) => w[0] !== 'snap');
+export const routeFor = (ch, i) => (ROUTES[ch.id] || ROUTES[i] || []).filter((w) => w[0] !== 'snap'); // routes are keyed by chapter id or number
 
 export function* pilot(g, route) {
   const inp = g.input, P = g.p, step = STEP;
