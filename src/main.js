@@ -7,6 +7,7 @@ import { Input } from './input.js';
 import { Game } from './game.js';
 import { loadBlahajModel } from './art.js';
 import { CINES, restingHug } from './cinematics.js';
+import { pilot, routeFor, STEP } from './autopilot.js';
 
 const $ = (id) => document.getElementById(id);
 const SAVE_KEY = 'blahaj-backtobed-v1';
@@ -86,7 +87,7 @@ const hooks = {
   pop(text) { const c = $('combo'); c.textContent = text; c.classList.add('show'); clearTimeout(popTimer); popTimer = setTimeout(() => c.classList.remove('show'), 900); },
   hint(t) { const h = $('hint'); if (t) { h.textContent = t; h.style.opacity = 1; } else h.style.opacity = 0; },
   fade(on) { $('fade').classList.toggle('on', on); },
-  star(i) { if (!save.stars[current][i]) { save.stars[current][i] = true; persist(); } },
+  star(i) { if (mode !== 'demo' && !save.stars[current][i]) { save.stars[current][i] = true; persist(); } },
   subtitle(text) { const s = $('subtitle'); if (text) { s.textContent = text; s.classList.add('show'); } else s.classList.remove('show'); },
   letterbox(on) { document.body.classList.toggle('cinema', on); },
   complete: onComplete,
@@ -196,6 +197,7 @@ function updateHud() {
 }
 
 function onComplete(r) {
+  if (mode === 'demo') return; // the attract-mode demo never counts
   const i = current, ch = CHAPTERS[i];
   save.completed[i] = true;
   r.stars.forEach((t, k) => { if (t) save.stars[i][k] = true; });
@@ -244,7 +246,7 @@ function cycleQuality() {
 }
 
 // ----------------------------------------------------------------- wiring --
-$('btnStart').onclick = () => { Audio.init(); Audio.click(); story = true; startChapter(save.completed[0] ? CHAPTERS.findIndex((c, i) => !save.completed[i]) : 0, true); };
+$('btnStart').onclick = () => { Audio.init(); Audio.click(); story = true; startChapter(save.completed[0] ? Math.max(0, CHAPTERS.findIndex((c, i) => !save.completed[i])) : 0, true); };
 $('btnChapters').onclick = () => { Audio.init(); Audio.click(); buildChapterList(); show('chapters'); };
 $('btnHow').onclick = () => { Audio.init(); Audio.click(); $('howControls').innerHTML = controlsHtml(learnedAbilities()); show('how'); };
 $('btnHowBack').onclick = () => { Audio.click(); show('title'); };
@@ -259,6 +261,8 @@ document.querySelectorAll('.qbtn').forEach((b) => { b.textContent = qualityLabel
 if ($('btnStart').textContent && save.completed[0]) $('btnStart').textContent = '▶ Continue';
 
 addEventListener('keydown', (e) => {
+  idleT = 0;
+  if (mode === 'demo') { e.preventDefault(); endDemo(e.code === 'Space' || e.code === 'Enter'); return; } // space starts the game; any other key, back to the title
   if (e.code === 'KeyM') { Audio.init(); const m = Audio.toggleMute(); hooks.toast(m ? '🔇 Sound off' : '🔊 Sound on'); }
   if (mode === 'cine' && (e.code === 'Enter' || e.code === 'Escape')) { skipCine(); return; }
   if (e.code === 'Escape' || e.code === 'KeyP') { if (mode === 'play') pause(true); else if (mode === 'paused') pause(false); }
@@ -293,6 +297,61 @@ const perf = {
 // ------------------------------------------------------------------- loop --
 const debug = { noRender: false, freeze: false };
 let last = performance.now(), beatT = 0;
+// ----------------------------------------------------------- attract mode --
+// Leave the title alone for two minutes and the game shows itself off, like an
+// arcade cabinet: about 15 seconds of the autopilot (the playtest bot, see
+// autopilot.js) playing a random stretch of a random chapter under a flashing
+// DEMO banner, then back to the title, and the two-minute wait starts over.
+// Space, a click or a tap starts the game for real.
+const ATTRACT = { idle: 120, length: 15, skipMax: 25 };
+let idleT = 0, demo = null;
+['pointermove', 'wheel'].forEach((ev) => addEventListener(ev, () => { idleT = 0; }, { passive: true }));
+addEventListener('pointerdown', () => { idleT = 0; if (mode === 'demo') endDemo(true); });
+function startDemo() {
+  const i = Math.floor(Math.random() * CHAPTERS.length);
+  mode = 'demo'; demo = null;
+  show(null);
+  loading(true, 'Demo');
+  setTimeout(() => {
+    if (mode !== 'demo') return;
+    newGame(i);
+    input.keys.clear();
+    demo = { gen: pilot(game, routeFor(game.ch, i)), t: 0, acc: 0, skip: 2 + Math.random() * ATTRACT.skipMax, ready: false }; // fast-forward to a random moment behind the curtain
+    $('demoChapter').textContent = `Chapter ${i + 1} · ${CHAPTERS[i].title}`;
+    $('demoStart').textContent = TOUCH ? 'TAP TO START' : 'PRESS SPACE TO START';
+  }, 40);
+}
+function endDemo(start) {
+  if (mode !== 'demo') return;
+  mode = 'title'; demo = null; idleT = 0;
+  input.keys.clear();
+  $('demo').classList.add('hidden');
+  if (start) $('btnStart').click(); else startTitle();
+}
+// one fixed step of the demo: the autopilot picks its keys, then the game moves on
+function demoStep() {
+  if (demo.gen.next().done) { endDemo(false); return false; }
+  game.update(STEP);
+  return true;
+}
+// returns true when there's a demo frame to draw
+function demoFrame(dt) {
+  if (!demo) return false;
+  if (!demo.ready) { // skipping ahead: run flat out for a few ms a frame, no drawing
+    const t0 = performance.now();
+    while (demo.skip > 0 && performance.now() - t0 < 40) { if (!demoStep()) return false; demo.skip -= STEP; }
+    if (demo.skip <= 0) { demo.ready = true; loading(false); $('demo').classList.remove('hidden'); }
+    return false;
+  }
+  demo.t += dt;
+  if (demo.t > ATTRACT.length || ['pad-jump', 'pad-pause'].some((k) => input.pressed.has(k))) { endDemo(demo.t <= ATTRACT.length); return false; }
+  demo.acc += dt; // fixed steps, snapped to the display's frames so motion stays smooth
+  const n = Math.min(4, Math.round(demo.acc / STEP));
+  demo.acc = THREE.MathUtils.clamp(demo.acc - n * STEP, -STEP, STEP);
+  for (let i = 0; i < n; i++) if (!demoStep()) return false;
+  return true;
+}
+
 function frame(now) {
   requestAnimationFrame(frame);
   const dt = Math.min(0.05, (now - last) / 1000);
@@ -302,6 +361,11 @@ function frame(now) {
   input.pollPad();
   if (input.pressed.has('pad-pause')) { if (mode === 'play') pause(true); else if (mode === 'paused') pause(false); }
   if (!game) { input.endFrame(); return; }
+  if (mode === 'title' && !$('title').classList.contains('hidden')) { // the attract-mode countdown
+    idleT = input.pressed.size ? 0 : idleT + dt;
+    if (idleT >= ATTRACT.idle) startDemo();
+  } else if (mode !== 'demo') idleT = 0;
+  if (mode === 'demo') { if (demoFrame(dt)) game.render(); else input.endFrame(); return; }
   if (mode !== 'paused') game.update(dt); else input.endFrame();
   if (mode === 'cine' && game.cine && game.cine.done) endCine();
   if (mode === 'play') {
@@ -319,7 +383,9 @@ loading(true);
 loadBlahajModel().then(() => { startTitle(); requestAnimationFrame(frame); });
 
 window.__blahaj = {
-  get game() { return game; }, get mode() { return mode; }, save, debug, CHAPTERS,
+  get game() { return game; }, get mode() { return mode; }, save, debug, CHAPTERS, startDemo, ATTRACT,
+  // the playtest: play a whole route right now, stepping the game as fast as it will go
+  runRoute(route) { const it = pilot(game, route); for (;;) { const r = it.next(); if (r.done) return { ...r.value, mode }; this.sim(STEP); } },
   startChapter, skipCine, startTitle,
   sim(seconds, step = 1 / 60) { for (let t = 0; t < seconds; t += step) { input.pollPad(); if (game) { game.update(step); if (mode === 'cine' && game.cine && game.cine.done) endCine(); } } },
 };

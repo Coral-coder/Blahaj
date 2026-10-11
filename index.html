@@ -5,9 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Blåhaj: Back to Bed</title>
 <meta name="description" content="A story platformer: a plush shark tumbles off a sleeping child's bed and must climb back before the nightmares reach him.">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦈</text></svg>">
+<link rel="icon" href="favicon.ico" sizes="48x48">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,800&family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,800&family=Nunito:wght@600;700;800;900&family=Press+Start+2P&display=swap" rel="stylesheet">
 <style>
   :root { --ink: #eef1ff; --muted: #aab3d6; --night: #0b0f24; --panel: rgba(14, 18, 40, 0.62); --edge: rgba(190, 205, 255, 0.22); --gold: #ffd27a; --violet: #9a6bff; }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -79,6 +81,17 @@
   #chapterCard em { display: block; font-family: Nunito, sans-serif; font-style: normal; font-size: 17px; color: #d9def5; margin-top: 8px; }
   #fade { position: absolute; inset: 0; background: #000; opacity: 0; transition: opacity .6s; pointer-events: none; z-index: 5; }
   #fade.on { opacity: 1; }
+  /* attract mode: the game shows itself off when the title is left alone */
+  #demo { position: absolute; inset: 0; pointer-events: none; z-index: 4; font-family: "Press Start 2P", ui-monospace, monospace; }
+  #demo .tag { position: absolute; top: 18px; left: 50%; transform: translateX(-50%); font-size: clamp(14px, 2.4vw, 22px); letter-spacing: 6px; color: #fff; background: rgba(154,107,255,.88); padding: 11px 14px 11px 20px; border-radius: 6px; box-shadow: 0 0 26px rgba(154,107,255,.65), 0 4px 0 #3b2470; }
+  #demo .where { position: absolute; top: 76px; left: 16px; right: 16px; text-align: center; font-family: Nunito, sans-serif; font-weight: 800; font-size: 15px; color: #fff4dc; text-shadow: 0 2px 10px rgba(0,0,0,.8); }
+  #demo .call { position: absolute; bottom: 14vh; left: 16px; right: 16px; height: 2em; text-align: center; font-size: clamp(13px, 3vw, 28px); line-height: 1.4; color: var(--gold); text-shadow: 0 0 18px rgba(255,210,122,.75), 0 3px 0 #000; }
+  #demo .call span { position: absolute; left: 0; right: 0; animation: 3.2s steps(1, end) infinite; }
+  #demo .call .a { animation-name: callA; }
+  #demo .call .b { animation-name: callB; }
+  @keyframes callA { 0% { opacity: 1; } 20% { opacity: 0; } 25% { opacity: 1; } 45% { opacity: 0; } 100% { opacity: 0; } }
+  @keyframes callB { 0% { opacity: 0; } 50% { opacity: 1; } 70% { opacity: 0; } 75% { opacity: 1; } 95% { opacity: 0; } 100% { opacity: 0; } }
+  #demo .credit { position: absolute; right: 18px; bottom: 18px; font-size: 11px; color: rgba(255,255,255,.75); text-shadow: 0 2px 0 #000; }
   #loading { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: radial-gradient(circle at 50% 40%, #1a2350, #05060c); z-index: 6; }
   #loading div { font-family: Fraunces, serif; font-size: 22px; color: #fff4dc; text-align: center; }
   #loading .moon { font-size: 64px; animation: float 2s ease-in-out infinite; }
@@ -162,6 +175,7 @@
       <button class="btn" id="btnEndTitle">Back to the title</button>
     </div>
   </div>
+  <div id="demo" class="hidden"><div class="tag">DEMO</div><div class="where" id="demoChapter"></div><div class="call"><span class="a" id="demoStart">PRESS SPACE TO START</span><span class="b">INSERT COIN</span></div><div class="credit">CREDIT 0</div></div>
   <div id="loading"><div><div class="moon">🌙</div><div id="loadingText">Tucking in…</div></div></div>
   <div id="fade"></div>
 </div>
