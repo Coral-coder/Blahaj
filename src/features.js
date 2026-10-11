@@ -147,13 +147,22 @@ function wingTexture() {
   x.fillStyle = 'rgba(255,200,90,0.8)'; x.beginPath(); x.arc(30, 30, 5, 0, Math.PI * 2); x.fill();
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
 }
-let WING = null;
-export function createMoth(scale = 1) {
-  const g = new THREE.Group();
-  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.28, 0.6, 6, 12), getShadowMat()); body.rotation.x = Math.PI / 2; g.add(body);
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.3, 14, 10), getShadowMat()); head.position.z = 0.55; g.add(head);
-  WING = WING || wingTexture();
-  const wm = new THREE.MeshBasicMaterial({ map: WING, transparent: true, side: THREE.DoubleSide, depthWrite: false });
+function paleWingTexture() { // an ordinary little moth's wings: dusty cream with a soft gold eye-spot
+  const c = document.createElement('canvas'); c.width = 64; c.height = 64;
+  const x = c.getContext('2d'), gr = x.createRadialGradient(20, 32, 2, 32, 32, 32);
+  gr.addColorStop(0, 'rgba(255,246,226,0.98)'); gr.addColorStop(0.6, 'rgba(226,206,170,0.92)'); gr.addColorStop(1, 'rgba(200,180,150,0)');
+  x.fillStyle = gr; x.fillRect(0, 0, 64, 64);
+  x.fillStyle = 'rgba(214,160,80,0.75)'; x.beginPath(); x.arc(30, 30, 4, 0, Math.PI * 2); x.fill();
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
+let WING = null, PALE = null;
+// pale: not a nightmare at all, just a soft, dusty little moth
+export function createMoth(scale = 1, pale = false) {
+  const g = new THREE.Group(), bodyMat = pale ? new THREE.MeshStandardMaterial({ color: 0xe8dcc2, roughness: 1 }) : getShadowMat();
+  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.28, 0.6, 6, 12), bodyMat); body.rotation.x = Math.PI / 2; g.add(body);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.3, 14, 10), bodyMat); head.position.z = 0.55; g.add(head);
+  WING = WING || wingTexture(); if (pale) PALE = PALE || paleWingTexture();
+  const wm = new THREE.MeshBasicMaterial({ map: pale ? PALE : WING, transparent: true, side: THREE.DoubleSide, depthWrite: false });
   const wings = [];
   for (const s of [-1, 1]) for (const f of [0, 1]) {
     const pivot = new THREE.Group(); pivot.position.set(s * 0.15, 0.1, f ? -0.15 : 0.2); g.add(pivot);
@@ -161,9 +170,9 @@ export function createMoth(scale = 1) {
     wings.push({ pivot, s, f });
   }
   for (const s of [-1, 1]) {
-    const e = new THREE.Sprite(new THREE.SpriteMaterial({ map: softDotTexture(), color: 0xffb02a, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
-    e.scale.set(0.26, 0.2, 1); e.position.set(s * 0.14, 0.12, 0.8); g.add(e);
-    const ant = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.5, 4), getShadowMat()); ant.position.set(s * 0.12, 0.35, 0.75); ant.rotation.set(0.6, 0, s * 0.4); g.add(ant);
+    const e = new THREE.Sprite(new THREE.SpriteMaterial({ map: softDotTexture(), color: pale ? 0x5a4630 : 0xffb02a, transparent: true, depthWrite: false, blending: pale ? THREE.NormalBlending : THREE.AdditiveBlending }));
+    e.scale.set(pale ? 0.16 : 0.26, pale ? 0.16 : 0.2, 1); e.position.set(s * 0.14, 0.12, 0.8); g.add(e);
+    const ant = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.5, 4), bodyMat); ant.position.set(s * 0.12, 0.35, 0.75); ant.rotation.set(0.6, 0, s * 0.4); g.add(ant);
   }
   g.scale.setScalar(scale);
   return { group: g, update(dt, t) { for (const w of wings) w.pivot.rotation.z = w.s * (Math.sin(t * 18 + w.f) * 0.7 + 0.2); } };
@@ -256,9 +265,17 @@ export function buildFeatures(game, ch, scene) {
       const aura = new THREE.Sprite(new THREE.SpriteMaterial({ map: softDotTexture(), color: 0x7a2ab8, transparent: true, opacity: 0.35, depthWrite: false, blending: THREE.AdditiveBlending }));
       aura.scale.setScalar(7 * (e.scale || 3) / 3); outer.add(aura);
       scene.add(outer);
-      const s = { group: outer, update(dt, t) { m.update(dt, t * 0.55); aura.material.opacity = 0.3 + Math.sin(t * 3) * 0.08; } };
+      // her mood shows: wings beat faster and the aura burns from violet to magenta to red as she's hurt
+      const auraCols = [new THREE.Color(0x7a2ab8), new THREE.Color(0xc0308a), new THREE.Color(0xff3020)];
+      const s = { group: outer, rage: 0, flash: 0, fade: 0, update(dt, t) {
+        m.update(dt, t * 0.55 * (1 + s.rage * 0.55));
+        s.flash = Math.max(0, s.flash - dt);
+        aura.material.color.copy(auraCols[Math.min(2, s.rage)]).lerp(auraCols[2], Math.min(1, s.flash * 1.5));
+        aura.material.opacity = (0.3 + s.rage * 0.08 + Math.sin(t * (3 + s.rage * 3)) * (0.08 + s.rage * 0.04) + s.flash * 0.4) * (1 - s.fade); // fade: her nightmare draining away
+        gold.emissiveIntensity = 0.6 + s.rage * 0.5 + s.flash;
+      } };
       const hp = e.hp || 3;
-      game.enemies.push({ e, s, m, type: 'boss', pos: V(...e.path[0]), alive: true, deadT: 0, t: 0, hitCool: 0, heading: 0, hp, maxHp: hp, inv: 0, orbT: 4, mv: { path3: e.path, loop: true, linear: true, speed: e.speed || 2.2 } });
+      game.enemies.push({ e, s, m, crown, type: 'boss', pos: V(...e.path[0]), alive: true, deadT: 0, t: 0, hitCool: 0, heading: 0, hp, maxHp: hp, inv: 0, orbT: 4, diveT: 99, dive: null, mv: { path3: e.path, loop: true, linear: true, speed: e.speed || 2.2 } });
       game.knotsLeft = (game.knotsLeft || 0) + 1; // the goal waits until she's beaten
       F.orbs = [];
     } else if (e.type === 'spider') {
@@ -310,13 +327,36 @@ export function stepFeatures(game, dt) {
       game.sparks.burst(V(s.min.x + 0.6, s.max.y + 0.3, s.min.z + 0.6), 24, { color: new THREE.Color(0xffe2a8), speed: 5, life: 0.7, size: 0.3 });
     }
   }
-  // the Moth Queen: loops faster as she's hurt, throws bad-dream orbs, and only a stomp from above hurts her
+  // the Moth Queen: only a stomp from above hurts her, and every hit makes her angrier.
+  //   calm (3 hp): loops under the rafters, one bad-dream orb at a time
+  //   angry (2 hp): faster, fans of three orbs, and she swoops at you
+  //   furious (1 hp): faster still, fans of five, swooping again and again, burning red
   for (const e of game.enemies) {
     if (e.type !== 'boss' || !e.alive) continue;
-    const hurtLv = e.maxHp - e.hp, R = (e.e.scale || 3) * 0.8;
-    e.t += dt * (1 + hurtLv * 0.3); e.inv -= dt; e.hitCool -= dt;
+    const hurtLv = Math.min(2, e.maxHp - e.hp), R = (e.e.scale || 3) * 0.8;
+    e.s.rage = hurtLv;
+    e.t += dt * [1, 1.45, 1.8][hurtLv]; e.inv -= dt; e.hitCool -= dt;
     const [x, y, z, h] = pathPoint3(e.mv, e.t);
-    e.pos.set(x, y + Math.sin(e.t * 2) * 0.35, z); e.heading = h;
+    const home = V(x, y + Math.sin(e.t * (2 + hurtLv)) * (0.35 + hurtLv * 0.15), z);
+    // the swoop: a shriek and a shudder, then she dives at where you are (just under you if
+    // you're up on a rafter — stomp her as she passes!) and climbs back to her loop
+    if (hurtLv >= 1 && !e.dive && game.state === 'play') {
+      e.diveT -= dt;
+      if (e.diveT <= 0 && home.distanceTo(P.pos) < 18) {
+        const ty = P.pos.y > 3 ? P.pos.y - 3.3 : 1.1;
+        e.dive = { t: 0, from: home.clone(), to: V(P.pos.x, ty, P.pos.z) };
+        e.s.flash = 0.8; Audio.screech(); Audio.accent('rage');
+      }
+    }
+    if (e.dive) {
+      const D = e.dive, warn = hurtLv >= 2 ? 0.5 : 0.75, go = 0.95, hang = 0.7, back = 1.2; // hang: she hovers at the bottom, hunting for you — stomp her now!
+      D.t += dt; D.hang = D.t >= warn + go && D.t < warn + go + hang;
+      if (D.t < warn) e.pos.copy(D.from).add(V((Math.random() - 0.5) * 0.25, Math.sin(D.t * 40) * 0.12, (Math.random() - 0.5) * 0.25)); // the shudder before she strikes
+      else if (D.t < warn + go) { const k = (D.t - warn) / go, kk = k * k * (3 - 2 * k); e.pos.lerpVectors(D.from, D.to, kk); e.pos.y -= Math.sin(k * Math.PI) * 0.6; e.heading = Math.atan2(D.to.x - D.from.x, D.to.z - D.from.z); }
+      else if (D.hang) e.pos.copy(D.to).add(V(Math.sin(D.t * 7) * 0.3, Math.sin(D.t * 11) * 0.15, Math.cos(D.t * 6) * 0.3));
+      else if (D.t < warn + go + hang + back) { const k = (D.t - warn - go - hang) / back, kk = k * k * (3 - 2 * k); e.pos.lerpVectors(D.to, home, kk); e.heading = h; }
+      else { e.dive = null; e.diveT = hurtLv >= 2 ? 3.4 : 6.0; e.pos.copy(home); e.heading = h; }
+    } else { e.pos.copy(home); e.heading = h; }
     e.s.group.visible = e.inv <= 0 || Math.floor(e.inv * 12) % 2 === 0; // flicker after a hit
     const d = e.pos.distanceTo(c);
     if (d < R + 0.5) {
@@ -325,17 +365,20 @@ export function stepFeatures(game, dt) {
         e.hp--; e.inv = 1.4; P.vel.y = CFG.stompBounce * 1.45; P.pound = 0; P.canDouble = !!game.ab.doubleJump; P.dashUsed = false; game.addComfort(12);
         Audio.stomp(); game.sparks.burst(e.pos.clone(), 50, { color: new THREE.Color(0xffe2a8), speed: 9, life: 0.9, size: 0.4 });
         game.puffs.burst(e.pos.clone(), 26, { color: new THREE.Color(0x2a1340), speed: 6, life: 1.1, size: 0.8, alpha: 0.7 });
+        Audio.accent('boss'); game.musicPulse = (game.musicPulse || 0) + 0.6; game.cam.shake = 0.35;
+        e.dive = null; e.diveT = 4.5; e.orbT = Math.max(e.orbT, 2.2); // she reels away (time to get back up on a rafter) before she comes at you again
         if (e.hp <= 0) {
-          e.alive = false; e.deadT = 0; game.knotsLeft--; game.stats.nightmares++; game.addComfort(35);
+          e.alive = false; e.deadT = 0; e.felled = true; game.knotsLeft--; game.stats.nightmares++; game.addComfort(35);
           for (const o of F.orbs) game.scene.remove(o.m); F.orbs.length = 0;
           // every other nightmare in the attic flees with her, and the dark lifts
           for (const o of game.enemies) if (o !== e && o.alive && o.type !== 'knot') { o.alive = false; o.deadT = 0; game.puffs.burst(o.pos.clone(), 14, { color: new THREE.Color(0x2a1340), speed: 4, life: 0.9, size: 0.6, alpha: 0.6 }); }
           game.safe.push({ x0: -1e3, z0: -1e3, x1: 1e3, z1: 1e3 }); if (game.darkFloor) game.darkFloor.setSafe(game.safe);
           for (const l of game.lamps) if (!l.on) l.setOn(true);
           game.hooks.pop('The Moth Queen is beaten!');
-          game.hooks.toast('The Nightmare Moth Queen flutters away into the night!', 'The way to Leo’s room is open');
+          e.cineOwned = true; game.pendingCine = 'queenFalls'; game.pendingT = 0; // once Blåhaj lands: she tumbles, bursts, and flies off to the moon
         } else {
           game.hooks.pop(e.hp === 1 ? 'One more!' : 'She shrieks!');
+          e.s.flash = 1.2; Audio.screech(); Audio.accent('rage');
           game.hooks.toast(`The Moth Queen is hurt! ${e.hp} more`, e.hp === 1 ? 'She’s furious — watch out!' : 'She’s getting faster…');
           // she calls two little moths to help
           for (let k = 0; k < 2; k++) {
@@ -350,14 +393,19 @@ export function stepFeatures(game, dt) {
     // bad-dream orbs, aimed at you
     e.orbT -= dt;
     if (e.orbT <= 0 && game.state === 'play') {
-      e.orbT = [4.6, 3.6, 2.8][Math.min(2, hurtLv)];
-      if (e.pos.distanceTo(c) < 20) {
-        const m = new THREE.Group();
-        m.add(new THREE.Mesh(new THREE.SphereGeometry(0.32, 16, 12), getShadowMat()));
-        const gl = new THREE.Sprite(new THREE.SpriteMaterial({ map: softDotTexture(), color: 0xb04aff, transparent: true, opacity: 0.8, depthWrite: false, blending: THREE.AdditiveBlending })); gl.scale.setScalar(1.4); m.add(gl);
-        const from = e.pos.clone().add(V(0, -0.6, 0));
-        m.position.copy(from); game.scene.add(m);
-        F.orbs.push({ m, pos: from, vel: c.clone().sub(from).normalize().multiplyScalar(5.2), life: 4.5 });
+      e.orbT = [4.6, 3.4, 2.6][hurtLv];
+      if (e.pos.distanceTo(c) < 20 && !e.dive) {
+        const from = e.pos.clone().add(V(0, -0.6, 0)), aim = c.clone().sub(from).normalize();
+        const n = [1, 3, 5][hurtLv], spread = 0.32, speed = [5.2, 5.8, 6.4][hurtLv];
+        for (let k = 0; k < n; k++) { // a fan of orbs, the middle one straight at you
+          const a = (k - (n - 1) / 2) * spread, ca = Math.cos(a), sa = Math.sin(a);
+          const dir = V(aim.x * ca - aim.z * sa, aim.y, aim.x * sa + aim.z * ca).normalize();
+          const m = new THREE.Group();
+          m.add(new THREE.Mesh(new THREE.SphereGeometry(0.32, 16, 12), getShadowMat()));
+          const gl = new THREE.Sprite(new THREE.SpriteMaterial({ map: softDotTexture(), color: [0xb04aff, 0xe040a0, 0xff4a30][hurtLv], transparent: true, opacity: 0.8, depthWrite: false, blending: THREE.AdditiveBlending })); gl.scale.setScalar(1.4); m.add(gl);
+          m.position.copy(from); game.scene.add(m);
+          F.orbs.push({ m, pos: from.clone(), vel: dir.multiplyScalar(speed), life: 4.5 });
+        }
       }
     }
   }

@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <radialGradient id="sky" cx="0.5" cy="0.38" r="0.75"><stop offset="0" stop-color="#2a3570"/><stop offset="0.6" stop-color="#151b3d"/><stop offset="1" stop-color="#070915"/></radialGradient>
+    <linearGradient id="back" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7d9ec4"/><stop offset="1" stop-color="#4f7098"/></linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#ffe2a2" stop-opacity="0.55"/><stop offset="1" stop-color="#ffe2a2" stop-opacity="0"/></radialGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#sky)"/>
+  <circle cx="392" cy="118" r="92" fill="url(#glow)"/>
+  <path d="M 392 64 A 54 54 0 1 0 446 136 A 44 44 0 1 1 392 64 Z" fill="#ffe2a2"/>
+  <g fill="#fff4dc"><circle cx="96" cy="104" r="6"/><circle cx="168" cy="62" r="4"/><circle cx="250" cy="120" r="3.5"/><circle cx="62" cy="200" r="3.5"/><circle cx="460" cy="230" r="4"/><circle cx="300" cy="58" r="3"/></g>
+  <g transform="translate(-6 26) rotate(-8 256 280)">
+    <!-- tail -->
+    <path d="M 118 288 C 92 262 72 228 60 188 C 92 210 116 240 138 272 Z" fill="url(#back)"/>
+    <path d="M 116 300 C 94 322 76 352 68 384 C 98 360 120 334 138 310 Z" fill="#4f7098"/>
+    <!-- dorsal fin -->
+    <path d="M 238 214 C 250 168 276 132 300 116 C 298 152 304 186 320 208 Z" fill="#5f82ab"/>
+    <!-- body -->
+    <path d="M 108 292 C 150 246 250 198 344 202 C 400 205 440 232 458 262 C 440 290 386 316 322 322 C 232 330 150 322 108 304 Z" fill="url(#back)"/>
+    <!-- belly -->
+    <path d="M 458 262 C 440 290 386 316 322 322 C 232 330 150 322 108 304 C 176 302 262 292 334 282 C 386 276 428 274 458 262 Z" fill="#f6f2e8"/>
+    <!-- pectoral fin -->
+    <path d="M 286 316 C 286 352 270 380 250 398 C 288 388 318 360 330 320 Z" fill="#5f82ab"/>
+    <!-- gills -->
+    <g fill="none" stroke="#3f5c80" stroke-width="5" stroke-linecap="round"><path d="M 352 232 Q 346 252 352 270"/><path d="M 338 234 Q 332 254 338 272"/><path d="M 324 236 Q 318 256 324 274"/></g>
+    <!-- eye and smile -->
+    <circle cx="404" cy="246" r="11" fill="#171a28"/><circle cx="407" cy="242" r="3.5" fill="#ffffff"/>
+    <path d="M 414 278 Q 430 286 448 272" fill="none" stroke="#171a28" stroke-width="5" stroke-linecap="round"/>
+  </g>
+</svg>

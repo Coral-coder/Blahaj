@@ -328,6 +328,7 @@ export class Game {
     this.sparks.burst(P.pos.clone().add(V(0, 0.6, 0)), 14, { color: new THREE.Color(0x9a5cff), speed: 5, life: 0.6, size: 0.3 });
     this.cam.shake = 0.25;
     this.addComfort(-amount, why);
+    Audio.accent('hit'); this.musicPulse = (this.musicPulse || 0) + 0.3;
   }
   nightmare() {
     if (this.state !== 'play') return;
@@ -355,6 +356,16 @@ export class Game {
     this.clock += dt;
     if (this.cine) { if (!this.cine.done) this.cine.update(dt, this); this.visuals(dt); this.input.endFrame(); return; }
     if (this.attract) { this.time += dt; this.cam.yaw += dt * 0.08; this.visuals(dt); this.input.endFrame(); return; }
+    if (this.pendingCine && this.state === 'play') { // a story moment waits for Blåhaj to land
+      this.pendingT += dt;
+      if ((this.p.grounded && this.pendingT > 0.4) || this.pendingT > 2.5) {
+        const name = this.pendingCine; this.pendingCine = null;
+        if (!(this.hooks.cine && this.hooks.cine(name))) { // no cutscene (the demo): she just fades away
+          for (const e of this.enemies) e.cineOwned = false;
+          this.hooks.toast('The Nightmare Moth Queen flutters away into the night!', 'The way to Leo’s room is open');
+        }
+      }
+    }
     if (this.state === 'play' || this.state === 'respawning') {
       this.acc = (this.acc || 0) + Math.min(dt, 0.1);
       const inp = this.input;
@@ -430,7 +441,7 @@ export class Game {
       const dir = wishLen > 0.2 ? wish.clone().normalize() : V(Math.sin(P.yaw), 0, Math.cos(P.yaw));
       P.dashDir.copy(dir); P.dashT = CFG.dashTime; P.dashCD = CFG.dashCooldown;
       if (!P.grounded) P.dashUsed = true;
-      this.rig.spin = Math.PI * 2; Audio.dash(); this.cam.fovKick = 8;
+      this.rig.spin = Math.PI * 2; Audio.dash(); this.cam.fovKick = 8; this.musicPulse = (this.musicPulse || 0) + 0.1;
     }
     if (P.dashT > 0) {
       P.dashT -= dt;
@@ -555,7 +566,8 @@ export class Game {
       this.addComfort(COMFORT.knot);
       this.hooks.pop(this.knotsLeft ? `Nightmare broken! ${this.knotsLeft} left` : 'Leo is safe… go to him!');
     } else {
-      this.addComfort(COMFORT.stomp); if (!linked) this.hooks.pop('Poof!');
+      this.addComfort(COMFORT.stomp); if (!linked) { this.hooks.pop('Poof!'); Audio.accent('poof'); }
+      this.musicPulse = (this.musicPulse || 0) + 0.3;
       if (e.type === 'shadow') Audio.dissolve();
       // the moths feed on the nightmares down on the floor: poof a moth and half of
       // those go with it; poof the last one on the floor and the moths fade away too
@@ -763,6 +775,27 @@ export class Game {
     }
   }
   shadowsLeft() { return this.enemies.filter((e) => e.type === 'shadow' && e.alive).length; }
+  // how intense the game is right now, for the music: [energy, threat], both 0..1.
+  // Threat: nightmares left in the room (more the closer they are, and when one's
+  // chasing you), the room's runaway nightmare, the Moth Queen (angrier each hit),
+  // low comfort. Energy adds what Blåhaj is up to (running, flying, dashing) and a
+  // kick from poofs and hits that dies away over a second or two.
+  intensity() {
+    const now = this.clock, dt = Math.min(0.2, now - (this.iLast ?? now)); this.iLast = now;
+    this.musicPulse = (this.musicPulse || 0) * Math.exp(-dt * 1.4);
+    if (this.state !== 'play') return [0.12, 0];
+    const P = this.p, hostiles = this.enemies.filter((e) => e.alive && e.doomT === undefined);
+    let near = 1e9, chase = false, boss = null;
+    for (const e of hostiles) { const d = e.pos.distanceTo(P.pos); if (d < near) near = d; if (e.chase) chase = true; if (e.type === 'boss') boss = e; }
+    const hz = this.hazard, hzOn = hz && !hz.calm;
+    if (hzOn && hz.car) near = Math.min(near, hz.car.position.distanceTo(P.pos));
+    const prox = Math.max(0, Math.min(1, 1 - (near - 2) / 10));
+    let threat = hostiles.length ? 0.3 + Math.min(0.2, hostiles.length * 0.04) : hzOn ? 0.25 : 0;
+    threat = Math.max(threat, prox * 0.85) + (chase ? 0.3 : 0) + (1 - this.comfort / 100) * 0.3;
+    if (boss) threat = Math.max(threat, 0.72 + (boss.maxHp - boss.hp) * 0.12);
+    const act = Math.min(1, Math.hypot(P.vel.x, P.vel.z) / CFG.run) * 0.16 + (P.grounded ? 0 : 0.08) + (P.dashT > 0 ? 0.12 : 0);
+    return [Math.min(1, threat * 0.75 + act + this.musicPulse), Math.min(1, threat)];
+  }
 
   // how far through the level you are, for the music: [0..1, way out open]
   progress() {
@@ -828,6 +861,10 @@ export class Game {
       this.darkFloor.setGloom(this.gloomSpots);
     }
     for (const e of this.enemies) {
+      if (!e.alive && e.cineOwned) { // the cutscene has her; until it starts she reels, stunned
+        if (!this.cine) { e.s.update(dt, t); e.pos.y = Math.max(1.2, e.pos.y - dt * 0.8); e.s.group.position.copy(e.pos); e.s.group.rotation.z = Math.sin(t * 6) * 0.25; }
+        continue;
+      }
       if (!e.alive) {
         e.deadT += dt;
         const k = Math.max(0, 1 - e.deadT * 2.5);

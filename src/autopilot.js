@@ -12,6 +12,7 @@ export function* pilot(g, route) {
   const inp = g.input, P = g.p, step = STEP;
   const log = []; let minComfort = 100;
   function* tick(keys, press) {
+    while (g.cine) { inp.keys.clear(); yield; } // let a cutscene play out (the Moth Queen's fall)
     inp.keys.clear(); keys.forEach((k) => inp.keys.add(k)); (press || []).forEach((k) => inp.pressed.add(k));
     yield;
     minComfort = Math.min(minComfort, g.comfort);
@@ -81,7 +82,7 @@ export function* pilot(g, route) {
       if (!b) { yield* stop(); return true; }
       if (g.state !== 'play') return 'state:' + g.state;
       const bh = Math.hypot(b.pos.x - P.pos.x, b.pos.z - P.pos.z);
-      if (P.grounded && b.inv <= 0 && bh < (o.trigger || 3.4) && b.pos.y < P.pos.y - 1.5) {
+      if (P.grounded && b.inv <= 0 && bh < (o.trigger || 3.4) && b.pos.y < P.pos.y - 1.5 && (!b.dive || b.dive.hang)) { // mid-swoop she's gone before you land: wait for her to hover
         const hp0 = b.hp; yield* tick(['Space', 'KeyW'], ['Space']);
         for (let k = 0; k < 3; k += step) {
           face(b.pos.x, b.pos.z);
@@ -100,7 +101,12 @@ export function* pilot(g, route) {
         }
         if (!b.alive) { yield* stop(); return true; }
         if (P.pos.y < 2) return 'fell, hp left ' + b.hp + ' ' + where();
-      } else { face(sx, sz); yield* tick(hd(sx, sz) > 0.3 ? ['KeyW'] : []); }
+      } else {
+        face(sx, sz);
+        const orb = ((g.features && g.features.orbs) || []).find((o) => o.pos.distanceTo(P.pos) < 2.3 && o.vel.dot(P.pos.clone().sub(o.pos)) > 0);
+        if (orb && P.grounded) yield* tick(['Space'], ['Space']); // hop a bad-dream orb
+        else yield* tick(hd(sx, sz) > 0.3 ? ['KeyW'] : []);
+      }
     }
     return 'timeout';
   }

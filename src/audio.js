@@ -99,6 +99,7 @@ export const Audio = {
     dogBark() { [0, 0.22].forEach((d) => { this.tone(330, { type: 'sawtooth', dur: 0.14, slide: -140, vol: 0.12, delay: d }); this.noise({ dur: 0.12, vol: 0.18, freq: 1200, delay: d }); }); },
     growl() { this.tone(70, { type: 'sawtooth', dur: 0.5, slide: 25, vol: 0.07 }); this.noise({ dur: 0.4, vol: 0.06, freq: 500 }); }, // a nightmare notices you
     dissolve() { this.tone(520, { type: 'sine', dur: 0.7, slide: -380, vol: 0.08 }); this.noise({ dur: 0.6, vol: 0.05, freq: 1400, delay: 0.05 }); }, // its gloom sighs away
+    screech() { this.tone(1500, { type: 'sawtooth', dur: 0.55, slide: -900, vol: 0.05 }); this.tone(1180, { type: 'square', dur: 0.45, slide: -700, vol: 0.03, delay: 0.04 }); this.noise({ dur: 0.4, vol: 0.06, freq: 2600 }); }, // the Moth Queen shrieks
     hiss() { this.noise({ dur: 0.35, vol: 0.07, freq: 3500 }); }, // a spider drops
     heartbeat() { this.tone(70, { type: 'sine', dur: 0.12, vol: 0.35 }); this.tone(60, { type: 'sine', dur: 0.14, vol: 0.3, delay: 0.22 }); },
     // 1 = sweet dream, 0 = full nightmare: the lullaby detunes and a drone creeps in
@@ -137,6 +138,8 @@ export const Audio = {
     updateRoom(camera) { if (this.room) this.room.update(camera); },
     // how far through the level you are (0..1) and whether the way out is open: the music builds with it
     setProgress(p, unlocked) { if (this.music) this.music.setProgress(p, unlocked); },
+    setIntensity(energy, threat) { if (this.music) this.music.setIntensity(energy, threat); }, // how hard the game is going: the music's rhythm follows
+    accent(kind) { if (this.music) this.music.accent(kind); }, // a musical hit for a poof, a hurt, the Queen
   };
 
 

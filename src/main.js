@@ -95,6 +95,12 @@ const hooks = {
   subtitle(text) { const s = $('subtitle'); if (text) { s.textContent = text; s.classList.add('show'); } else s.classList.remove('show'); },
   letterbox(on) { document.body.classList.toggle('cinema', on); },
   complete: onComplete,
+  // a story moment in the middle of a chapter (the Moth Queen's fall); false if it can't play now
+  cine(name) {
+    if (mode !== 'play' || !game || !CINES[name]) return false;
+    runCine(CINES[name](game, hooks), () => hooks.toast('The way to Leo’s room is open', 'Through the door by the round window'));
+    return true;
+  },
 };
 
 function loading(on, text = 'Tucking in…') { $('loading').classList.toggle('hidden', !on); $('loadingText').textContent = text; }
@@ -416,9 +422,10 @@ function frame(now) {
     updateHud();
     Audio.setDream(game.state === 'won' ? 1 : game.comfort / 100); // once you've won, the hum fades away
     Audio.setProgress(...game.progress());
+    Audio.setIntensity(...game.intensity()); // the rhythm plays to the action
     beatT -= dt;
     if (game.comfort < 25 && beatT <= 0) { Audio.heartbeat(); beatT = 0.9 + game.comfort / 40; }
-  } else if (mode !== 'paused') Audio.setDream(1); // cutscene or menu: the nightmare hum fades away
+  } else if (mode !== 'paused') { Audio.setDream(1); Audio.setIntensity(0.1, 0); } // cutscene or menu: the nightmare hum fades away, the beat settles
   Audio.updateRoom(game.camera);
   game.render();
   perf.sample(dt);
