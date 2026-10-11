@@ -83,10 +83,25 @@ export const LAUNDRY = {
     });
     return g;
   },
+  // an A-frame step ladder: front legs carrying the steps, back legs splayed behind,
+  // spreader arms between them, a top cap and rubber feet
   stepLadder() {
-    const g = new THREE.Group(), al = Mat.steel();
-    for (const [z, h] of [[0.8, 1.2], [0, 2.4], [-0.8, 3.6]]) box(g, 2.0, 0.12, 0.8, Mat.paint(0x3a3f44, 0.6), 0, h - 0.12, z, 0.03, 1);
-    for (const s of [-1, 1]) { const rail = box(g, 0.1, 3.9, 0.1, al, s * 0.95, 0, 0, 0.02, 1); rail.rotation.x = 0.38; rail.position.z = 0.1; }
+    const g = new THREE.Group(), al = Mat.steel(), dark = Mat.paint(0x3a3f44, 0.6), rubber = Mat.plastic(0x222428);
+    const bar = (a, b, w, d, mat) => { // a flat bar from point a to point b
+      const v = new THREE.Vector3().subVectors(b, a), m = box(g, w, v.length(), d, mat, 0, 0, 0, 0.02, 1);
+      m.position.copy(a).addScaledVector(v, 0.5); m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), v.normalize()); return m;
+    };
+    const V = (x, y, z) => new THREE.Vector3(x, y, z), top = 3.72;
+    for (const [z, h] of [[0.8, 1.2], [0, 2.4], [-0.8, 3.6]]) box(g, 1.9, 0.12, 0.8, dark, 0, h - 0.12, z, 0.03, 1);
+    for (const s of [-1, 1]) {
+      const x = s * 0.98;
+      bar(V(x, 0, 1.25), V(x, top, -1.2), 0.12, 0.2, al); // front leg
+      bar(V(x * 0.96, 0, -2.35), V(x * 0.96, top - 0.05, -1.3), 0.1, 0.16, al); // back leg
+      bar(V(x * 1.02, 1.55, -0.05), V(x * 1.0, 1.55, -1.85), 0.04, 0.08, al); // spreader arm
+      box(g, 0.2, 0.08, 0.36, rubber, x, 0, 1.25, 0.03, 1); box(g, 0.18, 0.08, 0.3, rubber, x * 0.96, 0, -2.35, 0.03, 1); // feet
+    }
+    for (const y of [0.55, 2.1]) { const t = y / top; bar(V(-0.92, y, -2.35 + t * 1.05), V(0.92, y, -2.35 + t * 1.05), 0.06, 0.06, al); } // back braces
+    box(g, 2.15, 0.22, 0.6, Mat.plastic(0xd8452f), 0, top - 0.05, -1.5, 0.06, 1); // the top cap
     return g;
   },
   lineBasket() {
