@@ -329,7 +329,6 @@ function watch(on) {
   auto.on = on || AUTOPLAY; auto.watching = on && !AUTOPLAY; auto.game = null; auto.gen = null; auto.idx = -1;
   $('autoBadge').classList.toggle('hidden', !auto.on);
 }
-$('btnPauseMusic').onclick = () => { Audio.click(); openBox('pause'); };
 Audio.vol = save.musicVol ?? 1; // the music volume you chose, for when the sound starts up
 
 // ----------------------------------------------------------------- wiring --
