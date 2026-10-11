@@ -73,7 +73,8 @@ const ROUTES = {
   attic: [['walk', -11.4, -6.0], ['jump', -13.6, 2.2, -6.0, { double: true }], ['jump', -13.8, 4.4, -3.4, { double: true }], ['jump', -14.2, 6.6, 0.0, { double: true }],
     ['jump', -10.0, 8.6, 0.0, { double: true }], ['walk', -4.0, 0.0], ['walk', -4.0, -5.0], ['boss', -4.0, -5.0, { max: 90 }],
     ['walk', -4.0, 0.0], ['walk', 7.6, 0.0], ['walk', 8.0, -5.0], ['jump', 13.0, 0, -6.0, { max: 6 }], ['walk', 14.6, -6.0]],
-  bed: [['walk', 4.0, 4.6], ['jump', 4.9, 1.0, 4.0], ['jump', 6.0, 3.0, 4.0, { double: true }], ['jump', 7.2, 3.6, 3.6], ['walk', 7.4, 4.2], ['walk', 7.4, 1.9],
+  // (the wait: the drawers slide out once the last nightmare's poofed)
+  bed: [['wait', 1.3], ['walk', 4.0, 4.6], ['jump', 4.9, 1.0, 4.0], ['jump', 6.0, 3.0, 4.0, { double: true }], ['jump', 7.2, 3.6, 3.6], ['walk', 7.4, 4.2], ['walk', 7.4, 1.9],
       ['jump', 7.7, 5.0, 0.6], ['jump', 7.5, 6.4, -1.6], ['walk', 7.6, -1.6], ['snap'], ['jump', -3.6, 4.5, -2.4, { double: true, glide: true, dash: true, hold: 0.35, max: 8 }], ['snap'], ['knots'], ['snap'], ['walk', -5.0, -6.6]],
 };
 // every chapter starts by hunting down the nightmares on the floor (the way out stays shut until they're poofed)

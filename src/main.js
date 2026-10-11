@@ -63,6 +63,7 @@ function loadSave() {
   s.best = s.best || [];
   CHAPTERS.forEach((c, i) => { s.stars[i] = s.stars[i] || [false, false, false]; });
   s.quality = s.quality || 'high';
+  if (s.run && !s.run.real) s.run = null; // (a run from before the real-time clock: start fresh)
   return s;
 }
 const save = loadSave();
@@ -120,6 +121,7 @@ function newGame(i, opts = {}) {
 // Title: a slow orbit around Leo asleep, hugging Blåhaj.
 function startTitle() {
   Audio.stopRoom();
+  if (clocking) { endSegment(); clocking = false; persist(); } // quitting to the title stops the run clock (Continue picks it back up)
   watch(false); // back at the title, you're the one playing again
   loading(true);
   setTimeout(() => {
@@ -145,8 +147,10 @@ function startTitle() {
 }
 
 function startChapter(i, withIntro) {
-  // restarting a chapter mid-run: the time you spent still counts on the run clock
-  if (runOn() && game && current === i && game.state !== 'won' && game.stats.time > 0) { save.run.extra = save.run.extra || Array(CHAPTERS.length).fill(0); save.run.extra[i] += game.stats.time; persist(); }
+  if (runOn()) { // the run clock keeps going through loading, cutscenes and restarts
+    if (game && current === i && game.state !== 'won' && save.run.seg) save.run.restarts[i]++;
+    endSegment(); save.run.seg = [i, save.run.clock]; clocking = true; persist();
+  }
   loading(true, `Chapter ${i + 1}: ${CHAPTERS[i].title}`);
   Audio.init(); Audio.resume();
   setTimeout(() => {
@@ -221,10 +225,18 @@ function updateHud() {
 // ---------------------------------------------------------------- speedrun --
 // Every chapter has its own stopwatch (in-game time: cutscenes and loading don't count) and a
 // completion %; a story run from chapter 1 adds a run stopwatch and splits, saved as it goes.
-function newRun() { save.run = { times: Array(CHAPTERS.length).fill(null), pcts: Array(CHAPTERS.length).fill(null) }; persist(); }
+// A run: the real-time clock (from loading the first chapter to the ending, with every
+// cutscene, load and restart in it; only the pause menu stops it), each chapter's real
+// split, and what you got in each chapter.
+const N = CHAPTERS.length, nil = () => Array(N).fill(null);
+function newRun() { save.run = { clock: 0, seg: null, real: Array(N).fill(0), times: nil(), pcts: nil(), parts: nil(), scares: Array(N).fill(0), restarts: Array(N).fill(0) }; persist(); }
+let clocking = false, clockSaveT = 0;
 const runOn = () => story && !!save.run && !auto.watching;
-const runTotal = () => (save.run ? save.run.times.reduce((a, t) => a + (t || 0), 0) + (save.run.extra || []).reduce((a, t) => a + (t || 0), 0) : 0); // (restarts count)
+const runTotal = () => (save.run ? save.run.clock : 0);
 const fullRun = () => !!save.run && save.run.times.every((t) => t !== null);
+function endSegment() { const R = save.run; if (!R || !R.seg) return; R.real[R.seg[0]] += R.clock - R.seg[1]; R.seg = null; }
+// a tab you've switched away from doesn't count against you
+document.addEventListener('visibilitychange', () => { last = performance.now(); });
 
 function onComplete(r) {
   if (mode === 'demo') return; // the attract-mode demo never counts
@@ -233,13 +245,13 @@ function onComplete(r) {
     save.completed[i] = true;
     r.stars.forEach((t, k) => { if (t) save.stars[i][k] = true; });
     save.bestFish = save.bestFish || []; save.bestFish[i] = Math.max(save.bestFish[i] || 0, r.fish);
-    const prevBest = save.best[i], pb = !prevBest || r.time < prevBest;
-    save.best[i] = prevBest ? Math.min(prevBest, r.time) : r.time;
+    save.best[i] = save.best[i] ? Math.min(save.best[i], r.time) : r.time;
     save.pcts = save.pcts || []; save.pcts[i] = Math.max(save.pcts[i] || 0, r.pct);
-    if (runOn()) { save.run.times[i] = r.time; save.run.pcts[i] = r.pct; }
-    persist();
-    // the split
-    hooks.toast(`⏱ ${fmtT(r.time)} · ${r.pct}%${runOn() ? ` · 🏁 ${fmtT(runTotal())}` : ''}`, pb ? (prevBest ? `New best! (was ${fmtT(prevBest)})` : `Chapter ${i + 1} done`) : `Best ${fmtT(prevBest)}`, 4200);
+    save.bestParts = save.bestParts || []; const bp = save.bestParts[i] || {};
+    for (const k in r.parts) if (r.parts[k]) bp[k] = [Math.max((bp[k] || [0])[0], r.parts[k][0]), r.parts[k][1]]; // the most of each kind you've ever got
+    save.bestParts[i] = bp;
+    if (runOn()) { const R = save.run; R.times[i] = r.time; R.pcts[i] = r.pct; R.parts[i] = r.parts; R.scares[i] += r.scares; }
+    persist(); // (no pop-up: the splits wait for the end)
   }
   const after = () => {
     if (ch.outro === 'ending') { Audio.stopMusic(); Audio.stopRoom(); mode = 'menu'; showEnding(r); return; }
@@ -249,24 +261,55 @@ function onComplete(r) {
   else after();
 }
 
+// The results: every chapter's real-time split and play time, and how much of each kind
+// of thing you got there (fish, starfish, nightmares poofed, the chapter's finds), with
+// the totals for the whole run. Watching (or no run going), it shows your bests instead.
+const KINDS = [['fish', '🐟', 'Fish', 'Fish'], ['stars', '⭐', 'Starfish', 'Stars'], ['nightmares', '👻', 'Nightmares', 'Poofed'], ['finds', '✨', 'Finds', 'Finds']];
+const pctOf = (x) => (x && x[1] ? Math.round((x[0] / x[1]) * 100) : null);
 function showEnding() {
   const total = save.stars.reduce((a, t) => a + t.filter(Boolean).length, 0);
-  $('endStars').textContent = `${total} / ${CHAPTERS.length * 3}`;
-  // the results: this run's splits (or your bests), every chapter's %, and the totals
-  const run = runOn() && save.run, pcts = save.pcts || [];
+  $('endStars').textContent = `${total} / ${N * 3}`;
+  const run = runOn() && save.run;
+  if (run) { endSegment(); clocking = false; persist(); }
+  const parts = (i) => (run ? run.parts[i] : (save.bestParts || [])[i]) || null;
+  const sum = {}; KINDS.forEach(([k]) => (sum[k] = [0, 0]));
+  const cell = (x, unit) => {
+    if (!x) return '<td class="n dim">—</td>';
+    const p = pctOf(x);
+    return `<td class="n${p === 100 ? ' full' : ''}">${p}%<small>${x[0]}/${x[1]}${unit ? ' ' + unit : ''}</small></td>`;
+  };
+  let play = 0, real = 0;
   const rows = CHAPTERS.map((c, i) => {
-    const t = run ? run.times[i] : save.best[i], p = run ? run.pcts[i] : pcts[i];
-    return `<tr><td>${i + 1}. ${c.title}</td><td class="n">${fmtT(t ?? NaN)}</td><td class="n">${fmtT(save.best[i] ?? NaN)}</td><td class="n">${p ?? '–'}${p != null ? '%' : ''}</td></tr>`;
+    const P = parts(i), t = run ? run.times[i] : save.best[i];
+    if (t != null) play += t;
+    if (run) real += run.real[i];
+    if (P) KINDS.forEach(([k]) => { if (P[k]) { sum[k][0] += P[k][0]; sum[k][1] += P[k][1]; } });
+    const unit = c.collect ? (c.collect.label || '').split(' ').pop() : '', all = P ? Object.values(P).filter(Boolean) : [];
+    const pc = all.length ? pctOf([all.reduce((a, x) => a + x[0], 0), all.reduce((a, x) => a + x[1], 0)]) : null;
+    const extra = run && (run.restarts[i] || run.scares[i]) ? `<small>${run.scares[i] ? `${run.scares[i]} scare${run.scares[i] > 1 ? 's' : ''}` : ''}${run.scares[i] && run.restarts[i] ? ' · ' : ''}${run.restarts[i] ? `${run.restarts[i]} restart${run.restarts[i] > 1 ? 's' : ''}` : ''}</small>` : '';
+    return `<tr><td class="ch">${i + 1}. ${c.title}${extra}</td>${run ? `<td class="n">${fmtT(run.real[i] || NaN)}</td>` : ''}<td class="n">${fmtT(t ?? NaN)}</td><td class="n">${fmtT(save.best[i] ?? NaN)}</td>${KINDS.map(([k]) => cell(P && P[k], k === 'finds' ? unit : '')).join('')}<td class="n pc${pc === 100 ? ' full' : ''}">${pc ?? '–'}${pc != null ? '%' : ''}</td></tr>`;
   }).join('');
-  const usePcts = CHAPTERS.map((c, i) => (run ? run.pcts[i] : pcts[i]) || 0), cum = Math.round(usePcts.reduce((a, b) => a + b, 0) / CHAPTERS.length);
-  let totalCell = '–', note = '';
+  const all = KINDS.map(([k]) => sum[k]), got = all.reduce((a, x) => a + x[0], 0), tot = all.reduce((a, x) => a + x[1], 0), cum = tot ? Math.round((got / tot) * 100) : 0;
+  let note = '';
   if (run && fullRun()) {
-    const tot = runTotal(), prev = save.bestRun, pb = !prev || tot < prev;
-    if (pb) { save.bestRun = tot; persist(); }
-    totalCell = fmtT(tot); note = pb ? `<p class="pb">🏁 New personal best${prev ? ` (was ${fmtT(prev)})` : ''}!</p>` : `<p>Personal best: <b>${fmtT(prev)}</b></p>`;
-  } else if (!run) totalCell = fmtT(save.best.reduce((a, t) => a + (t || 0), 0));
-  $('endResults').innerHTML = `${note}<table><thead><tr><th>${run ? 'This run' : 'Your bests'}</th><th class="n">Time</th><th class="n">Best</th><th class="n">%</th></tr></thead><tbody>${rows}</tbody>
-    <tfoot><tr class="total"><td>Total${run ? '' : ' (sum of bests)'}</td><td class="n">${totalCell}</td><td class="n">${save.bestRun ? fmtT(save.bestRun) : '–'}</td><td class="n">${cum}%</td></tr></tfoot></table>`;
+    const prev = save.bestRunRT, pb = !prev || run.clock < prev;
+    if (pb) { save.bestRunRT = run.clock; persist(); }
+    note = pb ? `<p class="pb">🏁 New personal best${prev ? ` (was ${fmtT(prev)})` : ''}!</p>` : `<p>Personal best: <b>${fmtT(prev)}</b></p>`;
+  }
+  // the big numbers
+  const scares = run ? run.scares.reduce((a, b) => a + b, 0) : null, restarts = run ? run.restarts.reduce((a, b) => a + b, 0) : null;
+  const tile = (label, v, sub) => `<div class="tile"><small>${label}</small><b>${v}</b>${sub ? `<em>${sub}</em>` : ''}</div>`;
+  const tiles = (run ? [
+    tile('Run time', fmtT(run.clock), 'real time, start to finish'),
+    tile('Play time', fmtT(play), 'in the chapters'),
+    tile('Cutscenes & loading', fmtT(Math.max(0, run.clock - play)), 'and restarts'),
+  ] : [tile('Sum of bests', fmtT(save.best.reduce((a, t) => a + (t || 0), 0)), 'play time')]).concat([
+    tile('Completion', `${cum}%`, `${got} / ${tot} things`),
+    ...KINDS.map(([k, ic, name]) => tile(`${ic} ${name}`, `${pctOf(sum[k]) ?? 0}%`, `${sum[k][0]} / ${sum[k][1]}`)),
+  ]).concat(run ? [tile('Scares taken', scares), tile('Restarts', restarts)] : []).join('');
+  $('endResults').innerHTML = `${note}<div class="tiles">${tiles}</div><div class="scroll"><table><thead><tr><th>${run ? 'This run' : 'Your bests'}</th>${run ? '<th class="n">Split</th>' : ''}<th class="n">Play</th><th class="n">Best</th>${KINDS.map(([, ic, name, short]) => `<th class="n" title="${name}">${ic} ${short}</th>`).join('')}<th class="n">%</th></tr></thead><tbody>${rows}</tbody>
+    <tfoot><tr class="total"><td>Total</td>${run ? `<td class="n">${fmtT(run.clock)}</td>` : ''}<td class="n">${fmtT(play)}</td><td class="n">${fmtT(save.best.reduce((a, t) => a + (t || 0), 0))}</td>${KINDS.map(([k]) => cell(sum[k][1] ? sum[k] : null)).join('')}<td class="n pc">${cum}%</td></tr></tfoot></table></div>
+    ${run ? '<p class="key">Split: real time in that chapter, cutscenes, loading and restarts included. Play: the time on the clock when you finished it.</p>' : ''}`;
   hooks.fade(false);
   show('ending');
 }
@@ -503,8 +546,12 @@ const debug = { noRender: false, freeze: false };
 let last = performance.now(), beatT = 0;
 function frame(now) {
   requestAnimationFrame(frame);
-  const dt = Math.min(0.05, (now - last) / 1000);
+  const raw = Math.max(0, (now - last) / 1000), dt = Math.min(0.05, raw);
   last = now;
+  if (clocking && mode !== 'paused' && runOn()) { // the run clock: real time, loading hitches and all
+    save.run.clock += Math.min(raw, 10);
+    if ((clockSaveT += raw) > 5) { clockSaveT = 0; persist(); }
+  }
   if (debug.noRender) return;
   if (debug.freeze && game) { game.render(); input.endFrame(); return; }
   input.pollPad();
@@ -531,7 +578,7 @@ function frame(now) {
   if (mode === 'play') {
     $('timer').textContent = `⏱ ${fmtT(game.stats.time)}`;
     $('runTimer').classList.toggle('hidden', !runOn());
-    if (runOn()) $('runTimer').textContent = `🏁 ${fmtT(runTotal() + game.stats.time)}`;
+    if (runOn()) $('runTimer').textContent = `🏁 ${fmtT(runTotal())}`;
     updateHud();
     Audio.setDream(game.state === 'won' ? 1 : game.comfort / 100); // once you've won, the hum fades away
     Audio.setProgress(...game.progress());
