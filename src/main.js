@@ -88,7 +88,7 @@ const hooks = {
   pop(text) { const c = $('combo'); c.textContent = text; c.classList.add('show'); clearTimeout(popTimer); popTimer = setTimeout(() => c.classList.remove('show'), 900); },
   hint(t) { const h = $('hint'); if (t) { h.textContent = t; h.style.opacity = 1; } else h.style.opacity = 0; },
   fade(on) { $('fade').classList.toggle('on', on); },
-  star(i) { if (!save.stars[current][i]) { save.stars[current][i] = true; persist(); } },
+  star(i) { if (mode !== 'demo' && !save.stars[current][i]) { save.stars[current][i] = true; persist(); } },
   subtitle(text) { const s = $('subtitle'); if (text) { s.textContent = text; s.classList.add('show'); } else s.classList.remove('show'); },
   letterbox(on) { document.body.classList.toggle('cinema', on); },
   complete: onComplete,
@@ -204,6 +204,7 @@ function updateHud() {
 }
 
 function onComplete(r) {
+  if (mode === 'demo') return; // the attract-mode demo never counts
   const i = current, ch = CHAPTERS[i];
   save.completed[i] = true;
   r.stars.forEach((t, k) => { if (t) save.stars[i][k] = true; });
@@ -266,6 +267,8 @@ $('tPause').onclick = () => pause(true);
 document.querySelectorAll('.qbtn').forEach((b) => { b.textContent = qualityLabel(); b.onclick = () => { Audio.click(); cycleQuality(); }; });
 
 addEventListener('keydown', (e) => {
+  idleT = 0;
+  if (mode === 'demo') { e.preventDefault(); endDemo(e.code === 'Space' || e.code === 'Enter'); return; } // space starts the game; any other key, back to the title
   if (e.code === 'KeyM') { Audio.init(); const m = Audio.toggleMute(); hooks.toast(m ? '🔇 Sound off' : '🔊 Sound on'); }
   if (mode === 'cine' && (e.code === 'Enter' || e.code === 'Escape')) { skipCine(); return; }
   if (e.code === 'Escape' || e.code === 'KeyP') { if (mode === 'play') pause(true); else if (mode === 'paused') pause(false); }
@@ -302,9 +305,13 @@ const perf = {
 // through it with the same routes the playtest uses. The game runs in fixed
 // 1/60 s steps so her jumps land exactly as tuned. If a run goes wrong she takes
 // the chapter again from the top; after three misses she hands you the controls.
-const auto = { on: true, game: null, gen: null, idx: -1, tries: 0, check: 0, acc: 0 };
+const AUTOPLAY = true;
+const auto = { on: AUTOPLAY, game: null, gen: null, idx: -1, tries: 0, check: 0, acc: 0 };
+$('autoBadge').classList.toggle('hidden', !AUTOPLAY);
 function autoStep() {
-  if (!auto.on || mode !== 'play' || !game) return;
+  if (!game) return;
+  if (mode === 'demo') { if (auto.gen && auto.game === game && auto.gen.next().done) { auto.gen = null; input.keys.clear(); endDemo(false); } return; }
+  if (!auto.on || mode !== 'play') return;
   if (auto.game !== game) {
     if (game.state !== 'play') return;
     if (auto.idx !== current) { auto.idx = current; auto.tries = 0; }
@@ -328,6 +335,48 @@ function autoMiss(why) {
   hooks.toast('Your turn!', 'Blåhaj needs a hand with this one', 4500);
 }
 
+// ----------------------------------------------------------- attract mode --
+// Leave the title alone for two minutes and the game shows itself off, like an
+// arcade cabinet: about 15 seconds of the autopilot playing a random stretch of
+// a random chapter under a flashing DEMO banner, then back to the title (and the
+// two-minute wait starts over). Space, a click or a tap starts the game for real.
+const ATTRACT = { idle: 120, length: 15, skipMax: 25 };
+let idleT = 0, demo = null;
+['pointermove', 'wheel'].forEach((ev) => addEventListener(ev, () => { idleT = 0; }, { passive: true }));
+addEventListener('pointerdown', () => { idleT = 0; if (mode === 'demo') endDemo(true); });
+function startDemo() {
+  const i = Math.floor(Math.random() * CHAPTERS.length);
+  mode = 'demo'; demo = null;
+  show(null);
+  loading(true, 'Demo');
+  setTimeout(() => {
+    if (mode !== 'demo') return;
+    newGame(i);
+    auto.game = game; auto.gen = pilot(game, routeFor(game.ch)); input.keys.clear();
+    demo = { t: 0, skip: 2 + Math.random() * ATTRACT.skipMax, ready: false }; // fast-forward to a random moment behind the curtain
+    $('demoChapter').textContent = `Chapter ${i + 1} · ${CHAPTERS[i].title}`;
+    $('demoStart').textContent = input.isTouch ? 'TAP TO START' : 'PRESS SPACE TO START';
+  }, 40);
+}
+function endDemo(start) {
+  if (mode !== 'demo') return;
+  mode = 'title'; demo = null; idleT = 0;
+  auto.gen = null; auto.game = null; input.keys.clear();
+  $('demo').classList.add('hidden');
+  if (start) $('btnStart').click(); else startTitle();
+}
+function demoFrame(dt) {
+  if (!demo) return;
+  if (!demo.ready) { // skipping ahead: run the autopilot flat out for a few ms a frame, no drawing
+    const t0 = performance.now();
+    while (demo && demo.skip > 0 && performance.now() - t0 < 40) { autoStep(); if (mode !== 'demo') return; game.update(STEP); demo.skip -= STEP; }
+    if (demo && demo.skip <= 0) { demo.ready = true; loading(false); $('demo').classList.remove('hidden'); }
+    return;
+  }
+  demo.t += dt;
+  if (demo.t > ATTRACT.length || ['pad-jump', 'pad-pause'].some((k) => input.pressed.has(k))) endDemo(demo.t <= ATTRACT.length);
+}
+
 // ------------------------------------------------------------------- loop --
 const debug = { noRender: false, freeze: false };
 let last = performance.now(), beatT = 0;
@@ -340,8 +389,13 @@ function frame(now) {
   input.pollPad();
   if (input.pressed.has('pad-pause')) { if (mode === 'play') pause(true); else if (mode === 'paused') pause(false); }
   if (!game) { input.endFrame(); return; }
+  if (mode === 'title' && !$('title').classList.contains('hidden')) { // the attract-mode countdown
+    idleT = input.pressed.size ? 0 : idleT + dt;
+    if (idleT >= ATTRACT.idle) startDemo();
+  } else if (mode !== 'demo') idleT = 0;
+  if (mode === 'demo') { demoFrame(dt); if (!demo || !demo.ready) { input.endFrame(); return; } }
   if (mode === 'paused') input.endFrame();
-  else if (auto.on) { // fixed steps, snapped to the display's frames so motion stays smooth
+  else if (auto.on || mode === 'demo') { // fixed steps, snapped to the display's frames so motion stays smooth
     auto.acc += dt;
     const n = Math.min(4, Math.round(auto.acc / STEP));
     auto.acc = THREE.MathUtils.clamp(auto.acc - n * STEP, -STEP, STEP);
@@ -370,7 +424,7 @@ loading(true);
 loadBlahajModel().then(() => { startTitle(); requestAnimationFrame(frame); });
 
 window.__blahaj = {
-  get game() { return game; }, get mode() { return mode; }, save, debug, CHAPTERS, auto,
+  get game() { return game; }, get mode() { return mode; }, save, debug, CHAPTERS, auto, startDemo, ATTRACT,
   startChapter, skipCine, startTitle,
   // the playtest: play a whole route right now, stepping the game as fast as it will go
   runRoute(route) { const it = pilot(game, route); for (;;) { const r = it.next(); if (r.done) return { ...r.value, mode }; this.sim(STEP); } },

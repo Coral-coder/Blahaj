@@ -32,7 +32,7 @@ const server = http.createServer((req, res) => {
   await page.addInitScript(() => localStorage.setItem('blahaj-big-adventure-v1', JSON.stringify({ quality: 'low', qualityLocked: true })));
   await page.goto(`http://localhost:${server.address().port}/`, { waitUntil: 'domcontentloaded', timeout: 120000 });
   await page.waitForFunction(() => window.__blahaj && window.__blahaj.game && window.__blahaj.mode === 'title', null, { timeout: 180000 });
-  await page.evaluate(() => { window.__blahaj.auto.on = false; }); // the playtest drives the autopilot itself, flat out
+  await page.evaluate(() => { window.__blahaj.auto.on = false; window.__blahaj.ATTRACT.idle = 1e9; }); // the playtest drives the autopilot itself, flat out (and no attract-mode demo)
   let failures = 0;
   const playCines = async () => {
     for (let guard = 0; guard < 200 && (await page.evaluate(() => window.__blahaj.mode)) === 'cine'; guard++) await page.evaluate(() => window.__blahaj.sim(0.5));
