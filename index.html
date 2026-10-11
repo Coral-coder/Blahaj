@@ -51,6 +51,27 @@
   .mbSliders input[type=range] { width: 100%; accent-color: var(--gold); height: 22px; cursor: pointer; }
   #mbAuto.on { background: linear-gradient(180deg, #d7c2ff, #9a6bff); color: #160b33; box-shadow: 0 0 26px rgba(154,107,255,.7); animation: mbGlow 2.4s ease-in-out infinite; }
   @keyframes mbGlow { 50% { box-shadow: 0 0 40px rgba(154,107,255,.95); } }
+  /* extras */
+  .extras { display: grid; gap: 12px; margin: 6px 0 18px; }
+  .xbtn { font: inherit; text-align: left; color: var(--ink); background: rgba(255,255,255,.06); border: 1px solid var(--edge); border-radius: 18px; padding: 16px 18px 16px 70px; cursor: pointer; position: relative; display: flex; flex-direction: column; gap: 3px; transition: transform .12s, background .12s, opacity .2s, filter .2s; }
+  .xbtn:hover { background: rgba(255,255,255,.11); transform: translateY(-2px); }
+  .xbtn .ic { position: absolute; left: 18px; top: 50%; transform: translateY(-50%); font-size: 34px; }
+  .xbtn b { font-family: Fraunces, Georgia, serif; font-size: 20px; color: #fff4dc; }
+  .xbtn small { color: var(--muted); font-weight: 700; font-size: 14px; line-height: 1.35; }
+  .xbtn.locked { opacity: .42; filter: grayscale(1); }
+  .xbtn.locked:hover { transform: none; background: rgba(255,255,255,.06); }
+  .xbtn.wiggle { animation: wiggle .32s ease; }
+  .xbtn.unlocking { animation: unlockGlow 1s ease forwards; }
+  @keyframes wiggle { 25% { transform: translateX(-4px) rotate(-.6deg); } 75% { transform: translateX(4px) rotate(.6deg); } }
+  @keyframes unlockGlow { 0% { filter: grayscale(1); opacity: .42; } 40% { filter: grayscale(0) brightness(1.6); opacity: 1; box-shadow: 0 0 40px rgba(255,210,122,.9); } 100% { filter: none; opacity: 1; } }
+  /* just listening: the music box tucks away to a little pill */
+  #nowPlaying { position: absolute; left: 50%; bottom: 22px; transform: translateX(-50%); display: flex; align-items: center; gap: 12px; padding: 10px 12px 10px 18px; border-radius: 999px; background: var(--panel); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border: 1px solid var(--edge); font-weight: 800; pointer-events: auto; white-space: nowrap; max-width: calc(100vw - 32px); }
+  #nowPlaying .eq { display: inline-flex; gap: 3px; align-items: flex-end; height: 16px; }
+  #nowPlaying .eq i { width: 3px; background: var(--gold); border-radius: 2px; animation: eq 1s ease-in-out infinite; }
+  #nowPlaying .eq i:nth-child(2) { animation-delay: -.3s; } #nowPlaying .eq i:nth-child(3) { animation-delay: -.6s; }
+  @keyframes eq { 0%, 100% { height: 4px; } 50% { height: 16px; } }
+  #npTitle { overflow: hidden; text-overflow: ellipsis; }
+  #nowPlaying .btn { margin: 0; }
   .chapters { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 10px; margin: 10px 0 16px; }
   #chapters .card { max-width: 1060px; max-height: calc(100vh - 40px); overflow-y: auto; }
   .chap { font: inherit; text-align: left; color: var(--ink); background: rgba(255,255,255,.06); border: 1px solid var(--edge); border-radius: 16px; padding: 14px; cursor: pointer; display: flex; flex-direction: column; gap: 4px; transition: transform .12s, background .12s; }
@@ -157,7 +178,7 @@
       <button class="btn" id="btnStart">▶ Begin</button>
       <button class="btn ghost" id="btnChapters">Chapters</button>
       <button class="btn ghost" id="btnHow">How to play</button>
-      <button class="btn ghost" id="btnMusic">🎵 Music</button>
+      <button class="btn ghost" id="btnExtras">✨ Extras</button>
       <button class="btn ghost small qbtn">Graphics</button>
       <div class="credit">Blåhaj 3D model: <a href="https://sketchfab.com/3d-models/blahaj-ce981de49111488c81ea646067abe1ec" target="_blank" rel="noopener">“Blahaj”</a> by <a href="https://sketchfab.com/Kaine_G" target="_blank" rel="noopener">Kaine_G</a>, <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a> (animated and re-materialled) · <kbd>M</kbd> sound</div>
     </div>
@@ -176,6 +197,18 @@
     <div class="card"><h2>Chapters</h2><div class="chapters" id="chapterGrid"></div><button class="btn ghost" id="btnChaptersBack">Back</button> <button class="btn ghost small qbtn">Graphics</button></div>
   </div>
 
+  <div id="extras" class="screen hidden">
+    <div class="card" style="max-width:560px">
+      <h2>✨ Extras</h2>
+      <div class="extras">
+        <button class="xbtn" id="xMusic"><span class="ic">🎵</span><b>The Music Box</b><small>Just the music: every chapter’s theme to listen to and play with, or let it dream on its own.</small></button>
+        <button class="xbtn" id="xWatch"><span class="ic">🤖</span><b>Watch Blåhaj play</b><small id="xWatchSub">Sit back while she plays the whole story by herself.</small></button>
+      </div>
+      <button class="btn ghost" id="btnExtrasBack">Back</button>
+    </div>
+  </div>
+  <div id="nowPlaying" class="hidden"><span class="eq"><i></i><i></i><i></i></span><span id="npTitle"></span><button class="btn ghost small" id="npShow">Controls</button></div>
+
   <div id="musicbox" class="screen hidden">
     <div class="card mb">
       <h2>🎵 The Music Box</h2>
@@ -189,7 +222,7 @@
         <label><span>Layers<em>sparse ↔ full</em></span><input type="range" id="mbLayers" min="0" max="5" step="1"></label>
         <label><span>Water<em>clear ↔ deep</em></span><input type="range" id="mbWater" min="0" max="100"></label>
       </div>
-      <button class="btn" id="mbAuto">✨ Auto</button><button class="btn ghost" id="mbBack">Back</button>
+      <button class="btn" id="mbAuto">✨ Auto</button><button class="btn ghost" id="mbListen">🎧 Just listen</button><button class="btn ghost" id="mbBack">Back</button>
     </div>
   </div>
 

@@ -76,7 +76,7 @@ const input = new Input($('game'));
 let game = null, mode = 'title', current = 0, story = false;
 
 function show(id) {
-  ['title', 'how', 'chapters', 'pause', 'complete', 'ending', 'musicbox'].forEach((s) => $(s).classList.toggle('hidden', s !== id));
+  ['title', 'how', 'chapters', 'pause', 'complete', 'ending', 'musicbox', 'extras'].forEach((s) => $(s).classList.toggle('hidden', s !== id));
   $('hud').classList.toggle('hidden', !(id === null && mode === 'play'));
   $('touch').classList.toggle('off', !(id === null && mode === 'play'));
 }
@@ -92,7 +92,7 @@ const hooks = {
   pop(text) { const c = $('combo'); c.textContent = text; c.classList.add('show'); clearTimeout(popTimer); popTimer = setTimeout(() => c.classList.remove('show'), 900); },
   hint(t) { const h = $('hint'); if (t) { h.textContent = t; h.style.opacity = 1; } else h.style.opacity = 0; },
   fade(on) { $('fade').classList.toggle('on', on); },
-  star(i) { if (mode !== 'demo' && !save.stars[current][i]) { save.stars[current][i] = true; persist(); } },
+  star(i) { if (mode !== 'demo' && !auto.watching && !save.stars[current][i]) { save.stars[current][i] = true; persist(); } },
   subtitle(text) { const s = $('subtitle'); if (text) { s.textContent = text; s.classList.add('show'); } else s.classList.remove('show'); },
   letterbox(on) { document.body.classList.toggle('cinema', on); },
   complete: onComplete,
@@ -118,6 +118,7 @@ function newGame(i, opts = {}) {
 // Title: a slow orbit around Leo asleep, hugging Blåhaj.
 function startTitle() {
   Audio.stopRoom();
+  watch(false); // back at the title, you're the one playing again
   loading(true);
   setTimeout(() => {
     mode = 'title';
@@ -216,11 +217,13 @@ function updateHud() {
 function onComplete(r) {
   if (mode === 'demo') return; // the attract-mode demo never counts
   const i = current, ch = CHAPTERS[i];
-  save.completed[i] = true;
-  r.stars.forEach((t, k) => { if (t) save.stars[i][k] = true; });
-  save.bestFish = save.bestFish || []; save.bestFish[i] = Math.max(save.bestFish[i] || 0, r.fish);
-  save.best[i] = save.best[i] ? Math.min(save.best[i], r.time) : r.time;
-  persist();
+  if (!auto.watching) { // watching her play (Extras) doesn't count as you finishing it
+    save.completed[i] = true;
+    r.stars.forEach((t, k) => { if (t) save.stars[i][k] = true; });
+    save.bestFish = save.bestFish || []; save.bestFish[i] = Math.max(save.bestFish[i] || 0, r.fish);
+    save.best[i] = save.best[i] ? Math.min(save.best[i], r.time) : r.time;
+    persist();
+  }
   const after = () => {
     if (ch.outro === 'ending') { Audio.stopMusic(); Audio.stopRoom(); mode = 'menu'; showEnding(r); return; }
     if (i + 1 < CHAPTERS.length) startChapter(i + 1, true);
@@ -268,17 +271,25 @@ let boxFrom = 'title';
 const SLIDERS = { mbEnergy: 'energy', mbMood: 'mood', mbTempo: 'tempo', mbWater: 'water' };
 function syncBox() { // the sliders show where the music is (in Auto you can watch them drift)
   $('mbTheme').innerHTML = box.title;
+  $('npTitle').textContent = $('mbTheme').textContent.replace(/^Chapter \d+/, '');
   for (const id in SLIDERS) if (document.activeElement !== $(id)) $(id).value = Math.round(box.params[SLIDERS[id]] * 100);
   if (document.activeElement !== $('mbLayers')) $('mbLayers').value = box.params.layers;
   $('mbAuto').classList.toggle('on', box.auto); $('mbAuto').textContent = box.auto ? '✨ Auto: on' : '✨ Auto';
 }
 function openBox(from) {
-  boxFrom = from;
+  boxFrom = from; $('nowPlaying').classList.add('hidden');
   $('mbVol').value = Math.round((save.musicVol ?? 1) * 100);
   box.open(game && from === 'pause' ? CHAPTERS[current].id : 'edge');
   syncBox(); show('musicbox');
 }
-function closeBox() { box.close(); show(boxFrom); }
+function closeBox() { box.close(); $('nowPlaying').classList.add('hidden'); show(boxFrom); }
+// just listen: the controls tuck away to a little 'now playing' pill
+function listen(on) {
+  if (on) { $('npTitle').textContent = $('mbTheme').textContent.replace(/^Chapter \d+/, ''); show(null); $('hud').classList.add('hidden'); $('touch').classList.add('off'); $('nowPlaying').classList.remove('hidden'); }
+  else { $('nowPlaying').classList.add('hidden'); syncBox(); show('musicbox'); }
+}
+$('mbListen').onclick = () => { Audio.click(); listen(true); };
+$('npShow').onclick = () => { Audio.click(); listen(false); };
 for (const id in SLIDERS) $(id).oninput = (e) => box.set(SLIDERS[id], e.target.value / 100);
 $('mbLayers').oninput = (e) => box.set('layers', +e.target.value);
 $('mbVol').oninput = (e) => { save.musicVol = e.target.value / 100; Audio.setMusicVolume(save.musicVol); persist(); };
@@ -286,7 +297,38 @@ $('mbPrev').onclick = () => box.step(-1);
 $('mbNext').onclick = () => box.step(1);
 $('mbAuto').onclick = () => box.toggleAuto();
 $('mbBack').onclick = () => { Audio.click(); closeBox(); };
-$('btnMusic').onclick = () => { Audio.init(); Audio.click(); openBox('title'); };
+// ----------------------------------------------------------------- extras --
+// The Music Box, and watching Blåhaj play the whole story by herself. That one
+// unlocks when you've finished the story… or if you knock on it ten times.
+let knocks = 0;
+const finished = () => !!save.completed[CHAPTERS.length - 1];
+function openExtras() {
+  knocks = 0;
+  const open = finished() || AUTOPLAY;
+  $('xWatch').classList.toggle('locked', !open); $('xWatch').classList.remove('unlocking');
+  $('xWatchSub').textContent = open ? 'Sit back while she plays the whole story by herself.' : '🔒 Finish the story to unlock';
+  show('extras');
+}
+$('btnExtras').onclick = () => { Audio.init(); Audio.click(); openExtras(); };
+$('btnExtrasBack').onclick = () => { Audio.click(); show('title'); };
+$('xMusic').onclick = () => { Audio.click(); openBox('extras'); };
+$('xWatch').onclick = () => {
+  const b = $('xWatch');
+  if (b.classList.contains('locked')) {
+    if (++knocks < 10) { Audio.tone(220 + knocks * 30, { type: 'triangle', dur: 0.08, vol: 0.1 }); b.classList.remove('wiggle'); void b.offsetWidth; b.classList.add('wiggle'); return; }
+    b.classList.remove('locked', 'wiggle'); b.classList.add('unlocking'); Audio.unlock(); // our little secret
+    $('xWatchSub').textContent = '🤫 Shh… our little secret.';
+    setTimeout(() => watchStory(), 1100);
+    return;
+  }
+  Audio.click(); watchStory();
+};
+function watchStory() { Audio.init(); watch(true); story = true; startChapter(0, true); }
+// watching: the autopilot plays every chapter (and nothing it does is saved)
+function watch(on) {
+  auto.on = on || AUTOPLAY; auto.watching = on && !AUTOPLAY; auto.game = null; auto.gen = null; auto.idx = -1;
+  $('autoBadge').classList.toggle('hidden', !auto.on);
+}
 $('btnPauseMusic').onclick = () => { Audio.click(); openBox('pause'); };
 Audio.vol = save.musicVol ?? 1; // the music volume you chose, for when the sound starts up
 
@@ -308,6 +350,7 @@ document.querySelectorAll('.qbtn').forEach((b) => { b.textContent = qualityLabel
 addEventListener('keydown', (e) => {
   idleT = 0;
   if (!$('musicbox').classList.contains('hidden') && e.code !== 'KeyM') { if (e.code === 'Escape') closeBox(); return; } // in the music box: Escape leaves it, M still mutes
+  if (!$('nowPlaying').classList.contains('hidden') && e.code !== 'KeyM') { if (e.code === 'Escape' || e.code === 'Space' || e.code === 'Enter') listen(false); return; } // just listening: a key brings the controls back
   if (mode === 'demo') { e.preventDefault(); endDemo(e.code === 'Space' || e.code === 'Enter'); return; } // space starts the game; any other key, back to the title
   if (e.code === 'KeyM') { Audio.init(); const m = Audio.toggleMute(); hooks.toast(m ? '🔇 Sound off' : '🔊 Sound on'); }
   if (mode === 'cine' && (e.code === 'Enter' || e.code === 'Escape')) { skipCine(); return; }
