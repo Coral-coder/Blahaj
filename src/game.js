@@ -691,9 +691,9 @@ export class Game {
       }
     }
     updateHazard(this, dt);
-    if (this.drawerLock && this.drawerLock.open < 1) { // the floor's clear: out slide the drawers
+    if (this.drawerLock && (this.drawerLock.open < 1 || this.drawerLock.pending)) { // the floor's clear: out slide the drawers
       if (!this.drawerLock.opening && this.shadowsLeft() === 0) { this.drawerLock.opening = true; Audio.tone(180, { type: 'triangle', dur: 0.5, slide: 60, vol: 0.12 }); this.hooks.toast('The drawers slide open!', 'Climb them up to Leo'); }
-      if (this.drawerLock.opening) this.setDrawers(Math.min(1, this.drawerLock.open + dt / 1.1));
+      if (this.drawerLock.opening) this.setDrawers(Math.min(1, this.drawerLock.open + dt / 1.1)); // (keeps checking while a drawer waits for Blåhaj to move)
     }
     // stairs: rolling balls and a grumpy cat
     if (this.ballSpawner) {
@@ -763,8 +763,14 @@ export class Game {
     return false;
   }
   setDrawers(k) {
-    const L = this.drawerLock; L.open = k;
-    for (const d of L.solids) { const off = d.dir.clone().multiplyScalar(d.out * (k - 1)); d.s.min.copy(d.min0).add(off); d.s.max.copy(d.max0).add(off); d.s.active = k > 0.97; }
+    const L = this.drawerLock, P = this.p, r = CFG.radius; L.open = k; L.pending = false;
+    for (const d of L.solids) {
+      const off = d.dir.clone().multiplyScalar(d.out * (k - 1)); d.s.min.copy(d.min0).add(off); d.s.max.copy(d.max0).add(off);
+      // a drawer never turns solid around Blåhaj: if she's in its way it waits until she's moved
+      const s = d.s, inside = P && P.pos.x > s.min.x - r && P.pos.x < s.max.x + r && P.pos.z > s.min.z - r && P.pos.z < s.max.z + r && P.pos.y < s.max.y - 0.05 && P.pos.y + CFG.height > s.min.y;
+      if (k > 0.97 && !s.active && inside) { L.pending = true; continue; }
+      s.active = k > 0.97;
+    }
     if (L.vis) L.vis.userData.open = k;
   }
   // a little stream of golden sparks from one nightmare to the next, showing they're linked
@@ -831,13 +837,16 @@ export class Game {
     this.hooks.complete(this.result());
   }
   // completion for speedrunners: fish, starfish, nightmares poofed (not the Queen's little helpers) and keys/bulbs, as a %
-  completion() {
+  // each kind on its own, as [got, out of]
+  breakdown() {
     const nm = this.enemies.filter((e) => !e.minion), F = this.features, col = F && F.collect;
-    const got = this.stats.fish + this.runStars.filter(Boolean).length + nm.filter((e) => !e.alive).length + (col ? F.got : 0);
-    const tot = this.fish.length + this.stars.length + nm.length + (col ? F.items.length : 0);
+    return { fish: [this.stats.fish, this.fish.length], stars: [this.runStars.filter(Boolean).length, this.stars.length], nightmares: [nm.filter((e) => !e.alive).length, nm.length], finds: col ? [F.got, F.items.length] : null };
+  }
+  completion() {
+    const b = Object.values(this.breakdown()).filter(Boolean), got = b.reduce((a, x) => a + x[0], 0), tot = b.reduce((a, x) => a + x[1], 0);
     return tot ? Math.round((got / tot) * 100) : 100;
   }
-  result() { return { pct: this.completion(), time: this.stats.time, fish: this.stats.fish, fishTotal: this.ch.fish.length, nightmares: this.stats.nightmares, scares: this.stats.scares, stars: this.runStars.slice(), comfort: this.comfort }; }
+  result() { return { pct: this.completion(), parts: this.breakdown(), time: this.stats.time, fish: this.stats.fish, fishTotal: this.ch.fish.length, nightmares: this.stats.nightmares, scares: this.stats.scares, stars: this.runStars.slice(), comfort: this.comfort }; }
 
   // ---------------------------------------------------------------- visuals --
   visuals(dt) {
