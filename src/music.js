@@ -107,7 +107,18 @@ const CELLS = {
 // key: tonic (semitones from C), mode, meter, tempo, who sings the tune, the
 // accompaniment colour, a little of the room in time with it, and how goofy
 const THEMES = { // leads: ocarina, horn, piano, synth (a soft dreamy lead), flute, marimba, musicbox...
-  edge:      { key: 0, mode: 'major', meter: '4/4', bpm: 96, lead: 'ocarina', color: 'musicbox', amb: 'bubbles', goof: 0.6 },
+  // the main theme, written by hand: a horn-call opening (sol - do - mi) that climbs, answered, then home
+  edge:      { key: 0, mode: 'major', meter: '4/4', bpm: 96, lead: 'ocarina', color: 'musicbox', amb: 'bubbles', goof: 0.6, tune: {
+    ant: [['I'], ['IV'], ['I'], ['V']], cons: [['I'], ['IV'], ['ii', 'V7'], ['I']],
+    antMel: [[0, 6, 4], [6, 2, 7], [8, 4, 9], [12, 2, 8], [14, 2, 7], //   G.  C | E  D C   (I)
+      [16, 6, 5], [22, 2, 7], [24, 4, 10], [28, 2, 9], [30, 2, 8], //      A.  C | F  E D   (IV)
+      [32, 6, 9], [38, 2, 10], [40, 4, 11], [44, 2, 10], [46, 2, 9], //    E.  F | G  F E   (I)
+      [48, 12, 8], [60, 4, 6]], //                                          D . . .  B         (V: half cadence)
+    consMel: [[0, 6, 4], [6, 2, 7], [8, 4, 9], [12, 2, 8], [14, 2, 7],
+      [16, 6, 5], [22, 2, 7], [24, 4, 10], [28, 2, 9], [30, 2, 8],
+      [32, 4, 10], [36, 4, 12], [40, 4, 11], [44, 2, 10], [46, 2, 8], //   F  A | G  F D    (ii - V7)
+      [48, 16, 7]], //                                                      C . . .            (I: home)
+  } },
   downstairs:{ key: -3, mode: 'major', meter: '4/4', bpm: 100, lead: 'piano', color: 'rhodes', amb: 'fire', goof: 0.8 },
   kitchen:   { key: 2, mode: 'major', meter: '4/4', bpm: 112, lead: 'marimba', color: 'pizz', amb: 'drips', goof: 1.1 },
   laundry:   { key: -2, mode: 'major', meter: '6/8', bpm: 72, lead: 'synth', color: 'glock', amb: 'churn', goof: 1 },
@@ -209,60 +220,96 @@ export function createMusic(ctx, out) {
   // --- composing the song -----------------------------------------------------------------
   // a melody for one phrase (4 bars) over its chords: rhythm from cells, pitches by
   // chord tones on strong beats, steps between them, arching to the cadence note
-  function composePhrase(chords, rhythm, cadenceNote, r, start, peak) {
+  // A one-bar motif as a contour in scale steps. 'call': a leap up off the first note (a 3rd to
+  // a 5th), then mostly steps back down, the shape of a call. 'answer': mostly falling steps.
+  function makeContour(cell, r, kind) {
+    const n = cell.filter(Boolean).length, c = [0];
+    for (let i = 1; i < n; i++) {
+      if (kind === 'call') c.push(i === 1 ? 2 + Math.floor(r() * 3) : c[i - 1] + (i === n - 1 ? -1 : r() < 0.72 ? -1 : 1));
+      else c.push(c[i - 1] + (r() < 0.78 ? -1 : 1) * (i === 1 && r() < 0.35 ? 2 : 1));
+    }
+    return c;
+  }
+  // the chord tone (as a scale degree, any octave) nearest to d
+  function chordToneNear(d, chord) {
+    let best = d, bd = 1e9;
+    for (const c of chordDegs(chord)) for (const o of [-14, -7, 0, 7, 14]) { const x = c + o, dd = Math.abs(x - d); if (dd < bd) { bd = dd; best = x; } }
+    return best;
+  }
+  // A phrase the way a songwriter builds one: the motif, an answer, the motif again a step or
+  // two higher (a sequence) - or, in a consequent, a line driving down to the cadence - then
+  // the cadence bar. Strong beats snap to chord tones, so the motif bends to the harmony.
+  function composePhrase(chords, rhythm, cadenceNote, r, start, motif, answer, drive = null) {
     const bs = barSteps(), M = S.meter, notes = [];
+    const chordAt = (b, st) => { const bar = chords[b]; return bar.length > 1 && st >= bs / 2 ? bar[1] : bar[0]; };
+    const strongAt = (st) => M.strong.includes(st) || M.medium.includes(st);
+    const lift = 1 + Math.floor(r() * 2);
     let last = start;
     for (let b = 0; b < 4; b++) {
-      const cell = rhythm[b], bar = chords[b];
-      const onsets = []; for (let i = 0; i < bs; i++) if (cell[i]) onsets.push(i);
+      const cell = rhythm[b], onsets = []; for (let i = 0; i < bs; i++) if (cell[i]) onsets.push(i);
+      let contour, base;
+      if (b === 0) { contour = motif; base = chordToneNear(start, chordAt(0, 0)); }
+      else if (b === 1) { contour = answer; base = last + (r() < 0.5 ? 1 : 0); }
+      else if (b === 2 && drive) { contour = drive; base = last + 2; }
+      else if (b === 2) { contour = motif; base = chordToneNear(start + lift, chordAt(2, 0)); }
       onsets.forEach((st, k) => {
-        const chordAt = bar.length > 1 && st >= bs / 2 ? bar[1] : bar[0];
-        const prog = (b * bs + st) / (4 * bs); // where we are in the phrase, 0..1
-        const target = prog < 0.55 ? start + (peak - start) * (prog / 0.55) : peak + (cadenceNote - peak) * ((prog - 0.55) / 0.45);
-        const strong = M.strong.includes(st) || M.medium.includes(st);
+        const ch = chordAt(b, st), strong = strongAt(st);
         let d;
-        if (b === 3 && k === 0) d = cadenceNote; // land the cadence
-        else if (strong) { // nearest chord tone to where the arch wants us, not too far from the last note
-          const cands = []; for (const c of chordDegs(chordAt)) for (const o of [-7, 0, 7, 14]) cands.push(c + o);
-          d = cands.reduce((a, c) => (Math.abs(c - target) + Math.abs(c - last) * 0.5 < Math.abs(a - target) + Math.abs(a - last) * 0.5 ? c : a), cands[0]);
-        } else d = last + (target > last + 0.5 ? 1 : target < last - 0.5 ? -1 : r() < 0.5 ? 1 : -1); // passing / neighbour step
-        if (b === 3 && k === 1) d = cadenceNote; // a cadence bar's second note stays home
-        // how long it rings: until the next onset (or the end of the bar)
-        const nextSt = onsets[k + 1] ?? bs;
-        notes.push({ step: b * bs + st, len: nextSt - st, deg: d, chord: chordAt, strong });
+        if (b === 3) d = k <= 1 ? cadenceNote : cadenceNote + (k % 2 ? 2 : 0); // land and stay home
+        else { d = base + (contour[k] ?? contour[contour.length - 1] - (k - contour.length + 1)); if (strong) d = chordToneNear(d, ch); }
+        while (d > 14) d -= 7; while (d < 3) d += 7; // keep it singable (F4 .. C6)
+        notes.push({ step: b * bs + st, len: (onsets[k + 1] ?? bs) - st, deg: d, chord: ch, strong });
         last = d;
       });
+    }
+    // smoothing: no leap wider than a sixth, and never the same note three times running
+    for (let i = 1; i < notes.length; i++) {
+      const n = notes[i], p = notes[i - 1].deg; if (n.step >= 3 * bs) break;
+      while (n.deg - p > 5) n.deg -= 7; while (p - n.deg > 5) n.deg += 7;
+      if (i >= 2 && n.deg === p && notes[i - 2].deg === p) {
+        const nx = notes[i + 1], dir = nx && nx.deg < p ? -1 : 1;
+        n.deg = n.strong ? chordToneNear(p + dir * 2, n.chord) : p + dir;
+        if (n.deg === p) n.deg = p + dir;
+      }
     }
     // the note before the cadence steps into it: from the leading tone below (rising home) or from above
     const pre = notes.filter((n) => n.step < 3 * bs).pop();
     if (pre) pre.deg = cadenceNote + (cadenceNote % 7 === 0 && r() < 0.5 ? -1 : 1);
     return notes;
   }
-  // approach the cadence by step: 2 or 7 before 1
+  // a hand-written tune: [step in the phrase, length in steps, scale degree (7 = the tonic an octave up)]
+  function fromTune(list, chords) {
+    const bs = barSteps(), M = S.meter;
+    return list.map(([step, len, deg]) => { const b = Math.floor(step / bs), st = step % bs, bar = chords[b]; return { step, len, deg, chord: bar.length > 1 && st >= bs / 2 ? bar[1] : bar[0], strong: M.strong.includes(st) || M.medium.includes(st) }; });
+  }
   function compose(id) {
     const r = mkRng(hashStr(id) * 7 + S.loop * 101);
     const rTheme = mkRng(hashStr(id)); // the A tune is the theme's own: the same every time
-    const C = S.cells;
-    const ant = pickOf(ANTECEDENT, rTheme), cons = pickOf(CONSEQUENT, rTheme);
-    const cellA = pickOf(C.a, rTheme), cellB = pickOf(C.b, rTheme), cad = pickOf(C.cad, rTheme), cad2 = pickOf(C.cad, rTheme);
-    const start = 7 + Math.floor(rTheme() * 3) * 2; // start on 1, 3 or 5 (an octave up)
-    const peak = start + 3 + Math.floor(rTheme() * 3);
-    const hcNote = rTheme() < 0.5 ? 8 : 4 + 7; // half cadence: scale degree 2 or 5
-    const antMel = composePhrase(ant, [cellA, cellB, cellA, cad], hcNote, rTheme, start, peak);
-    // the consequent starts like the antecedent (a parallel period), then heads home to 1
-    const consMel = composePhrase(cons, [cellA, cellB, pickOf(C.a, rTheme), cad2], 7, rTheme, start, peak - 1);
-    for (let i = 0; i < antMel.length && antMel[i].step < barSteps() * 2; i++) if (consMel[i] && consMel[i].step === antMel[i].step) consMel[i].deg = antMel[i].deg;
-    // the bridge: new chords, smoother rhythm, a different register
-    const br = pickOf(BRIDGE, r), sm = C.smooth;
-    const bA = composePhrase(br.slice(0, 4), [pickOf(sm, r), pickOf(sm, r), pickOf(sm, r), pickOf(sm, r)], 9 + (r() < 0.5 ? 0 : 2), r, start + 2, peak + 1);
-    const bB = composePhrase(br.slice(4), [pickOf(sm, r), pickOf(C.b, r), pickOf(sm, r), cad], 8, r, start + 2, peak);
+    const C = S.cells, T = S.th.tune;
+    let ant, cons, antMel, consMel;
+    if (T) { // a theme with its own hand-written tune
+      ant = T.ant; cons = T.cons; antMel = fromTune(T.antMel, ant); consMel = fromTune(T.consMel, cons);
+    } else {
+      ant = pickOf(ANTECEDENT, rTheme); cons = pickOf(CONSEQUENT, rTheme);
+      const cellA = pickOf(C.a, rTheme), cellB = pickOf(C.b, rTheme), cellC = pickOf(C.b, rTheme), cad = pickOf(C.cad, rTheme), cad2 = pickOf(C.cad, rTheme);
+      const motif = makeContour(cellA, rTheme, 'call'), answer = makeContour(cellB, rTheme, 'answer'), drive = makeContour(cellC, rTheme, 'answer');
+      const start = rTheme() < 0.5 ? 4 : 7; // start on 5 below the tonic, or on the tonic
+      const hcNote = rTheme() < 0.5 ? 8 : 4 + 7; // half cadence: scale degree 2 or 5
+      antMel = composePhrase(ant, [cellA, cellB, cellA, cad], hcNote, rTheme, start, motif, answer);
+      // the consequent starts the same (a parallel period), then drives home to 1
+      consMel = composePhrase(cons, [cellA, cellB, cellC, cad2], 7, mkRng(hashStr(id) + 3), start, motif, answer, drive);
+    }
+    // the bridge: new chords, its own smoother motif, a step higher
+    const br = pickOf(BRIDGE, r), sm = C.smooth, bm = pickOf(sm, r), bn = pickOf(sm, r);
+    const bMotif = makeContour(bm, r, 'call'), bAnswer = makeContour(bn, r, 'answer');
+    const bA = composePhrase(br.slice(0, 4), [bm, bn, bm, pickOf(sm, r)], 9 + (r() < 0.5 ? 0 : 2), r, 9, bMotif, bAnswer);
+    const bB = composePhrase(br.slice(4), [bm, bn, bm, pickOf(C.cad, r)], 8, r, 9, bMotif, bAnswer);
     const section = (name, chords, mel, cadence) => ({ name, chords, mel, cadence });
-    const ornament = (mel) => mel.map((n) => n); // A' is the same tune; ornaments are added live (see play())
     return [
       section('A', ant, antMel, 'HC'), section('A', cons, consMel, 'PAC'),
-      section("A'", ant, ornament(antMel), 'HC'), section("A'", cons, ornament(consMel), 'PAC'),
+      section("A'", ant, antMel, 'HC'), section("A'", cons, consMel, 'PAC'), // (A' adds grace notes live)
       section('B', br.slice(0, 4), bA, '—'), section('B', br.slice(4), bB, 'HC'),
-      section('A', ant, antMel, 'HC'), section('A', cons, consMel, S.loop % 2 ? 'PAC' : 'PAC'),
+      section('A', ant, antMel, 'HC'), section('A', cons, consMel, 'PAC'),
     ];
   }
 
@@ -518,6 +565,7 @@ export function createMusic(ctx, out) {
     setTempo(m) { S.pendingTempo = Math.max(0.5, Math.min(1.6, m)); }, // applied at the next phrase, so the groove never stumbles
     setLayers(n) { S.manualStage = n; if (n !== null) S.pendingStage = Math.max(0, Math.min(5, Math.round(n))); },
     setDream(d) { S.dream = d; const t = ctx.currentTime; water.frequency.setTargetAtTime(1300 + d * 1500 + S.energy * 1000, t, 0.6); swayAmt.gain.setTargetAtTime(160 + d * 240, t, 0.6); },
+    debugSong() { return S.song; }, // the composed song (for the tools)
     info() { return S.info; }, // where the song is: section, bar, beat, chord (and its roman numeral), cadence, key
     renderUntil(T, theme = 'edge', progressAt = null, intensityAt = null) {
       this.start(theme); this.stop();
