@@ -14,7 +14,7 @@ import { createMusicBox } from './musicbox.js';
 const $ = (id) => document.getElementById(id);
 // The self-playing build (branch claude/blahaj-autoplay) flips this on: Begin
 // then tells the whole story with Blåhaj playing herself.
-const AUTOPLAY = false;
+const AUTOPLAY = true;
 const SAVE_KEY = 'blahaj-big-adventure-v1';
 const TOUCH = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 const ABILITIES = {
