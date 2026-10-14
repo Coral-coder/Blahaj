@@ -1,0 +1,34 @@
+# Keeps GitHub Pages in step with the game: every push to the Big Adventure branch
+# copies the built game (index.html, dist/game.js and the icons) onto gh-pages.
+name: GitHub Pages
+on:
+  push:
+    branches: [claude/blahaj-big-adventure]
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: pages
+  cancel-in-progress: true
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Gather the site
+        run: |
+          mkdir -p site/dist
+          cp index.html favicon.ico favicon.svg apple-touch-icon.png apple-touch-icon-precomposed.png icon-192.png icon-512.png site/
+          cp dist/game.js site/dist/
+          touch site/.nojekyll
+      - name: Push to gh-pages
+        run: |
+          git fetch origin gh-pages
+          git worktree add pages origin/gh-pages
+          cd pages
+          git rm -rq --ignore-unmatch .
+          cp -r ../site/. .
+          git add -A
+          if git diff --cached --quiet; then echo "Nothing changed"; exit 0; fi
+          git -c user.name="github-actions[bot]" -c user.email="41898099+github-actions[bot]@users.noreply.github.com" commit -qm "Pages: ${GITHUB_SHA::7}"
+          git push origin HEAD:gh-pages
